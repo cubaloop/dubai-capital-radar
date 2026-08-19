@@ -10,8 +10,8 @@ RUN npm run build
 FROM python:3.11-slim
 WORKDIR /app
 
-# Install Node.js & curl
-RUN apt-get update && apt-get install -y curl gnupg \
+# Install Node.js, git & build essentials
+RUN apt-get update && apt-get install -y git curl gnupg ca-certificates build-essential \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
