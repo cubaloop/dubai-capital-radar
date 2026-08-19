@@ -13,7 +13,8 @@ import {
   Layers, 
   Sparkles,
   Award,
-  ChevronRight
+  ChevronRight,
+  PhoneCall
 } from 'lucide-react';
 import { DossierResponse } from '../types';
 import { apiService } from '../services/api';
@@ -328,7 +329,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ slugOrId, onBack }) =>
           Coordina una sesión confidencial de 15 minutos con nuestro equipo en DIFC para revisar la asignación de unidades y la tramitación directa de tu Golden Visa.
         </p>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 flex-wrap">
           <a
             href={dossier.calendly_link}
             target="_blank"
@@ -345,6 +346,13 @@ export const DossierView: React.FC<DossierViewProps> = ({ slugOrId, onBack }) =>
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-emerald-400 font-semibold px-6 py-3.5 rounded-xl border border-emerald-600/40 transition-all text-sm"
           >
             <MessageSquare className="w-4 h-4" /> Contactar por WhatsApp VIP
+          </a>
+
+          <a
+            href="tel:+971501378020"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-gold-400 font-semibold px-6 py-3.5 rounded-xl border border-gold-500/40 transition-all text-sm"
+          >
+            <PhoneCall className="w-4 h-4" /> Llamar Directo (+971 50 137 8020)
           </a>
         </div>
       </div>
