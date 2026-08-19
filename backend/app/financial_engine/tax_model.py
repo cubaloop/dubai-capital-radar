@@ -129,3 +129,16 @@ def calculate_tax_arbitrage(
         recommended_investment_aed=round(recommended_investment_aed, 2),
         recommended_investment_usd=round(recommended_investment_usd, 2)
     )
+
+def detect_currency_for_country(country_name: str) -> str:
+    """
+    Detects regional currency code. Falls back to USD if unidentified.
+    """
+    country_clean = country_name.strip().lower()
+    if any(c in country_clean for c in ["united kingdom", "uk", "britain", "england", "london"]):
+        return "GBP"
+    if any(c in country_clean for c in ["spain", "france", "germany", "italy", "portugal", "netherlands", "belgium", "austria", "europe"]):
+        return "EUR"
+    if any(c in country_clean for c in ["uae", "united arab emirates", "dubai", "abu dhabi"]):
+        return "AED"
+    return "USD"
