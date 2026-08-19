@@ -6,6 +6,7 @@ SAMPLE_PROSPECT_DATABASE = [
     {
         "name": "Alexander Wright",
         "email": "a.wright@solisfinance.co.uk",
+        "phone": "+447700900123",
         "role_title": "Founder & Ex-Managing Director",
         "company_name": "Solis Payments UK",
         "country": "United Kingdom",
@@ -18,6 +19,7 @@ SAMPLE_PROSPECT_DATABASE = [
     {
         "name": "Dr. Mateo Fernández",
         "email": "m.fernandez@biogenix-madrid.es",
+        "phone": "+34612345678",
         "role_title": "CEO & Principal Shareholder",
         "company_name": "BioGenix Therapeutics",
         "country": "Spain",
@@ -30,6 +32,7 @@ SAMPLE_PROSPECT_DATABASE = [
     {
         "name": "Julian Vance",
         "email": "jvance@hyperion-node.io",
+        "phone": "+14155552671",
         "role_title": "Core Contributor & Protocol Angel",
         "company_name": "Hyperion Web3 Labs",
         "country": "Canada",
@@ -42,6 +45,7 @@ SAMPLE_PROSPECT_DATABASE = [
     {
         "name": "Laurent Dubreuil",
         "email": "laurent.d@elysee-logistics.fr",
+        "phone": "+33612345678",
         "role_title": "Managing Partner",
         "company_name": "Élysée Supply Chain",
         "country": "France",
@@ -56,10 +60,7 @@ SAMPLE_PROSPECT_DATABASE = [
 def enrich_signal_to_prospect(signal: LiquiditySignal) -> ProspectProfile:
     """
     Enriches an incoming liquidity signal into an actionable High-Net-Worth prospect profile.
-    Connects to live API providers (Apollo, Proxycurl, Hunter) when keys are available,
-    and falls back to deterministic institutional data modeling.
     """
-    # Deterministic matching or synthetic enrichment
     name = f"{signal.entity_name} Principal"
     country = signal.source_country
     role = signal.target_prospect_role or "Founder & Managing Director"
@@ -70,11 +71,13 @@ def enrich_signal_to_prospect(signal: LiquiditySignal) -> ProspectProfile:
     
     clean_company = company.lower().replace(" ", "").replace(".", "")
     email = f"leadership@{clean_company}.com"
+    phone = f"+97150{uuid.uuid4().int % 9000000 + 1000000}"
 
     return ProspectProfile(
         id=f"prosp-{uuid.uuid4().hex[:8]}",
         name=name,
         email=email,
+        phone=phone,
         role_title=role,
         company_name=company,
         country=country,
@@ -94,6 +97,7 @@ def get_preset_prospects() -> list[ProspectProfile]:
             id=f"prosp-{uuid.uuid4().hex[:8]}",
             name=item["name"],
             email=item["email"],
+            phone=item["phone"],
             role_title=item["role_title"],
             company_name=item["company_name"],
             country=item["country"],

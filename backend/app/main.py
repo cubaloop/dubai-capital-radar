@@ -36,10 +36,56 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import asyncio
+import httpx
+
 # In-Memory State for fast prototyping and live demo
 PROSPECTS_STORE: Dict[str, ProspectProfile] = {}
 DOSSIERS_STORE: Dict[str, DossierResponse] = {}
 AUTOPILOT_ENABLED: bool = False
+AUTOPILOT_DISPATCH_COUNT: int = 0
+
+WHATSAPP_GATEWAY_URL = os.getenv("WHATSAPP_GATEWAY_URL", "http://localhost:3001")
+
+async def dispatch_whatsapp_direct(to_phone: str, message: str):
+    """Asynchronously calls the WhatsApp Web Gateway to deliver message."""
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            res = await client.post(f"{WHATSAPP_GATEWAY_URL}/send", json={"to": to_phone, "message": message})
+            return res.json()
+    except Exception as e:
+        return {"success": False, "error": str(e), "simulated": True}
+
+async def autopilot_daemon():
+    """Continuous background worker that scans and auto-delivers without human intervention."""
+    global AUTOPILOT_ENABLED, AUTOPILOT_DISPATCH_COUNT
+    while True:
+        try:
+            if AUTOPILOT_ENABLED:
+                new_sig = radar_engine.trigger_live_scan()
+                prospect = enrich_signal_to_prospect(new_sig)
+                PROSPECTS_STORE[prospect.id] = prospect
+
+                # Auto-generate AI Dossier with Gemini
+                dossier = build_dossier(prospect)
+                DOSSIERS_STORE[dossier.slug] = dossier
+                DOSSIERS_STORE[dossier.dossier_id] = dossier
+
+                # Create multi-channel campaign
+                campaign = create_outreach_campaign(prospect, dossier)
+                prospect.status = "contacted"
+                AUTOPILOT_DISPATCH_COUNT += 1
+
+                # Send real WhatsApp message automatically to prospect phone
+                if prospect.phone and campaign.whatsapp_message:
+                    await dispatch_whatsapp_direct(prospect.phone, campaign.whatsapp_message)
+                    print(f"⚡ [AUTOPILOT] Automatically dispatched WhatsApp message to {prospect.name} ({prospect.phone})")
+
+        except Exception as err:
+            print(f"⚠️ [AUTOPILOT DAEMON ERROR]: {err}")
+
+        # Wait 45 seconds before next automated cycle
+        await asyncio.sleep(45)
 
 @app.on_event("startup")
 async def startup_seed():
@@ -54,6 +100,9 @@ async def startup_seed():
         # Pre-seed sample campaign
         create_outreach_campaign(p, dos)
 
+    # Start the continuous Autopilot background daemon
+    asyncio.create_task(autopilot_daemon())
+
 @app.get("/api/health")
 def health_check():
     return {
@@ -63,15 +112,19 @@ def health_check():
         "cached_signals": len(radar_engine.get_latest_signals()),
         "active_prospects": len(PROSPECTS_STORE),
         "dossiers_generated": len(DOSSIERS_STORE) // 2,
-        "autopilot_enabled": AUTOPILOT_ENABLED
+        "autopilot_enabled": AUTOPILOT_ENABLED,
+        "autopilot_dispatches": AUTOPILOT_DISPATCH_COUNT
     }
 
 # --- AUTOPILOT ENDPOINTS ---
 
 @app.get("/api/autopilot/status")
 def get_autopilot_status():
-    global AUTOPILOT_ENABLED
-    return {"autopilot_enabled": AUTOPILOT_ENABLED}
+    global AUTOPILOT_ENABLED, AUTOPILOT_DISPATCH_COUNT
+    return {
+        "autopilot_enabled": AUTOPILOT_ENABLED,
+        "dispatches_count": AUTOPILOT_DISPATCH_COUNT
+    }
 
 @app.post("/api/autopilot/toggle")
 def toggle_autopilot():
@@ -79,7 +132,7 @@ def toggle_autopilot():
     AUTOPILOT_ENABLED = not AUTOPILOT_ENABLED
     return {
         "autopilot_enabled": AUTOPILOT_ENABLED,
-        "message": f"Autopilot is now {'ENABLED (Auto-Detect, Auto-Dossier & Auto-Dispatch)' if AUTOPILOT_ENABLED else 'DISABLED (Supervised Mode)'}"
+        "message": f"Autopilot is now {'ENABLED (Auto-Detect, Auto-Dossier & Auto-WhatsApp Dispatch Active)' if AUTOPILOT_ENABLED else 'DISABLED (Supervised Mode)'}"
     }
 
 # --- RADAR & SIGNALS ENDPOINTS ---
@@ -89,8 +142,8 @@ def get_signals():
     return radar_engine.get_latest_signals()
 
 @app.post("/api/radar/scan", response_model=LiquiditySignal)
-def trigger_radar_scan():
-    global AUTOPILOT_ENABLED
+async def trigger_radar_scan():
+    global AUTOPILOT_ENABLED, AUTOPILOT_DISPATCH_COUNT
     new_sig = radar_engine.trigger_live_scan()
     # Auto enrich into a prospect
     prospect = enrich_signal_to_prospect(new_sig)
@@ -101,8 +154,11 @@ def trigger_radar_scan():
         dossier = build_dossier(prospect)
         DOSSIERS_STORE[dossier.slug] = dossier
         DOSSIERS_STORE[dossier.dossier_id] = dossier
-        create_outreach_campaign(prospect, dossier)
+        campaign = create_outreach_campaign(prospect, dossier)
         prospect.status = "contacted"
+        AUTOPILOT_DISPATCH_COUNT += 1
+        if prospect.phone and campaign.whatsapp_message:
+            await dispatch_whatsapp_direct(prospect.phone, campaign.whatsapp_message)
 
     return new_sig
 
@@ -204,7 +260,7 @@ def list_campaigns():
     return get_all_campaigns()
 
 @app.post("/api/campaigns/launch/{prospect_id}", response_model=OutreachCampaign)
-def launch_campaign_for_prospect(prospect_id: str):
+async def launch_campaign_for_prospect(prospect_id: str):
     prospect = PROSPECTS_STORE.get(prospect_id)
     if not prospect:
         raise HTTPException(status_code=404, detail="Prospect not found")
@@ -218,6 +274,11 @@ def launch_campaign_for_prospect(prospect_id: str):
 
     campaign = create_outreach_campaign(prospect, dossier)
     prospect.status = "contacted"
+
+    # Automatically dispatch to WhatsApp
+    if prospect.phone and campaign.whatsapp_message:
+        await dispatch_whatsapp_direct(prospect.phone, campaign.whatsapp_message)
+
     return campaign
 
 @app.post("/api/triage/classify", response_model=TriageResponse)

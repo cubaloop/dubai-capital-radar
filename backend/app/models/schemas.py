@@ -30,6 +30,7 @@ class ProspectProfile(BaseModel):
     role_title: str
     company_name: str
     country: str
+    phone: Optional[str] = None
     linkedin_url: Optional[str] = None
     estimated_net_worth_usd: float
     liquidity_event: str
