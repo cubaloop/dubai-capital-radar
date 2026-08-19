@@ -41,6 +41,7 @@ export function App() {
           <RadarDashboard 
             onOpenDossier={handleOpenDossier}
             onOpenCampaigns={handleOpenCampaigns}
+            onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
           />
         )}
 

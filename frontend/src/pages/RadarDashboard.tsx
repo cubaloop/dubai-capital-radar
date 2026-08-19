@@ -12,7 +12,9 @@ import {
   CheckCircle2, 
   RefreshCw,
   ExternalLink,
-  Flame
+  Flame,
+  Smartphone,
+  QrCode
 } from 'lucide-react';
 import { LiquiditySignal, ProspectProfile } from '../types';
 import { apiService } from '../services/api';
@@ -20,11 +22,13 @@ import { apiService } from '../services/api';
 interface RadarDashboardProps {
   onOpenDossier: (slug: string) => void;
   onOpenCampaigns: () => void;
+  onOpenWhatsAppModal: () => void;
 }
 
 export const RadarDashboard: React.FC<RadarDashboardProps> = ({
   onOpenDossier,
-  onOpenCampaigns
+  onOpenCampaigns,
+  onOpenWhatsAppModal
 }) => {
   const [signals, setSignals] = useState<LiquiditySignal[]>([]);
   const [prospects, setProspects] = useState<ProspectProfile[]>([]);
@@ -140,7 +144,16 @@ export const RadarDashboard: React.FC<RadarDashboardProps> = ({
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-wrap">
+            {/* WhatsApp QR Connector Button */}
+            <button
+              onClick={onOpenWhatsAppModal}
+              className="flex items-center justify-center gap-2 bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-500 text-emerald-300 font-bold px-4 py-3 rounded-xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95 text-xs font-mono"
+            >
+              <QrCode className="w-4 h-4 text-emerald-400" />
+              <span>Conectar WhatsApp (QR)</span>
+            </button>
+
             {/* Autopilot Switch */}
             <button
               onClick={handleToggleAutopilot}
