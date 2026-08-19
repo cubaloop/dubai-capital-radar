@@ -88,6 +88,26 @@ async def autopilot_daemon():
         # Run automatically every 60 seconds (1 minute interval)
         await asyncio.sleep(60)
 
+PUBLIC_APP_URL = os.getenv("PUBLIC_APP_URL", "https://dubai-capital-radar.onrender.com")
+
+async def keep_alive_pulse_daemon():
+    """
+    Continuous keep-alive pinger running every 8 minutes (480s) 
+    to guarantee Render containers never enter sleep/spin-down mode.
+    """
+    await asyncio.sleep(60)  # Initial wait after cold start
+    while True:
+        try:
+            target_url = f"{PUBLIC_APP_URL}/api/health"
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.get(target_url, headers={"User-Agent": "Dubai-Capital-Radar-Pulse/1.0 (Keep-Alive)"})
+                print(f"💓 [KEEP-ALIVE PULSE] Heartbeat delivered to {target_url} -> Status: {res.status_code} (100% Uptime Active)")
+        except Exception as err:
+            print(f"⚠️ [KEEP-ALIVE PULSE WARNING]: {err}")
+        
+        # Ping every 8 minutes (Render sleeps at 15 minutes of inactivity)
+        await asyncio.sleep(480)
+
 @app.on_event("startup")
 async def startup_seed():
     # Seed preset high-conviction prospects
@@ -101,8 +121,11 @@ async def startup_seed():
         # Pre-seed sample campaign
         create_outreach_campaign(p, dos)
 
-    # Start the continuous Autopilot background daemon
+    # Start the continuous Autopilot background daemon (1 minute interval)
     asyncio.create_task(autopilot_daemon())
+
+    # Start the continuous Keep-Alive pulse daemon (8 minute interval)
+    asyncio.create_task(keep_alive_pulse_daemon())
 
 @app.get("/api/health")
 def health_check():
