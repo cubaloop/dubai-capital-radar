@@ -33,11 +33,15 @@ export const OffPlanMatcher: React.FC = () => {
     fetchProjects();
   }, []);
 
+  const [cryptoOnly, setCryptoOnly] = useState<boolean>(false);
+
   const developers = ['all', ...Array.from(new Set(projects.map(p => p.developer)))];
 
-  const filteredProjects = filterDeveloper === 'all' 
-    ? projects 
-    : projects.filter(p => p.developer === filterDeveloper);
+  const filteredProjects = projects.filter(p => {
+    if (cryptoOnly && !p.crypto_accepted) return false;
+    if (filterDeveloper !== 'all' && p.developer !== filterDeveloper) return false;
+    return true;
+  });
 
   return (
     <div className="space-y-8 pb-12">
@@ -47,12 +51,23 @@ export const OffPlanMatcher: React.FC = () => {
             Catálogo Off-Plan & Matcher de Dubái
           </h1>
           <p className="text-sm text-slate-300 mt-1 max-w-2xl">
-            Proyectos de primer nivel protegidos bajo cuenta de custodia oficial de la Dubai Land Department (DLD) con asignación de Golden Visa de 10 años.
+            Proyectos de primer nivel protegidos bajo cuenta de custodia oficial de la Dubai Land Department (DLD) con asignación de Golden Visa de 10 años y rieles de liquidación cripto (USDT/BTC/ETH).
           </p>
         </div>
 
-        {/* Developer filter pills */}
-        <div className="flex flex-wrap gap-2">
+        {/* Developer and Crypto filter pills */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setCryptoOnly(!cryptoOnly)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+              cryptoOnly
+                ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/25 border border-purple-400'
+                : 'bg-purple-950/60 text-purple-300 border border-purple-800/60 hover:bg-purple-900/60'
+            }`}
+          >
+            <span>🪙 {cryptoOnly ? 'Mostrando Solo Cripto' : 'Filtrar Cripto-Friendly'}</span>
+          </button>
+
           {developers.map(dev => (
             <button
               key={dev}
@@ -63,7 +78,7 @@ export const OffPlanMatcher: React.FC = () => {
                   : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
               }`}
             >
-              {dev === 'all' ? 'Todos los Desarrolladores' : dev}
+              {dev === 'all' ? 'Todos' : dev}
             </button>
           ))}
         </div>
@@ -85,8 +100,16 @@ export const OffPlanMatcher: React.FC = () => {
                 <div className="absolute top-4 left-4 bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-gold-300 border border-gold-500/30">
                   {proj.developer}
                 </div>
-                <div className="absolute top-4 right-4 bg-emerald-950/80 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-emerald-300 border border-emerald-800/60 flex items-center gap-1">
-                  <Award className="w-3.5 h-3.5" /> 10-Yr Golden Visa
+                
+                <div className="absolute top-4 right-4 flex items-center gap-2">
+                  {proj.crypto_accepted && (
+                    <div className="bg-purple-950/90 backdrop-blur-md px-2.5 py-1 rounded-full text-[11px] font-bold text-purple-300 border border-purple-500/50 shadow-md">
+                      🪙 {proj.supported_cryptos?.join(', ') || 'USDT, BTC'}
+                    </div>
+                  )}
+                  <div className="bg-emerald-950/80 backdrop-blur-md px-2.5 py-1 rounded-full text-xs font-bold text-emerald-300 border border-emerald-800/60 flex items-center gap-1">
+                    <Award className="w-3.5 h-3.5" /> 10-Yr Visa
+                  </div>
                 </div>
 
                 <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">

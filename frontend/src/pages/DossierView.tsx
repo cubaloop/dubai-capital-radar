@@ -514,6 +514,12 @@ export const DossierView: React.FC<DossierViewProps> = ({ slugOrId, onBack }) =>
                 <div className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold text-gold-300 border border-gold-500/30">
                   {proj.developer}
                 </div>
+                {proj.crypto_accepted && (
+                  <div className="absolute top-3 right-3 bg-purple-950/80 backdrop-blur-md px-2.5 py-1 rounded-full text-[11px] font-bold text-purple-300 border border-purple-600/50 flex items-center gap-1 shadow-lg">
+                    <span>🪙 Crypto Escrow:</span>
+                    <span className="font-mono">{proj.supported_cryptos?.join(', ') || 'USDT, BTC, ETH'}</span>
+                  </div>
+                )}
                 <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end">
                   <div>
                     <h3 className="text-lg font-bold text-white font-serif-luxury">{proj.name}</h3>

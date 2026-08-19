@@ -66,6 +66,8 @@ class RealEstateProject(BaseModel):
     payment_plan: str  # e.g., "70/30 on Handover"
     dld_escrow_number: str
     golden_visa_eligible: bool
+    crypto_accepted: bool = False
+    supported_cryptos: List[str] = []
     images: List[str] = []
     key_features: List[str] = []
     description: str

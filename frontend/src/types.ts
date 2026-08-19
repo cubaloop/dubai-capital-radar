@@ -58,6 +58,8 @@ export interface RealEstateProject {
   payment_plan: string;
   dld_escrow_number: string;
   golden_visa_eligible: boolean;
+  crypto_accepted?: boolean;
+  supported_cryptos?: string[];
   images: string[];
   key_features: string[];
   description: string;

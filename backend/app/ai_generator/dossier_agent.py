@@ -66,35 +66,57 @@ def build_dossier(prospect: ProspectProfile) -> DossierResponse:
     dossier_id = f"dos-{uuid.uuid4().hex[:8]}"
     slug = f"{prospect.name.lower().replace(' ', '-').replace('.', '')}-{uuid.uuid4().hex[:4]}"
     
+    # Detect if prospect is crypto/web3 native
+    is_crypto = any(k in f"{prospect.liquidity_event} {' '.join(prospect.interests)} {prospect.role_title}".lower() for k in ["crypto", "token", "web3", "protocol", "blockchain", "otc", "whale", "cliff"])
+
     # Financial calculations
     annual_income = max(300000.0, prospect.estimated_net_worth_usd * 0.08)
     capital_gains = prospect.estimated_net_worth_usd * 0.4
     tax_analysis = calculate_tax_arbitrage(prospect.country, annual_income, capital_gains)
     
-    # Project Matching
-    matched_projects = match_projects_for_budget(prospect.estimated_net_worth_usd)
+    # Project Matching (prioritize crypto-friendly developers like DAMAC, Binghatti, Sobha, Danube)
+    matched_projects = match_projects_for_budget(prospect.estimated_net_worth_usd, is_crypto_investor=is_crypto)
     
     # Investment narrative
     thesis_text = generate_investment_thesis(prospect, tax_analysis, matched_projects)
     
-    # Golden Visa Milestones
-    gv_roadmap = [
-        {
-            "step": "Phase 1: Escrow Allocation & Title Deed / Oqood",
-            "timeline": "Days 1 - 7",
-            "description": "Selection of qualifying Tier-1 unit (+2,000,000 AED) and registration with Dubai Land Department."
-        },
-        {
-            "step": "Phase 2: Fast-Track Medical & VIP Biometrics",
-            "timeline": "Days 8 - 14",
-            "description": "Private VIP concierge handling medical fitness test and Emirates ID issuance in Dubai."
-        },
-        {
-            "step": "Phase 3: 10-Year Golden Visa & Private Banking Setup",
-            "timeline": "Days 15 - 21",
-            "description": "Stamping of 10-year residency visa and introduction to Emirates NBD / FAB Private Wealth management."
-        }
-    ]
+    # Golden Visa Milestones (Customized for Crypto if applicable)
+    if is_crypto:
+        gv_roadmap = [
+            {
+                "step": "Phase 1: VARA-Compliant Crypto-to-Escrow Settlement",
+                "timeline": "Days 1 - 3",
+                "description": "Direct USDT/BTC payment execution via licensed UAE trustee directly into the DLD Escrow Account with 0% capital gains."
+            },
+            {
+                "step": "Phase 2: DLD Title Deed / Oqood Issuance",
+                "timeline": "Days 4 - 8",
+                "description": "Immediate registration of ownership with Dubai Land Department and Golden Visa nomination filing."
+            },
+            {
+                "step": "Phase 3: 10-Year Golden Visa & UAE Banking Setup",
+                "timeline": "Days 9 - 18",
+                "description": "Issuance of Emirates ID, 10-year residency visa and crypto-friendly private bank accounts (Emirates NBD / Wio Bank)."
+            }
+        ]
+    else:
+        gv_roadmap = [
+            {
+                "step": "Phase 1: Escrow Allocation & Title Deed / Oqood",
+                "timeline": "Days 1 - 7",
+                "description": "Selection of qualifying Tier-1 unit (+2,000,000 AED) and registration with Dubai Land Department."
+            },
+            {
+                "step": "Phase 2: Fast-Track Medical & VIP Biometrics",
+                "timeline": "Days 8 - 14",
+                "description": "Private VIP concierge handling medical fitness test and Emirates ID issuance in Dubai."
+            },
+            {
+                "step": "Phase 3: 10-Year Golden Visa & Private Banking Setup",
+                "timeline": "Days 15 - 21",
+                "description": "Stamping of 10-year residency visa and introduction to Emirates NBD / FAB Private Wealth management."
+            }
+        ]
 
     # Asset Allocation Recommendation
     allocation = {
