@@ -39,6 +39,7 @@ app.add_middleware(
 # In-Memory State for fast prototyping and live demo
 PROSPECTS_STORE: Dict[str, ProspectProfile] = {}
 DOSSIERS_STORE: Dict[str, DossierResponse] = {}
+AUTOPILOT_ENABLED: bool = False
 
 @app.on_event("startup")
 async def startup_seed():
@@ -61,7 +62,24 @@ def health_check():
         "gemini_ai_connected": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
         "cached_signals": len(radar_engine.get_latest_signals()),
         "active_prospects": len(PROSPECTS_STORE),
-        "dossiers_generated": len(DOSSIERS_STORE) // 2
+        "dossiers_generated": len(DOSSIERS_STORE) // 2,
+        "autopilot_enabled": AUTOPILOT_ENABLED
+    }
+
+# --- AUTOPILOT ENDPOINTS ---
+
+@app.get("/api/autopilot/status")
+def get_autopilot_status():
+    global AUTOPILOT_ENABLED
+    return {"autopilot_enabled": AUTOPILOT_ENABLED}
+
+@app.post("/api/autopilot/toggle")
+def toggle_autopilot():
+    global AUTOPILOT_ENABLED
+    AUTOPILOT_ENABLED = not AUTOPILOT_ENABLED
+    return {
+        "autopilot_enabled": AUTOPILOT_ENABLED,
+        "message": f"Autopilot is now {'ENABLED (Auto-Detect, Auto-Dossier & Auto-Dispatch)' if AUTOPILOT_ENABLED else 'DISABLED (Supervised Mode)'}"
     }
 
 # --- RADAR & SIGNALS ENDPOINTS ---
@@ -72,10 +90,20 @@ def get_signals():
 
 @app.post("/api/radar/scan", response_model=LiquiditySignal)
 def trigger_radar_scan():
+    global AUTOPILOT_ENABLED
     new_sig = radar_engine.trigger_live_scan()
     # Auto enrich into a prospect
     prospect = enrich_signal_to_prospect(new_sig)
     PROSPECTS_STORE[prospect.id] = prospect
+
+    # If Autopilot is enabled: automatically generate dossier and dispatch multi-channel outreach!
+    if AUTOPILOT_ENABLED:
+        dossier = build_dossier(prospect)
+        DOSSIERS_STORE[dossier.slug] = dossier
+        DOSSIERS_STORE[dossier.dossier_id] = dossier
+        create_outreach_campaign(prospect, dossier)
+        prospect.status = "contacted"
+
     return new_sig
 
 # --- PROSPECTS & ENRICHMENT ---

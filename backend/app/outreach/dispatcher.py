@@ -35,15 +35,34 @@ Private Client Advisory
 Dubai Capital Radar | DIFC Asset Management
 """
 
+    # LinkedIn InMail copy (High status, brief, executive)
+    linkedin_copy = (
+        f"Hi {prospect.name.split()[0]}, congratulations on the recent milestone with {prospect.company_name}. "
+        f"Following the fiscal shifts in {prospect.country}, we prepared a private 5-year tax arbitrage model "
+        f"showing an estimated ${dossier.tax_analysis.five_year_savings_usd:,.0f} USD in capital preservation "
+        f"via DLD escrow-backed Tier-1 assets and a 10-year UAE Golden Visa. "
+        f"You can review your private portal here: https://dubai-capital-radar.onrender.com/dossier/{dossier.slug} - Best regards."
+    )
+
+    # WhatsApp Direct message (Conversational, VIP direct)
+    whatsapp_copy = (
+        f"Hello {prospect.name}, hope you are having a productive week. "
+        f"Regarding your liquidity milestone at {prospect.company_name}, we structured a confidential "
+        f"Dubai Real Estate & Golden Visa allocation portfolio for you (0% capital gains tax + 8.8% net rental yields). "
+        f"Here is your private interactive model: https://dubai-capital-radar.onrender.com/dossier/{dossier.slug}"
+    )
+
     campaign = OutreachCampaign(
         id=campaign_id,
-        name=f"Tax Arbitrage Outreach - {prospect.name}",
+        name=f"Multi-Channel Arbitrage Outreach - {prospect.name}",
         prospect_id=prospect.id,
         prospect_name=prospect.name,
         prospect_email=prospect.email,
-        channel="email",
+        channel="multi-channel",
         subject_line=subject,
         body_content=body,
+        linkedin_message=linkedin_copy,
+        whatsapp_message=whatsapp_copy,
         status="sent",
         dossier_slug=dossier.slug,
         sent_at=datetime.now(),

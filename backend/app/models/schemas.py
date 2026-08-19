@@ -89,9 +89,11 @@ class OutreachCampaign(BaseModel):
     prospect_id: str
     prospect_name: str
     prospect_email: str
-    channel: str  # email, linkedin
+    channel: str  # email, linkedin, whatsapp, multi-channel
     subject_line: str
     body_content: str
+    linkedin_message: Optional[str] = None
+    whatsapp_message: Optional[str] = None
     status: str  # draft, sent, opened, clicked, replied
     dossier_slug: str
     sent_at: Optional[datetime] = None

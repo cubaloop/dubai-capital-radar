@@ -16,6 +16,18 @@ export const apiService = {
     return res.json();
   },
 
+  async getAutopilotStatus(): Promise<{ autopilot_enabled: boolean }> {
+    const res = await fetch(`${API_BASE_URL}/autopilot/status`);
+    if (!res.ok) throw new Error('Failed to get autopilot status');
+    return res.json();
+  },
+
+  async toggleAutopilot(): Promise<{ autopilot_enabled: boolean; message: string }> {
+    const res = await fetch(`${API_BASE_URL}/autopilot/toggle`, { method: 'POST' });
+    if (!res.ok) throw new Error('Failed to toggle autopilot');
+    return res.json();
+  },
+
   async getSignals(): Promise<LiquiditySignal[]> {
     const res = await fetch(`${API_BASE_URL}/radar/signals`);
     if (!res.ok) throw new Error('Failed to fetch signals');

@@ -77,33 +77,84 @@ export const CampaignManager: React.FC = () => {
             </span>
           </div>
 
-          <div className="space-y-3">
-            {campaigns.map((camp) => (
-              <div key={camp.id} className="glass-panel p-5 rounded-xl border border-slate-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                    <h3 className="font-bold text-sm text-white">{camp.prospect_name}</h3>
-                    <span className="text-xs text-slate-400 font-mono">({camp.prospect_email})</span>
+          <div className="space-y-4">
+            {campaigns.map((camp) => {
+              return (
+                <div key={camp.id} className="glass-panel p-5 rounded-xl border border-slate-800 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                      <h3 className="font-bold text-sm text-white">{camp.prospect_name}</h3>
+                      <span className="text-xs text-slate-400 font-mono">({camp.prospect_email})</span>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 uppercase font-mono">
+                      Multi-Channel Ready
+                    </span>
                   </div>
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 uppercase">
-                    {camp.status}
-                  </span>
-                </div>
 
-                <div className="bg-slate-900/90 rounded-lg p-3 border border-slate-800/60 text-xs space-y-2">
-                  <div className="font-semibold text-gold-300">{camp.subject_line}</div>
-                  <div className="text-slate-400 font-mono text-[11px] line-clamp-3 whitespace-pre-line">
-                    {camp.body_content}
+                  {/* 3 Channel Cards */}
+                  <div className="space-y-2">
+                    {/* 1. Email */}
+                    <div className="bg-slate-900/90 rounded-lg p-3 border border-slate-800/60 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gold-400 font-bold flex items-center gap-1.5">
+                          <Mail className="w-3.5 h-3.5" /> 1. Correo Institucional
+                        </span>
+                        <span className="text-[11px] text-slate-500 font-mono">Asunto: {camp.subject_line}</span>
+                      </div>
+                      <div className="text-slate-300 font-mono text-[11px] line-clamp-2 whitespace-pre-line bg-slate-950/60 p-2 rounded border border-slate-800">
+                        {camp.body_content}
+                      </div>
+                    </div>
+
+                    {/* 2. LinkedIn InMail */}
+                    <div className="bg-slate-900/90 rounded-lg p-3 border border-slate-800/60 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-blue-400 font-bold flex items-center gap-1.5">
+                          💼 2. LinkedIn InMail Pitch
+                        </span>
+                        <a
+                          href={`https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(camp.prospect_name)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-blue-400 hover:underline flex items-center gap-1"
+                        >
+                          Buscar en LinkedIn ↗
+                        </a>
+                      </div>
+                      <div className="text-slate-300 text-xs bg-slate-950/60 p-2 rounded border border-slate-800 italic">
+                        "{camp.linkedin_message || `Hi ${camp.prospect_name.split(' ')[0]}, we prepared a 5-year tax arbitrage model for Dubai Golden Visa...`}"
+                      </div>
+                    </div>
+
+                    {/* 3. WhatsApp Direct */}
+                    <div className="bg-slate-900/90 rounded-lg p-3 border border-slate-800/60 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                          📱 3. WhatsApp Direct Outreach
+                        </span>
+                        <a
+                          href={`https://wa.me/?text=${encodeURIComponent(camp.whatsapp_message || `Hello ${camp.prospect_name}, here is your confidential Dubai dossier: https://dubai-capital-radar.onrender.com/dossier/${camp.dossier_slug}`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-emerald-400 hover:underline flex items-center gap-1 font-semibold"
+                        >
+                          Enviar por WhatsApp ↗
+                        </a>
+                      </div>
+                      <div className="text-slate-300 text-xs bg-slate-950/60 p-2 rounded border border-slate-800 italic">
+                        "{camp.whatsapp_message || `Hello ${camp.prospect_name}, we structured a Dubai real estate & Golden Visa allocation portfolio for you...`}"
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono pt-1">
+                    <span>Enlace Privado: /dossier/{camp.dossier_slug}</span>
+                    <span className="text-emerald-400 font-semibold">Estado: Despacho Activo</span>
                   </div>
                 </div>
-
-                <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono pt-1">
-                  <span>Enlace Privado: /dossier/{camp.dossier_slug}</span>
-                  <span>Canal: Correo Verificado (DMARC/DKIM)</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

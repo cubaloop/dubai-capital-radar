@@ -86,6 +86,8 @@ export interface OutreachCampaign {
   channel: string;
   subject_line: string;
   body_content: string;
+  linkedin_message?: string;
+  whatsapp_message?: string;
   status: 'draft' | 'sent' | 'opened' | 'clicked' | 'replied';
   dossier_slug: string;
   sent_at?: string;

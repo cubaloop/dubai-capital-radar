@@ -3,6 +3,32 @@ from ..models.schemas import RealEstateProject
 
 CURATED_PROJECTS: List[RealEstateProject] = [
     RealEstateProject(
+        id="proj-damac-chelsea-maritime",
+        name="Chelsea Residences by DAMAC",
+        developer="DAMAC Properties",
+        location="Dubai Maritime City",
+        starting_price_aed=2100000.0,
+        starting_price_usd=571817.0,
+        completion_date="Q4 2027",
+        project_type="Luxury Waterfront Branded Residence",
+        projected_net_yield=8.8,
+        five_year_capital_gain=44.5,
+        payment_plan="70/30 (20% Downpayment / 50% During Construction / 30% on Handover)",
+        dld_escrow_number="DLD-ESC-2024-5519",
+        golden_visa_eligible=True,
+        images=[
+            "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80",
+            "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80"
+        ],
+        key_features=[
+            "Direct Arabian Gulf & Port Rashid Superyacht Marina Views",
+            "Waterfront Infinity Pool, Private Floating Deck & Sky Spa",
+            "Qualifies for Instant 10-Year Renewable UAE Golden Visa (+2M AED)",
+            "100% Escrow Account Regulated by Dubai Land Department"
+        ],
+        description="Exclusive waterfront branded development in Dubai Maritime City, offering high-yield residential units designed for international capital seeking tax optimization and coastal lifestyle."
+    ),
+    RealEstateProject(
         id="proj-palm-crown",
         name="The Palm Crown Residences",
         developer="Nakheel Luxury",

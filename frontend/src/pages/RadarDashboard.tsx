@@ -30,17 +30,20 @@ export const RadarDashboard: React.FC<RadarDashboardProps> = ({
   const [prospects, setProspects] = useState<ProspectProfile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isScanning, setIsScanning] = useState<boolean>(false);
+  const [autopilotEnabled, setAutopilotEnabled] = useState<boolean>(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   const loadData = async () => {
     try {
       setIsLoading(true);
-      const [signalsData, prospectsData] = await Promise.all([
+      const [signalsData, prospectsData, autoStatus] = await Promise.all([
         apiService.getSignals(),
-        apiService.getProspects()
+        apiService.getProspects(),
+        apiService.getAutopilotStatus()
       ]);
       setSignals(signalsData);
       setProspects(prospectsData);
+      setAutopilotEnabled(autoStatus.autopilot_enabled);
     } catch (err) {
       console.error('Error loading radar data', err);
     } finally {
@@ -51,6 +54,15 @@ export const RadarDashboard: React.FC<RadarDashboardProps> = ({
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleToggleAutopilot = async () => {
+    try {
+      const res = await apiService.toggleAutopilot();
+      setAutopilotEnabled(res.autopilot_enabled);
+    } catch (err) {
+      console.error('Failed to toggle autopilot', err);
+    }
+  };
 
   const handleTriggerScan = async () => {
     try {
@@ -128,14 +140,34 @@ export const RadarDashboard: React.FC<RadarDashboardProps> = ({
             </p>
           </div>
 
-          <button
-            onClick={handleTriggerScan}
-            disabled={isScanning}
-            className="flex items-center gap-2 bg-gradient-to-r from-gold-500 via-gold-400 to-amber-300 hover:from-gold-600 hover:to-gold-400 text-slate-950 font-bold px-5 py-3 rounded-xl shadow-lg shadow-gold-500/25 transition-all transform active:scale-95 disabled:opacity-50 whitespace-nowrap"
-          >
-            <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
-            <span>{isScanning ? 'Escaneando Mercados...' : 'Escanear Nuevas Señales'}</span>
-          </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {/* Autopilot Switch */}
+            <button
+              onClick={handleToggleAutopilot}
+              className={`flex items-center justify-between sm:justify-start gap-3 px-4 py-3 rounded-xl border transition-all ${
+                autopilotEnabled
+                  ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300 shadow-lg shadow-emerald-500/20'
+                  : 'bg-slate-900/90 border-slate-700 text-slate-400 hover:border-slate-600'
+              }`}
+            >
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider font-mono">
+                <span className={`w-2.5 h-2.5 rounded-full ${autopilotEnabled ? 'bg-emerald-400 animate-ping' : 'bg-slate-600'}`}></span>
+                <span>Autopilot: {autopilotEnabled ? 'ACTIVO' : 'INACTIVO'}</span>
+              </div>
+              <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors ${autopilotEnabled ? 'bg-emerald-500' : 'bg-slate-700'}`}>
+                <div className={`bg-slate-950 w-3.5 h-3.5 rounded-full shadow-md transform transition-transform ${autopilotEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
+              </div>
+            </button>
+
+            <button
+              onClick={handleTriggerScan}
+              disabled={isScanning}
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-gold-500 via-gold-400 to-amber-300 hover:from-gold-600 hover:to-gold-400 text-slate-950 font-bold px-5 py-3 rounded-xl shadow-lg shadow-gold-500/25 transition-all transform active:scale-95 disabled:opacity-50 whitespace-nowrap text-sm"
+            >
+              <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
+              <span>{isScanning ? 'Escaneando...' : 'Escanear Nuevas Señales'}</span>
+            </button>
+          </div>
         </div>
 
         {/* Real-time stats */}
