@@ -19,7 +19,8 @@ import { apiService } from '../services/api';
 
 interface DossierViewProps {
   slugOrId: string;
-  onBack: () => void;
+  onBack?: () => void;
+  isClientDirectView?: boolean;
 }
 
 type CurrencyCode = 'USD' | 'AED' | 'EUR' | 'GBP';
@@ -215,7 +216,7 @@ const TRANSLATIONS: Record<LanguageCode, Record<string, string>> = {
   }
 };
 
-export const DossierView: React.FC<DossierViewProps> = ({ slugOrId, onBack }) => {
+export const DossierView: React.FC<DossierViewProps> = ({ slugOrId, onBack, isClientDirectView = false }) => {
   const [dossier, setDossier] = useState<DossierResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [customIncome, setCustomIncome] = useState<number>(500000);
@@ -244,7 +245,8 @@ export const DossierView: React.FC<DossierViewProps> = ({ slugOrId, onBack }) =>
     const fetchDossier = async () => {
       try {
         setIsLoading(true);
-        const data = await apiService.getDossier(slugOrId);
+        const cleanSlug = decodeURIComponent(slugOrId).trim();
+        const data = await apiService.getDossier(cleanSlug);
         setDossier(data);
         setCustomIncome(data.tax_analysis.annual_income_usd);
         setCustomCapitalGains(data.tax_analysis.capital_gains_usd);
@@ -296,17 +298,24 @@ export const DossierView: React.FC<DossierViewProps> = ({ slugOrId, onBack }) =>
     return (
       <div className="flex flex-col items-center justify-center min-h-[500px] space-y-4">
         <div className="w-12 h-12 rounded-full border-2 border-gold-500 border-t-transparent animate-spin"></div>
-        <p className="text-sm font-serif-luxury text-gold-300">Generating Confidential Wealth Dossier...</p>
+        <p className="text-sm font-serif-luxury text-gold-300">Loading Confidential Wealth Dossier...</p>
       </div>
     );
   }
 
   if (!dossier) {
     return (
-      <div className="text-center py-16 space-y-4">
-        <p className="text-slate-400">Dossier not found.</p>
-        <button onClick={onBack} className="text-gold-400 font-semibold hover:underline">
-          Return to Radar
+      <div className="text-center py-16 space-y-4 max-w-md mx-auto">
+        <div className="w-12 h-12 rounded-full border-2 border-gold-500 border-t-transparent animate-spin mx-auto"></div>
+        <h3 className="text-white font-serif-luxury font-bold text-lg">Initializing Sovereign Proposal...</h3>
+        <p className="text-slate-400 text-xs">
+          Synchronizing institutional tax rates and DIFC allocation models for your profile.
+        </p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="bg-gold-500 hover:bg-gold-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs"
+        >
+          Refresh Portal
         </button>
       </div>
     );
@@ -318,12 +327,18 @@ export const DossierView: React.FC<DossierViewProps> = ({ slugOrId, onBack }) =>
     <div className={`space-y-10 max-w-5xl mx-auto pb-16 ${language === 'ar' ? 'rtl' : 'ltr'}`}>
       {/* Control Bar: Currency & Language Switchers */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/90 p-4 rounded-2xl border border-slate-800">
-        <button
-          onClick={onBack}
-          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" /> {t.back}
-        </button>
+        {!isClientDirectView && onBack ? (
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" /> {t.back}
+          </button>
+        ) : (
+          <div className="inline-flex items-center gap-2 text-xs font-bold text-gold-400 font-mono uppercase tracking-wider bg-gold-950/40 px-3 py-1.5 rounded-xl border border-gold-800/40">
+            <Lock className="w-3.5 h-3.5" /> Private Investor Suite
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-3">
           {/* Currency Selector */}

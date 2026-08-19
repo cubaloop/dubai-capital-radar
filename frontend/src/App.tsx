@@ -121,6 +121,7 @@ export function App() {
           <DossierView 
             slugOrId={selectedDossierSlug || 'alexander-wright-fintech-demo'} 
             onBack={() => handleTabChange('radar')} 
+            isClientDirectView={isClientDirectView}
           />
         )}
 

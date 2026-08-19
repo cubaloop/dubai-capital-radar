@@ -201,22 +201,36 @@ def get_dossier(slug_or_id: str):
                 return d
         
         # If not cached yet (e.g. after fresh deploy or direct link), synthesize dynamically:
-        parts = [p.capitalize() for p in slug_or_id.replace('-principal-', '-').replace('-demo', '').split('-') if p and not p.isdigit()]
-        raw_name = " ".join(parts[:3]) or "Institutional Investor"
-        country = "Germany" if any(k in slug_or_id.lower() for k in ["munich", "berlin", "frankfurt", "germany"]) else ("Spain" if any(k in slug_or_id.lower() for k in ["madrid", "spain", "barcelona"]) else "United Kingdom")
+        clean_slug = slug_or_id.lower()
+        parts = [p.capitalize() for p in slug_or_id.replace('-principal-', ' ').replace('-demo', '').replace('-', ' ').split() if p and not p.isdigit()]
+        raw_name = " ".join(parts[:4]) or "Private Client"
         
+        country = "United Kingdom"
+        if any(k in clean_slug for k in ["munich", "berlin", "frankfurt", "germany", "gmbh"]):
+            country = "Germany"
+        elif any(k in clean_slug for k in ["madrid", "spain", "barcelona", "valencia"]):
+            country = "Spain"
+        elif any(k in clean_slug for k in ["france", "paris", "french", "lyon"]):
+            country = "France"
+        elif any(k in clean_slug for k in ["canada", "toronto", "vancouver"]):
+            country = "Canada"
+        elif any(k in clean_slug for k in ["us", "usa", "america", "california", "york"]):
+            country = "United States"
+        
+        is_crypto = any(k in clean_slug for k in ["crypto", "token", "web3", "protocol", "node", "hyperion", "blockchain", "otc", "whale"])
+
         fallback_prospect = ProspectProfile(
             id=f"prosp-{uuid.uuid4().hex[:8]}",
             name=raw_name,
             email="confidential@familyoffice.com",
             phone="+971501378020",
             role_title="Managing Partner & Principal",
-            company_name=raw_name + " Group",
+            company_name=raw_name if " " in raw_name else f"{raw_name} Capital",
             country=country,
-            estimated_net_worth_usd=8500000.0,
-            liquidity_event="Institutional Liquidity & Asset Allocation Event",
+            estimated_net_worth_usd=9500000.0,
+            liquidity_event="Institutional Liquidity & Asset Allocation Event" if not is_crypto else "Crypto OTC Liquidity & Token Treasury Diversification",
             tier="Tier 1",
-            interests=["Tax Arbitrage", "10-Year Golden Visa", "Dubai Prime Real Estate"],
+            interests=["Tax Arbitrage", "10-Year Golden Visa", "Dubai Prime Real Estate"] + (["Crypto-to-Escrow", "Zero Capital Gains"] if is_crypto else []),
             matched_projects=[],
             status="contacted"
         )
