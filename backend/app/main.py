@@ -155,6 +155,34 @@ def launch_campaign_for_prospect(prospect_id: str):
 def classify_reply(request: TriageRequest):
     return triage_incoming_response(request)
 
+# --- STATIC FILES & SINGLE PAGE APP (SPA) ROUTING ---
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+# Check potential frontend dist directories
+possible_dist_dirs = [
+    os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"),
+    os.path.join(os.getcwd(), "frontend", "dist"),
+    "/app/frontend/dist"
+]
+
+frontend_dist = next((d for d in possible_dist_dirs if os.path.exists(d)), None)
+
+if frontend_dist:
+    assets_dir = os.path.join(frontend_dist, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # Don't intercept API routes
+        if full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Endpoint not found")
+        target_file = os.path.join(frontend_dist, full_path)
+        if os.path.exists(target_file) and os.path.isfile(target_file):
+            return FileResponse(target_file)
+        return FileResponse(os.path.join(frontend_dist, "index.html"))
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=True)
