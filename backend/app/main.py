@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Any, Optional
 import uvicorn
 import os
+import uuid
 
 from .models.schemas import (
     LiquiditySignal,
