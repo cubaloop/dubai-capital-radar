@@ -57,6 +57,22 @@ export const RadarDashboard: React.FC<RadarDashboardProps> = ({
 
   useEffect(() => {
     loadData();
+    // Live polling every 10 seconds to show new prospects detected by Autopilot daemon
+    const interval = setInterval(async () => {
+      try {
+        const [signalsData, prospectsData, autoStatus] = await Promise.all([
+          apiService.getSignals(),
+          apiService.getProspects(),
+          apiService.getAutopilotStatus()
+        ]);
+        setSignals(signalsData);
+        setProspects(prospectsData);
+        setAutopilotEnabled(autoStatus.autopilot_enabled);
+      } catch (err) {
+        // silent polling
+      }
+    }, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleToggleAutopilot = async () => {

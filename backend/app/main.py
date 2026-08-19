@@ -84,8 +84,8 @@ async def autopilot_daemon():
         except Exception as err:
             print(f"⚠️ [AUTOPILOT DAEMON ERROR]: {err}")
 
-        # Wait 45 seconds before next automated cycle
-        await asyncio.sleep(45)
+        # Run automatically every 60 seconds (1 minute interval)
+        await asyncio.sleep(60)
 
 @app.on_event("startup")
 async def startup_seed():
