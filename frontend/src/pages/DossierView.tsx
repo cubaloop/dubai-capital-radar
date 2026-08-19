@@ -384,7 +384,7 @@ function buildInstantDossier(slug: string): DossierResponse {
       'High-Yield Off-Plan Rental Assets (8%+ ROI)': 35.0,
       'Liquid Treasury & UAE Private Banking Reserve': 20.0
     },
-    calendly_link: 'https://calendly.com/dubai-private-wealth/vip-advisory',
+    calendly_link: 'https://us05web.zoom.us/j/5961345068?pwd=0zahkOUEvN4oeOXwvwvNNtPqcxN6UH.1',
     whatsapp_direct_link: 'https://wa.me/971501378020?text=Hello,%20I%20have%20reviewed%20my%20Confidential%20Dubai%20Wealth%20Dossier.'
   };
 }

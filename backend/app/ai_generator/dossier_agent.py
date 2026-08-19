@@ -5,7 +5,7 @@ from ..models.schemas import ProspectProfile, TaxComparison, RealEstateProject, 
 from ..financial_engine.tax_model import calculate_tax_arbitrage
 from ..inventory.projects import match_projects_for_budget
 
-CALENDLY_URL_DEFAULT = os.getenv("CALENDLY_URL", "https://calendly.com/dubai-private-wealth/vip-advisory")
+CALENDLY_URL_DEFAULT = os.getenv("CALENDLY_URL", "https://us05web.zoom.us/j/5961345068?pwd=0zahkOUEvN4oeOXwvwvNNtPqcxN6UH.1")
 WHATSAPP_PHONE_DEFAULT = os.getenv("WHATSAPP_PHONE", "+971501378020")
 
 def generate_investment_thesis(

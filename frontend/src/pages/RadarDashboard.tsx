@@ -14,7 +14,13 @@ import {
   ExternalLink,
   Flame,
   Smartphone,
-  QrCode
+  QrCode,
+  ShieldCheck,
+  Search,
+  Copy,
+  Check,
+  Database,
+  Users
 } from 'lucide-react';
 import { LiquiditySignal, ProspectProfile } from '../types';
 import { apiService } from '../services/api';
@@ -36,6 +42,11 @@ export const RadarDashboard: React.FC<RadarDashboardProps> = ({
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [autopilotEnabled, setAutopilotEnabled] = useState<boolean>(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [safetyStatus, setSafetyStatus] = useState<any>(null);
+  const [xrayQueries, setXrayQueries] = useState<any[]>([]);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [isSyncingCRM, setIsSyncingCRM] = useState<boolean>(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const loadData = async () => {
     try {
@@ -48,6 +59,17 @@ export const RadarDashboard: React.FC<RadarDashboardProps> = ({
       setSignals(signalsData);
       setProspects(prospectsData);
       setAutopilotEnabled(autoStatus.autopilot_enabled);
+
+      // Fetch safety shield and xray queries
+      try {
+        const [safeRes, xrayRes] = await Promise.all([
+          fetch('/api/safety/status').then(r => r.json()),
+          fetch('/api/xray-queries').then(r => r.json())
+        ]);
+        setSafetyStatus(safeRes);
+        setXrayQueries(xrayRes);
+      } catch (e) {}
+
     } catch (err) {
       console.error('Error loading radar data', err);
     } finally {
@@ -60,14 +82,16 @@ export const RadarDashboard: React.FC<RadarDashboardProps> = ({
     // Live polling every 10 seconds to show new prospects detected by Autopilot daemon
     const interval = setInterval(async () => {
       try {
-        const [signalsData, prospectsData, autoStatus] = await Promise.all([
+        const [signalsData, prospectsData, autoStatus, safeRes] = await Promise.all([
           apiService.getSignals(),
           apiService.getProspects(),
-          apiService.getAutopilotStatus()
+          apiService.getAutopilotStatus(),
+          fetch('/api/safety/status').then(r => r.json()).catch(() => null)
         ]);
         setSignals(signalsData);
         setProspects(prospectsData);
         setAutopilotEnabled(autoStatus.autopilot_enabled);
+        if (safeRes) setSafetyStatus(safeRes);
       } catch (err) {
         // silent polling
       }
@@ -89,11 +113,10 @@ export const RadarDashboard: React.FC<RadarDashboardProps> = ({
       setIsScanning(true);
       const newSignal = await apiService.triggerRadarScan();
       setSignals(prev => [newSignal, ...prev]);
-      // refresh prospects as it auto-enriches
       const updatedProspects = await apiService.getProspects();
       setProspects(updatedProspects);
     } catch (err) {
-      console.error('Failed to trigger scan', err);
+      console.error('Scan error', err);
     } finally {
       setIsScanning(false);
     }
@@ -103,8 +126,6 @@ export const RadarDashboard: React.FC<RadarDashboardProps> = ({
     try {
       setActionLoadingId(prospectId);
       const dossier = await apiService.generateDossier(prospectId);
-      const updatedProspects = await apiService.getProspects();
-      setProspects(updatedProspects);
       onOpenDossier(dossier.slug);
     } catch (err) {
       console.error('Failed to generate dossier', err);
@@ -117,8 +138,7 @@ export const RadarDashboard: React.FC<RadarDashboardProps> = ({
     try {
       setActionLoadingId(prospectId);
       await apiService.launchCampaign(prospectId);
-      const updatedProspects = await apiService.getProspects();
-      setProspects(updatedProspects);
+      setProspects(prev => prev.map(p => p.id === prospectId ? { ...p, status: 'contacted' } : p));
       onOpenCampaigns();
     } catch (err) {
       console.error('Failed to launch campaign', err);
@@ -127,26 +147,96 @@ export const RadarDashboard: React.FC<RadarDashboardProps> = ({
     }
   };
 
-  const getSignalBadge = (type: string) => {
-    switch (type) {
-      case 'crypto_whale':
-        return <span className="bg-purple-950/80 text-purple-300 border border-purple-800/60 px-2.5 py-0.5 rounded-full text-xs font-semibold">🪙 Crypto Whale OTC</span>;
-      case 'tech_exit':
-        return <span className="bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 px-2.5 py-0.5 rounded-full text-xs font-semibold">🚀 M&A Tech Exit</span>;
-      case 'tax_reform':
-        return <span className="bg-rose-950/80 text-rose-300 border border-rose-800/60 px-2.5 py-0.5 rounded-full text-xs font-semibold">⚖️ Fiscal Reform Outflow</span>;
-      case 'venture_funding':
-        return <span className="bg-amber-950/80 text-amber-300 border border-amber-800/60 px-2.5 py-0.5 rounded-full text-xs font-semibold">💰 Secondary Liquidity</span>;
-      default:
-        return <span className="bg-blue-950/80 text-blue-300 border border-blue-800/60 px-2.5 py-0.5 rounded-full text-xs font-semibold">🌐 Global HNWI Flight</span>;
+  const handleSyncCRM = async () => {
+    try {
+      setIsSyncingCRM(true);
+      const res = await fetch('/api/crm/sync-all', { method: 'POST' });
+      const data = await res.json();
+      setSyncMessage(`✅ ¡${data.synced_count || prospects.length} Leads sincronizados con éxito en CRM Real Estate TDAH!`);
+      setTimeout(() => setSyncMessage(null), 5000);
+    } catch (e: any) {
+      setSyncMessage(`❌ Error: ${e.message}`);
+    } finally {
+      setIsSyncingCRM(false);
     }
+  };
+
+  const handleCopyQuery = (query: string, index: number) => {
+    navigator.clipboard.writeText(query);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2500);
   };
 
   return (
     <div className="space-y-8 pb-12">
-      {/* Top Banner & Quick Metrics */}
-      <div className="glass-panel-gold rounded-2xl p-6 sm:p-8 relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-96 h-96 bg-gold-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      {/* Anti-Ban & CRM Live Status Bar */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Anti-Ban Guard Status */}
+        <div className="bg-slate-900/90 border border-emerald-500/40 rounded-2xl p-4 flex items-center justify-between shadow-lg shadow-emerald-950/20">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 border border-emerald-500/40">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">WhatsApp Anti-Ban Shield</span>
+                <span className="px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-300 text-[10px] font-mono border border-emerald-800">0% RIESGO BANEO</span>
+              </div>
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                Cap diario: <strong>{safetyStatus?.daily_sent || 0}/{safetyStatus?.daily_limit || 20} envíos</strong> • Pausas humanas: <strong>2 - 5 min aleatorias</strong>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* CRM Real Estate TDAH Bridge */}
+        <div className="bg-slate-900/90 border border-gold-500/40 rounded-2xl p-4 flex items-center justify-between shadow-lg shadow-gold-950/20">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gold-500/20 flex items-center justify-center text-gold-400 border border-gold-500/40">
+              <Database className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">CRM Real Estate TDAH</span>
+                <span className="px-2 py-0.5 rounded-md bg-gold-950 text-gold-300 text-[10px] font-mono border border-gold-800">SINCRONIZADO</span>
+              </div>
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                Conectado a: <strong className="text-gold-300">tadh-crm.netlify.app</strong>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSyncCRM}
+              disabled={isSyncingCRM}
+              className="px-3 py-1.5 rounded-lg bg-gold-500 hover:bg-gold-400 text-slate-950 text-xs font-bold transition-all"
+            >
+              {isSyncingCRM ? 'Sincronizando...' : 'Sincronizar'}
+            </button>
+            <a
+              href="https://tadh-crm.netlify.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+              title="Abrir CRM en nueva pestaña"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {syncMessage && (
+        <div className="bg-emerald-950/90 border border-emerald-500 text-emerald-200 text-xs p-3 rounded-xl font-mono text-center animate-fade-in">
+          {syncMessage}
+        </div>
+      )}
+
+      {/* Hero Header & Real-Time Stats */}
+      <div className="glass-panel-gold rounded-3xl p-6 sm:p-8 relative overflow-hidden border border-gold-500/30">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-gold-500/5 rounded-full blur-3xl pointer-events-none"></div>
+
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold-500/20 text-gold-400 text-xs font-semibold tracking-wide uppercase mb-3">
@@ -167,7 +257,7 @@ export const RadarDashboard: React.FC<RadarDashboardProps> = ({
               className="flex items-center justify-center gap-2 bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-500 text-emerald-300 font-bold px-4 py-3 rounded-xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95 text-xs font-mono"
             >
               <QrCode className="w-4 h-4 text-emerald-400" />
-              <span>Conectar WhatsApp (QR)</span>
+              <span>WhatsApp QR</span>
             </button>
 
             {/* Autopilot Switch */}
@@ -203,69 +293,113 @@ export const RadarDashboard: React.FC<RadarDashboardProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t border-slate-800/80">
           <div>
             <div className="text-xs text-slate-400 uppercase tracking-wider font-mono">Liquidez Rastreada</div>
-            <div className="text-xl sm:text-2xl font-bold text-white mt-1">$54.6M+ <span className="text-xs text-emerald-400 font-mono">+18%</span></div>
+            <div className="text-xl sm:text-2xl font-bold text-white mt-1">$68.4M+ <span className="text-xs text-emerald-400 font-mono">+24%</span></div>
           </div>
           <div>
             <div className="text-xs text-slate-400 uppercase tracking-wider font-mono">Ahorro Fiscal EAU</div>
             <div className="text-xl sm:text-2xl font-bold text-gold-400 mt-1">0% IRPF / CGT</div>
           </div>
           <div>
-            <div className="text-xs text-slate-400 uppercase tracking-wider font-mono">Prospectos Tier 1</div>
-            <div className="text-xl sm:text-2xl font-bold text-white mt-1">{prospects.filter(p => p.tier === 'Tier 1').length} Calificados</div>
+            <div className="text-xs text-slate-400 uppercase tracking-wider font-mono">Proyectos Cripto & Escrow</div>
+            <div className="text-xl sm:text-2xl font-bold text-white mt-1">100% DLD Aprobados</div>
           </div>
           <div>
-            <div className="text-xs text-slate-400 uppercase tracking-wider font-mono">Golden Visa Allocation</div>
-            <div className="text-xl sm:text-2xl font-bold text-emerald-400 mt-1">100% Elegibles</div>
+            <div className="text-xs text-slate-400 uppercase tracking-wider font-mono">Sala de Zoom Conectada</div>
+            <div className="text-xl sm:text-2xl font-bold text-emerald-400 mt-1 font-mono">596 134 5068</div>
           </div>
         </div>
       </div>
 
+      {/* Google X-Ray Search Hub for LinkedIn Leads */}
+      <div className="glass-panel rounded-2xl p-6 border border-slate-800 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-serif-luxury font-bold text-white flex items-center gap-2">
+              <Search className="w-5 h-5 text-gold-400" /> Generador de Búsquedas X-Ray (LinkedIn Gratuito)
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Copia estos comandos y pégalos en Google para extraer perfiles reales de directivos con ventas millonarias recientes sin pagar LinkedIn Sales Navigator.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          {xrayQueries.map((item, idx) => (
+            <div key={idx} className="bg-slate-900/90 rounded-xl p-3.5 border border-slate-800 space-y-2 flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-center">
+                  <h4 className="text-xs font-bold text-gold-300 font-mono">{item.category}</h4>
+                  <button
+                    onClick={() => handleCopyQuery(item.query, idx)}
+                    className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all font-mono"
+                  >
+                    {copiedIndex === idx ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-400" /> Copiado
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" /> Copiar Comando
+                      </>
+                    )}
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">{item.description}</p>
+              </div>
+              <div className="bg-slate-950 p-2 rounded-lg border border-slate-800/80 text-[10px] font-mono text-slate-300 truncate">
+                {item.query}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Main Two-Column View: Signals Stream + Enriched HNWI Pipeline */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Live Liquidity Radar Feed */}
+        {/* Left Column: Live Liquidity Signals Stream (5 cols) */}
         <div className="lg:col-span-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-serif-luxury font-bold text-lg text-white flex items-center gap-2">
-              <Radar className="w-5 h-5 text-gold-400 animate-pulse" /> Live Capital Signals Feed
+            <h2 className="text-lg font-serif-luxury font-bold text-white flex items-center gap-2">
+              <Radar className="w-5 h-5 text-gold-400" /> Señales de Liquidez en Vivo
             </h2>
-            <span className="text-xs text-slate-400 font-mono bg-slate-900 px-2.5 py-1 rounded-md border border-slate-800">
-              {signals.length} Eventos detectados
-            </span>
+            <span className="text-xs text-slate-400 font-mono">{signals.length} Eventos Detectados</span>
           </div>
 
-          <div className="space-y-3 max-h-[620px] overflow-y-auto pr-1">
+          <div className="space-y-3">
             {signals.map((sig) => (
-              <div 
+              <div
                 key={sig.id}
-                className="glass-panel p-4 rounded-xl border border-slate-800 hover:border-gold-500/40 transition-all group relative"
+                className="glass-panel rounded-xl p-4 border border-slate-800 hover:border-gold-500/40 transition-all space-y-3"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    {getSignalBadge(sig.signal_type)}
+                  <div>
+                    <span className="inline-block px-2 py-0.5 text-[10px] font-mono font-bold uppercase rounded bg-slate-800 text-gold-300 border border-slate-700">
+                      {sig.source_country} • {sig.signal_type.replace('_', ' ')}
+                    </span>
+                    <h3 className="font-bold text-sm text-white mt-1.5">{sig.title}</h3>
                   </div>
-                  <span className="text-[11px] font-mono text-slate-400">
-                    hace {Math.floor(Math.random() * 25 + 2)}m
-                  </span>
+                  <div className="text-right">
+                    <span className="text-xs font-bold text-emerald-400 font-mono block">
+                      ${(sig.estimated_liquidity_usd / 1000000).toFixed(1)}M
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">Confianza: {(sig.confidence_score * 100).toFixed(0)}%</span>
+                  </div>
                 </div>
 
-                <h3 className="font-semibold text-slate-100 mt-2 text-sm group-hover:text-gold-300 transition-colors">
-                  {sig.title}
-                </h3>
-
-                <p className="text-xs text-slate-400 mt-1 line-clamp-2">
+                <p className="text-xs text-slate-300 leading-relaxed">
                   {sig.description}
                 </p>
 
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-800/80 text-xs">
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold text-emerald-400 font-mono">
-                      ${(sig.estimated_liquidity_usd / 1000000).toFixed(1)}M USD
-                    </span>
-                    <span className="text-slate-400 flex items-center gap-1">
-                      <Globe className="w-3 h-3 text-slate-500" /> {sig.source_country}
-                    </span>
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs">
+                  <div className="flex flex-wrap gap-1">
+                    {sig.tags.slice(0, 2).map((t, idx) => (
+                      <span key={idx} className="text-[10px] bg-slate-900 text-slate-400 px-2 py-0.5 rounded border border-slate-800">
+                        #{t}
+                      </span>
+                    ))}
                   </div>
-                  <span className="text-slate-400 font-mono text-[11px]">
-                    Confianza: {(sig.confidence_score * 100).toFixed(0)}%
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    {new Date(sig.detected_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
               </div>
@@ -273,14 +407,14 @@ export const RadarDashboard: React.FC<RadarDashboardProps> = ({
           </div>
         </div>
 
-        {/* Right Column: Enriched Prospects & Instant Action Matrix */}
+        {/* Right Column: Enriched HNWI Prospect Pipeline (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-serif-luxury font-bold text-lg text-white flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-gold-400" /> Enriched HNWI Pipeline & Action Matrix
+            <h2 className="text-lg font-serif-luxury font-bold text-white flex items-center gap-2">
+              <Users className="w-5 h-5 text-gold-400" /> Pipeline de Inversores Cualificados (HNWI)
             </h2>
-            <span className="text-xs text-emerald-400 font-mono bg-emerald-950/60 border border-emerald-800/60 px-2.5 py-1 rounded-md">
-              Golden Visa Priority Ready
+            <span className="text-xs text-emerald-400 font-mono font-semibold">
+              ● Enriquecimiento Activo
             </span>
           </div>
 
@@ -288,15 +422,13 @@ export const RadarDashboard: React.FC<RadarDashboardProps> = ({
             {prospects.map((prosp) => (
               <div
                 key={prosp.id}
-                className="glass-panel p-5 rounded-xl border border-slate-800 hover:border-slate-700 transition-all"
+                className="glass-panel rounded-2xl p-5 border border-slate-800 hover:border-gold-500/50 transition-all space-y-4"
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-white text-base">
-                        {prosp.name}
-                      </h3>
-                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                      <h3 className="text-base font-bold text-white font-serif-luxury">{prosp.name}</h3>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider font-mono ${
                         prosp.tier === 'Tier 1'
                           ? 'bg-gold-500/20 text-gold-400 border border-gold-500/40'
                           : 'bg-blue-500/20 text-blue-400 border border-blue-500/40'

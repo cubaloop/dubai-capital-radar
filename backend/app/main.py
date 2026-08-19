@@ -46,19 +46,34 @@ DOSSIERS_STORE: Dict[str, DossierResponse] = {}
 AUTOPILOT_ENABLED: bool = False
 AUTOPILOT_DISPATCH_COUNT: int = 0
 
+from .safety.anti_ban import anti_ban_guard
+from .crm.sync_tadh import crm_bridge
+
 WHATSAPP_GATEWAY_URL = os.getenv("WHATSAPP_GATEWAY_URL", "http://localhost:3001")
 
-async def dispatch_whatsapp_direct(to_phone: str, message: str):
-    """Asynchronously calls the WhatsApp Web Gateway to deliver message."""
+async def dispatch_whatsapp_direct(to_phone: str, message: str, bypass_shield: bool = False):
+    """
+    Delivers message via WhatsApp Web Gateway while respecting the Anti-Ban Safety Protocol.
+    """
+    if not bypass_shield:
+        can_send, reason = anti_ban_guard.can_send()
+        if not can_send:
+            print(f"🛡️ [ANTI-BAN SHIELD] Outbound paused: {reason}")
+            return {"success": False, "throttled": True, "reason": reason}
+
     try:
-        async with httpx.AsyncClient(timeout=4.0) as client:
+        async with httpx.AsyncClient(timeout=5.0) as client:
             res = await client.post(f"{WHATSAPP_GATEWAY_URL}/send", json={"to": to_phone, "message": message})
-            return res.json()
+            data = res.json()
+            if data.get("success"):
+                anti_ban_guard.record_send()
+                print(f"📨 [ANTI-BAN SHIELD] Message safely delivered to {to_phone} ({anti_ban_guard.daily_sent_count}/{anti_ban_guard.max_daily_limit} today)")
+            return data
     except Exception as e:
         return {"success": False, "error": str(e), "simulated": True}
 
 async def autopilot_daemon():
-    """Continuous background worker that scans and auto-delivers without human intervention."""
+    """Continuous background worker with Anti-Ban Protection and CRM Synchronization."""
     global AUTOPILOT_ENABLED, AUTOPILOT_DISPATCH_COUNT
     while True:
         try:
@@ -77,15 +92,23 @@ async def autopilot_daemon():
                 prospect.status = "contacted"
                 AUTOPILOT_DISPATCH_COUNT += 1
 
-                # Send real WhatsApp message automatically to prospect phone
+                # 1. Automatically sync Lead to CRM Real Estate TDAH (https://tadh-crm.netlify.app/)
+                await crm_bridge.sync_lead_to_crm(prospect, dossier)
+
+                # 2. Safely dispatch WhatsApp message via Anti-Ban shield
                 if prospect.phone and campaign.whatsapp_message:
                     await dispatch_whatsapp_direct(prospect.phone, campaign.whatsapp_message)
-                    print(f"⚡ [AUTOPILOT] Automatically dispatched WhatsApp message to {prospect.name} ({prospect.phone})")
+
+                # 3. Add humanized randomized cooldown between outreach actions
+                jitter = anti_ban_guard.get_randomized_delay()
+                print(f"⏳ [ANTI-BAN SHIELD] Humanized pause: next scan in {jitter}s")
+                await asyncio.sleep(jitter)
+                continue
 
         except Exception as err:
             print(f"⚠️ [AUTOPILOT DAEMON ERROR]: {err}")
 
-        # Run automatically every 60 seconds (1 minute interval)
+        # Standard cycle if autopilot is idle
         await asyncio.sleep(60)
 
 PUBLIC_APP_URL = os.getenv("PUBLIC_APP_URL", "https://dubai-capital-radar.onrender.com")
@@ -342,11 +365,45 @@ async def launch_campaign_for_prospect(prospect_id: str):
     campaign = create_outreach_campaign(prospect, dossier)
     prospect.status = "contacted"
 
-    # Automatically dispatch to WhatsApp
+    # Automatically dispatch to WhatsApp respecting Anti-Ban Guard
     if prospect.phone and campaign.whatsapp_message:
         await dispatch_whatsapp_direct(prospect.phone, campaign.whatsapp_message)
 
+    # Sync to CRM Real Estate TDAH
+    await crm_bridge.sync_lead_to_crm(prospect, dossier)
+
     return campaign
+
+# --- SAFETY & ANTI-BAN PROTOCOL ---
+
+@app.get("/api/safety/status")
+def get_safety_status():
+    return anti_ban_guard.get_status()
+
+# --- PROSPECTING & GOOGLE X-RAY QUERIES ---
+
+@app.get("/api/xray-queries")
+def get_google_xray_queries():
+    return radar_engine.get_xray_queries()
+
+# --- CRM REAL ESTATE TDAH SYNC ---
+
+@app.get("/api/crm/leads")
+def get_crm_synced_leads():
+    return crm_bridge.get_synced_leads()
+
+@app.post("/api/crm/sync-all")
+async def sync_all_to_crm():
+    count = 0
+    for p in PROSPECTS_STORE.values():
+        dossier = next((d for d in DOSSIERS_STORE.values() if d.prospect.id == p.id), None)
+        await crm_bridge.sync_lead_to_crm(p, dossier)
+        count += 1
+    return {
+        "success": True,
+        "synced_count": count,
+        "crm_url": "https://tadh-crm.netlify.app"
+    }
 
 @app.post("/api/triage/classify", response_model=TriageResponse)
 def classify_reply(request: TriageRequest):
