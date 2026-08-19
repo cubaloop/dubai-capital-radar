@@ -156,6 +156,47 @@ def get_supported_countries():
 def get_inventory():
     return get_all_projects()
 
+# --- WHATSAPP QR GATEWAY INTEGRATION ---
+import httpx
+
+WHATSAPP_GATEWAY_URL = os.getenv("WHATSAPP_GATEWAY_URL", "http://localhost:3001")
+
+@app.get("/api/whatsapp/status")
+async def get_whatsapp_gateway_status():
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            res = await client.get(f"{WHATSAPP_GATEWAY_URL}/status")
+            return res.json()
+    except Exception:
+        return {"connected": False, "phone": None, "has_qr": False, "gateway_online": False}
+
+@app.get("/api/whatsapp/qr")
+async def get_whatsapp_qr():
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            res = await client.get(f"{WHATSAPP_GATEWAY_URL}/qr")
+            return res.json()
+    except Exception:
+        return {"connected": False, "qr": None, "gateway_online": False}
+
+@app.post("/api/whatsapp/send")
+async def send_whatsapp_message(payload: Dict[str, str]):
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            res = await client.post(f"{WHATSAPP_GATEWAY_URL}/send", json=payload)
+            return res.json()
+    except Exception as e:
+        return {"success": False, "error": str(e), "simulated": True}
+
+@app.post("/api/whatsapp/logout")
+async def logout_whatsapp():
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            res = await client.post(f"{WHATSAPP_GATEWAY_URL}/logout")
+            return res.json()
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 # --- OUTREACH & CAMPAIGNS ---
 
 @app.get("/api/campaigns", response_model=List[OutreachCampaign])

@@ -5,12 +5,14 @@ interface NavbarProps {
   activeTab: 'radar' | 'dossiers' | 'campaigns' | 'inventory';
   setActiveTab: (tab: 'radar' | 'dossiers' | 'campaigns' | 'inventory') => void;
   selectedDossierSlug?: string;
+  onOpenWhatsAppModal: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
-  selectedDossierSlug
+  selectedDossierSlug,
+  onOpenWhatsAppModal
 }) => {
   return (
     <header className="sticky top-0 z-50 glass-panel border-b border-slate-800/80 bg-slate-950/80">
@@ -82,10 +84,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </nav>
 
-          {/* Golden Visa Status indicator */}
-          <div className="hidden lg:flex items-center space-x-3 bg-slate-900/80 px-3 py-1.5 rounded-full border border-slate-800 text-xs text-slate-300">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>DLD Escrow + 10-Yr Golden Visa Engine</span>
+          {/* WhatsApp QR Connector Action */}
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={onOpenWhatsAppModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-900/80 border border-emerald-500/60 text-emerald-300 text-xs font-bold transition-all shadow-md shadow-emerald-500/15 active:scale-95"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              <span>WhatsApp QR</span>
+            </button>
           </div>
         </div>
       </div>

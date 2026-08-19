@@ -4,10 +4,12 @@ import { RadarDashboard } from './pages/RadarDashboard';
 import { DossierView } from './pages/DossierView';
 import { CampaignManager } from './pages/CampaignManager';
 import { OffPlanMatcher } from './pages/OffPlanMatcher';
+import { WhatsAppQRModal } from './components/WhatsAppQRModal';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'radar' | 'dossiers' | 'campaigns' | 'inventory'>('radar');
   const [selectedDossierSlug, setSelectedDossierSlug] = useState<string>('');
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState<boolean>(false);
 
   const handleOpenDossier = (slug: string) => {
     setSelectedDossierSlug(slug);
@@ -26,6 +28,12 @@ export function App() {
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
         selectedDossierSlug={selectedDossierSlug} 
+        onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
+      />
+
+      <WhatsAppQRModal 
+        isOpen={isWhatsAppModalOpen} 
+        onClose={() => setIsWhatsAppModalOpen(false)} 
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8">
