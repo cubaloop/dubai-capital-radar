@@ -65,7 +65,7 @@ def triage_incoming_response(request: TriageRequest) -> TriageResponse:
         try:
             import google.generativeai as genai
             genai.configure(api_key=gemini_api_key)
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            model = genai.GenerativeModel("gemini-3.6-flash")
             prompt = f"""
             You are a senior real estate structuring advisor in Dubai.
             Analyze this message from prospect '{request.sender_name}':
@@ -78,7 +78,16 @@ def triage_incoming_response(request: TriageRequest) -> TriageResponse:
             4. suggested_reply (A polite, ultra-professional 3-sentence reply addressing their exact point and proposing a Zoom call or WhatsApp conversation).
             """
             result = model.generate_content(prompt)
-            # if we get response text, we can parse or fallback
+            if result and result.text:
+                import json
+                cleaned = result.text.strip().replace("```json", "").replace("```", "").strip()
+                parsed = json.loads(cleaned)
+                return TriageResponse(
+                    sentiment=parsed.get("sentiment", "positive"),
+                    suggested_reply=parsed.get("suggested_reply", ""),
+                    action_required=parsed.get("action_required", "schedule_call"),
+                    priority_level=parsed.get("priority_level", "HIGH")
+                )
         except Exception:
             pass
 

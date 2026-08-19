@@ -15,7 +15,7 @@ def generate_investment_thesis(
 ) -> str:
     """
     Generates an institutional private banking investment thesis narrative.
-    Connects to Google Gemini if GEMINI_API_KEY is in environment, or uses structured synthesis.
+    Connects to Google Gemini 3.6 Flash live.
     """
     gemini_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     
@@ -23,7 +23,7 @@ def generate_investment_thesis(
         try:
             import google.generativeai as genai
             genai.configure(api_key=gemini_api_key)
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            model = genai.GenerativeModel("gemini-3.6-flash")
             
             prompt = f"""
             Act as a senior Family Office Structuring Partner in Dubai DIFC.
