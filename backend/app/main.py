@@ -408,7 +408,8 @@ async def sync_all_to_crm():
 from .outreach.miami_event_campaign import (
     MIAMI_EVENT_LEADS, 
     build_miami_message, 
-    dispatch_miami_event_campaign
+    dispatch_miami_event_campaign,
+    get_miami_campaign_status
 )
 
 @app.get("/api/campaigns/miami-event/leads")
@@ -430,6 +431,10 @@ def get_miami_event_leads():
         ]
     }
 
+@app.get("/api/campaigns/miami-event/status")
+def get_miami_status():
+    return get_miami_campaign_status()
+
 @app.post("/api/campaigns/miami-event/launch")
 async def launch_miami_event_campaign(background_tasks: BackgroundTasks):
     background_tasks.add_task(dispatch_miami_event_campaign)
@@ -445,6 +450,11 @@ def classify_reply(request: TriageRequest):
 # --- STATIC FILES & SINGLE PAGE APP (SPA) ROUTING ---
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+
+# Mount static media
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Check potential frontend dist directories
 possible_dist_dirs = [

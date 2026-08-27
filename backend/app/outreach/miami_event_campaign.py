@@ -29,6 +29,14 @@ def build_miami_message(name: str) -> str:
         f"Saludos"
     )
 
+CAMPAIGN_PROGRESS = {
+    "is_running": False,
+    "total": len(MIAMI_EVENT_LEADS),
+    "sent_count": 0,
+    "delivered": [],
+    "last_updated": None
+}
+
 async def dispatch_miami_event_campaign(
     gateway_url: str = "http://localhost:3001",
     image_rel_path: str = "uploads/dubai_miami_event.jpg"
@@ -37,7 +45,10 @@ async def dispatch_miami_event_campaign(
     Sequentially delivers the personalized Miami Dubai Real Estate Event invitation
     with attached flyer image and anti-ban randomized spacing to all 13 registered leads.
     """
-    results = []
+    global CAMPAIGN_PROGRESS
+    CAMPAIGN_PROGRESS["is_running"] = True
+    CAMPAIGN_PROGRESS["sent_count"] = 0
+    CAMPAIGN_PROGRESS["delivered"] = []
     
     # Path resolution for local or Docker execution
     possible_paths = [
@@ -78,7 +89,8 @@ async def dispatch_miami_event_campaign(
                     "status": "DELIVERED" if resp_data.get("success") else "FAILED",
                     "response": resp_data
                 }
-                results.append(status_entry)
+                CAMPAIGN_PROGRESS["delivered"].append(status_entry)
+                CAMPAIGN_PROGRESS["sent_count"] += 1
                 print(f"[{idx}/{len(MIAMI_EVENT_LEADS)}] 📨 {lead['name']} ({lead['phone']}) -> {status_entry['status']}")
 
         except Exception as e:
@@ -90,14 +102,18 @@ async def dispatch_miami_event_campaign(
                 "status": "ERROR",
                 "error": str(e)
             }
-            results.append(err_entry)
+            CAMPAIGN_PROGRESS["delivered"].append(err_entry)
             print(f"[{idx}/{len(MIAMI_EVENT_LEADS)}] ❌ Error sending to {lead['name']}: {e}")
 
-        # Humanized anti-ban pause between messages (15 to 35 seconds)
+        # Humanized anti-ban pause between messages (15 to 30 seconds)
         if idx < len(MIAMI_EVENT_LEADS):
             delay = random.randint(15, 30)
             print(f"⏳ Humanized safety cooldown: waiting {delay}s before next contact...")
             await asyncio.sleep(delay)
 
+    CAMPAIGN_PROGRESS["is_running"] = False
     print("🏁 [MIAMI EVENT CAMPAIGN] Finished execution.")
-    return results
+    return CAMPAIGN_PROGRESS["delivered"]
+
+def get_miami_campaign_status():
+    return CAMPAIGN_PROGRESS
