@@ -99,30 +99,79 @@ app.post('/send', async (req, res) => {
       });
     }
 
-    // Format phone number to WhatsApp JID (clean +, spaces, dashes)
+    // Format phone number to clean digits
     const cleanNumber = to.replace(/[^0-9]/g, '');
-    const jid = `${cleanNumber}@s.whatsapp.net`;
 
-    if (image_path && fs.existsSync(image_path)) {
-      const imageBuffer = fs.readFileSync(image_path);
-      await sock.sendMessage(jid, {
-        image: imageBuffer,
-        caption: message || ''
-      });
-    } else if (image_url) {
-      await sock.sendMessage(jid, {
-        image: { url: image_url },
-        caption: message || ''
-      });
-    } else {
-      await sock.sendMessage(jid, { text: message });
+    // Check if number is actually registered on WhatsApp
+    try {
+      const checkResults = await sock.onWhatsApp(cleanNumber);
+      const onWa = Array.isArray(checkResults) ? checkResults[0] : checkResults;
+
+      if (!onWa || !onWa.exists) {
+        console.log(`⚠️ [WhatsApp Gateway] Phone ${cleanNumber} is NOT registered on WhatsApp.`);
+        return res.json({ 
+          success: false, 
+          exists: false, 
+          error: `The phone number ${to} is NOT registered on WhatsApp.` 
+        });
+      }
+
+      // Use the verified WhatsApp JID returned by the server
+      const jid = onWa.jid || `${cleanNumber}@s.whatsapp.net`;
+
+      if (image_path && fs.existsSync(image_path)) {
+        const imageBuffer = fs.readFileSync(image_path);
+        await sock.sendMessage(jid, {
+          image: imageBuffer,
+          caption: message || ''
+        });
+      } else if (image_url) {
+        await sock.sendMessage(jid, {
+          image: { url: image_url },
+          caption: message || ''
+        });
+      } else {
+        await sock.sendMessage(jid, { text: message });
+      }
+
+      console.log(`📨 [WhatsApp Gateway] Message delivered to ${cleanNumber} (${jid})`);
+      return res.json({ success: true, delivered_to: cleanNumber, jid: jid, exists: true });
+
+    } catch (sendErr) {
+      console.error(`❌ [WhatsApp Gateway] Error sending to ${cleanNumber}:`, sendErr);
+      return res.status(500).json({ success: false, error: sendErr.message });
     }
-
-    console.log(`📨 [WhatsApp Gateway] Message delivered to ${cleanNumber}`);
-    return res.json({ success: true, delivered_to: cleanNumber });
   } catch (err) {
-    console.error('❌ [WhatsApp Gateway] Error sending message:', err);
+    console.error('❌ [WhatsApp Gateway] Internal error:', err);
     return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/verify-numbers', async (req, res) => {
+  try {
+    const { numbers } = req.body;
+    if (!isConnected || !sock) {
+      return res.status(503).json({ error: 'WhatsApp gateway not connected' });
+    }
+    const results = [];
+    for (const num of numbers) {
+      const clean = num.replace(/[^0-9]/g, '');
+      try {
+        const checkResults = await sock.onWhatsApp(clean);
+        const onWa = Array.isArray(checkResults) ? checkResults[0] : checkResults;
+        results.push({
+          phone: num,
+          clean: clean,
+          exists: !!onWa?.exists,
+          jid: onWa?.jid || null
+        });
+      } catch (e) {
+        results.push({ phone: num, clean: clean, exists: false, error: e.message });
+      }
+    }
+    return res.json({ results });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 

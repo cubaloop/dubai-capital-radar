@@ -343,6 +343,15 @@ async def logout_whatsapp():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.post("/api/whatsapp/verify-numbers")
+async def verify_whatsapp_numbers(payload: Dict[str, Any]):
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.post(f"{WHATSAPP_GATEWAY_URL}/verify-numbers", json=payload)
+            return res.json()
+    except Exception as e:
+        return {"error": str(e)}
+
 # --- OUTREACH & CAMPAIGNS ---
 
 @app.get("/api/campaigns", response_model=List[OutreachCampaign])
