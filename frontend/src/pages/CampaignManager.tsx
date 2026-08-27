@@ -10,15 +10,35 @@ import {
   User, 
   ArrowRight,
   ShieldCheck,
-  AlertTriangle
+  AlertTriangle,
+  Image as ImageIcon,
+  MapPin,
+  Calendar,
+  Phone,
+  Play,
+  Check
 } from 'lucide-react';
 import { OutreachCampaign, TriageResponse } from '../types';
 import { apiService } from '../services/api';
+
+interface MiamiLead {
+  index: number;
+  name: string;
+  phone: string;
+  email: string;
+  sample_message: string;
+}
 
 export const CampaignManager: React.FC = () => {
   const [campaigns, setCampaigns] = useState<OutreachCampaign[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
+  // Miami Event Campaign State
+  const [miamiLeads, setMiamiLeads] = useState<MiamiLead[]>([]);
+  const [isLaunchingMiami, setIsLaunchingMiami] = useState<boolean>(false);
+  const [miamiStatusMsg, setMiamiStatusMsg] = useState<string | null>(null);
+  const [selectedLeadPreview, setSelectedLeadPreview] = useState<MiamiLead | null>(null);
+
   // Triage state
   const [testSender, setTestSender] = useState<string>('Alexander Wright');
   const [testMessage, setTestMessage] = useState<string>(
@@ -28,19 +48,39 @@ export const CampaignManager: React.FC = () => {
   const [triageResult, setTriageResult] = useState<TriageResponse | null>(null);
 
   useEffect(() => {
-    const fetchCampaigns = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true);
-        const data = await apiService.getCampaigns();
-        setCampaigns(data);
+        const [campsData, miamiData] = await Promise.all([
+          apiService.getCampaigns(),
+          fetch('/api/campaigns/miami-event/leads').then(r => r.json()).catch(() => null)
+        ]);
+        setCampaigns(campsData);
+        if (miamiData?.leads) {
+          setMiamiLeads(miamiData.leads);
+          setSelectedLeadPreview(miamiData.leads[0]);
+        }
       } catch (err) {
         console.error(err);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchCampaigns();
+    fetchData();
   }, []);
+
+  const handleLaunchMiamiCampaign = async () => {
+    try {
+      setIsLaunchingMiami(true);
+      const res = await fetch('/api/campaigns/miami-event/launch', { method: 'POST' });
+      const data = await res.json();
+      setMiamiStatusMsg(`✅ ¡${data.message || 'Campaña iniciada para los 13 leads con imagen adjunta'}!`);
+    } catch (err: any) {
+      setMiamiStatusMsg(`❌ Error al iniciar campaña: ${err.message}`);
+    } finally {
+      setIsLaunchingMiami(false);
+    }
+  };
 
   const handleTestTriage = async () => {
     try {
@@ -55,16 +95,130 @@ export const CampaignManager: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-10 pb-16">
+      {/* Header */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-serif-luxury font-bold text-white">
           Outreach Automatizado & Triage de Respuestas IA
         </h1>
         <p className="text-sm text-slate-300 mt-1 max-w-2xl">
-          Monitoreo de secuencias de captación institucional y motor de clasificación semántica para respuestas de inversores.
+          Monitoreo de secuencias de captación institucional, campañas de eventos presenciales y clasificación semántica de respuestas.
         </p>
       </div>
 
+      {/* MIAMI VIP EVENT DEDICATED CAMPAIGN CARD */}
+      <div className="glass-panel-gold rounded-3xl p-6 sm:p-8 border border-gold-500/40 relative overflow-hidden space-y-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="space-y-2 max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold-500/20 text-gold-300 font-mono text-xs uppercase tracking-wider font-bold">
+              <Calendar className="w-3.5 h-3.5" /> Evento Presencial VIP • Miami
+            </div>
+            <h2 className="text-2xl font-serif-luxury font-bold text-white">
+              Inversiones Inmobiliarias en Dubai — Hilton Garden Miramar
+            </h2>
+            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300 pt-1">
+              <span className="flex items-center gap-1.5 text-gold-400 font-semibold font-mono">
+                <Clock className="w-4 h-4" /> Domingo 29 de Agosto (10:00 AM - 8:00 PM)
+              </span>
+              <span className="flex items-center gap-1.5 text-slate-300">
+                <MapPin className="w-4 h-4 text-rose-400" /> Hilton Garden Inn, Miramar, Florida
+              </span>
+              <span className="flex items-center gap-1.5 text-emerald-400 font-mono font-bold">
+                <ImageIcon className="w-4 h-4" /> Flyer Adjunto Incluido
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <button
+              onClick={handleLaunchMiamiCampaign}
+              disabled={isLaunchingMiami}
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-600 hover:to-emerald-500 text-slate-950 font-black px-6 py-3.5 rounded-xl shadow-lg shadow-emerald-500/25 transition-all active:scale-95 text-xs font-mono uppercase tracking-wider disabled:opacity-50"
+            >
+              <Send className="w-4 h-4" />
+              <span>{isLaunchingMiami ? 'Despachando...' : `Enviar a los ${miamiLeads.length || 13} Leads`}</span>
+            </button>
+          </div>
+        </div>
+
+        {miamiStatusMsg && (
+          <div className="bg-emerald-950/90 border border-emerald-500 text-emerald-200 text-xs p-3.5 rounded-xl font-mono text-center shadow-lg">
+            {miamiStatusMsg}
+          </div>
+        )}
+
+        {/* Lead Table + Message Preview Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-4 border-t border-slate-800">
+          {/* Leads List (7 cols) */}
+          <div className="lg:col-span-7 space-y-3">
+            <div className="flex justify-between items-center text-xs font-mono text-slate-400">
+              <span>Lista de Leads Registrados ({miamiLeads.length})</span>
+              <span className="text-gold-400">Canal: WhatsApp Directo</span>
+            </div>
+
+            <div className="max-h-72 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+              {miamiLeads.map((lead) => (
+                <div
+                  key={lead.index}
+                  onClick={() => setSelectedLeadPreview(lead)}
+                  className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between text-xs ${
+                    selectedLeadPreview?.phone === lead.phone
+                      ? 'bg-gold-500/10 border-gold-500/60 shadow-md shadow-gold-500/10'
+                      : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-full bg-slate-800 text-gold-400 font-mono font-bold flex items-center justify-center text-[10px]">
+                      {lead.index}
+                    </div>
+                    <div>
+                      <div className="font-bold text-white">{lead.name}</div>
+                      <div className="text-[11px] text-slate-400 font-mono">{lead.email}</div>
+                    </div>
+                  </div>
+
+                  <div className="text-right font-mono">
+                    <span className="text-emerald-400 font-bold block">{lead.phone}</span>
+                    <span className="text-[10px] text-slate-500">Listo para despacho</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Message Preview (5 cols) */}
+          <div className="lg:col-span-5 space-y-3">
+            <div className="text-xs font-mono text-slate-400 flex items-center justify-between">
+              <span>Vista Previa del Mensaje</span>
+              <span className="text-emerald-400 font-bold">WhatsApp Oficial</span>
+            </div>
+
+            {selectedLeadPreview ? (
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs">
+                  <span className="text-slate-400">Destinatario:</span>
+                  <span className="font-bold text-gold-300 font-mono">{selectedLeadPreview.name} ({selectedLeadPreview.phone})</span>
+                </div>
+
+                <div className="bg-emerald-950/40 p-3.5 rounded-xl border border-emerald-800/40 text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-line">
+                  {selectedLeadPreview.sample_message}
+                </div>
+
+                <div className="flex items-center gap-2 text-[11px] text-slate-400 bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                  <ImageIcon className="w-4 h-4 text-gold-400 shrink-0" />
+                  <span>Imagen adjunta: <strong>Flyer Hilton Garden Miramar</strong></span>
+                </div>
+              </div>
+            ) : (
+              <div className="p-8 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-2xl">
+                Selecciona un lead para ver la personalización
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Two-Column View: Standard Radar Sequences + AI Triage */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left: Active Campaigns Table */}
         <div className="lg:col-span-7 space-y-4">
@@ -88,64 +242,13 @@ export const CampaignManager: React.FC = () => {
                       <span className="text-xs text-slate-400 font-mono">({camp.prospect_email})</span>
                     </div>
                     <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 uppercase font-mono">
-                      Multi-Channel Ready
+                      {camp.status}
                     </span>
                   </div>
 
-                  {/* 3 Channel Cards */}
-                  <div className="space-y-2">
-                    {/* 1. Email */}
-                    <div className="bg-slate-900/90 rounded-lg p-3 border border-slate-800/60 space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-gold-400 font-bold flex items-center gap-1.5">
-                          <Mail className="w-3.5 h-3.5" /> 1. Correo Institucional
-                        </span>
-                        <span className="text-[11px] text-slate-500 font-mono">Asunto: {camp.subject_line}</span>
-                      </div>
-                      <div className="text-slate-300 font-mono text-[11px] line-clamp-2 whitespace-pre-line bg-slate-950/60 p-2 rounded border border-slate-800">
-                        {camp.body_content}
-                      </div>
-                    </div>
-
-                    {/* 2. LinkedIn InMail */}
-                    <div className="bg-slate-900/90 rounded-lg p-3 border border-slate-800/60 space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-blue-400 font-bold flex items-center gap-1.5">
-                          💼 2. LinkedIn InMail Pitch
-                        </span>
-                        <a
-                          href={`https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(camp.prospect_name)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[10px] text-blue-400 hover:underline flex items-center gap-1"
-                        >
-                          Buscar en LinkedIn ↗
-                        </a>
-                      </div>
-                      <div className="text-slate-300 text-xs bg-slate-950/60 p-2 rounded border border-slate-800 italic">
-                        "{camp.linkedin_message || `Hi ${camp.prospect_name.split(' ')[0]}, we prepared a 5-year tax arbitrage model for Dubai Golden Visa...`}"
-                      </div>
-                    </div>
-
-                    {/* 3. WhatsApp Direct */}
-                    <div className="bg-slate-900/90 rounded-lg p-3 border border-slate-800/60 space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-emerald-400 font-bold flex items-center gap-1.5">
-                          📱 3. WhatsApp Direct Outreach
-                        </span>
-                        <a
-                          href={`https://wa.me/?text=${encodeURIComponent(camp.whatsapp_message || `Hello ${camp.prospect_name}, here is your confidential Dubai dossier: https://dubai-capital-radar.onrender.com/dossier/${camp.dossier_slug}`)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[10px] text-emerald-400 hover:underline flex items-center gap-1 font-semibold"
-                        >
-                          Enviar por WhatsApp ↗
-                        </a>
-                      </div>
-                      <div className="text-slate-300 text-xs bg-slate-950/60 p-2 rounded border border-slate-800 italic">
-                        "{camp.whatsapp_message || `Hello ${camp.prospect_name}, we structured a Dubai real estate & Golden Visa allocation portfolio for you...`}"
-                      </div>
-                    </div>
+                  <div className="bg-slate-900/90 rounded-lg p-3 border border-slate-800/60 space-y-2 text-xs">
+                    <div className="font-semibold text-gold-300">Asunto: {camp.subject_line}</div>
+                    <p className="text-slate-300 italic">"{camp.body_content.slice(0, 150)}..."</p>
                   </div>
 
                   <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono pt-1">

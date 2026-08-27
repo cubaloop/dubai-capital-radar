@@ -405,6 +405,39 @@ async def sync_all_to_crm():
         "crm_url": "https://tadh-crm.netlify.app"
     }
 
+from .outreach.miami_event_campaign import (
+    MIAMI_EVENT_LEADS, 
+    build_miami_message, 
+    dispatch_miami_event_campaign
+)
+
+@app.get("/api/campaigns/miami-event/leads")
+def get_miami_event_leads():
+    return {
+        "event": "Dubai Real Estate Investment VIP Briefing (Miami - Hilton Garden Miramar)",
+        "event_date": "Sunday, August 29 (10:00 AM - 8:00 PM)",
+        "total_leads": len(MIAMI_EVENT_LEADS),
+        "attached_flyer": "/static/dubai_miami_event.jpg",
+        "leads": [
+            {
+                "index": i + 1,
+                "name": lead["name"],
+                "phone": lead["phone"],
+                "email": lead["email"],
+                "sample_message": build_miami_message(lead["name"])
+            }
+            for i, lead in enumerate(MIAMI_EVENT_LEADS)
+        ]
+    }
+
+@app.post("/api/campaigns/miami-event/launch")
+async def launch_miami_event_campaign(background_tasks: BackgroundTasks):
+    background_tasks.add_task(dispatch_miami_event_campaign)
+    return {
+        "success": True,
+        "message": f"Campana iniciada con exito en segundo plano para los {len(MIAMI_EVENT_LEADS)} leads con imagen adjunta y pausas de seguridad anti-baneo."
+    }
+
 @app.post("/api/triage/classify", response_model=TriageResponse)
 def classify_reply(request: TriageRequest):
     return triage_incoming_response(request)

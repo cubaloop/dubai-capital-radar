@@ -86,9 +86,9 @@ app.get('/qr', (req, res) => {
 
 app.post('/send', async (req, res) => {
   try {
-    const { to, message } = req.body;
-    if (!to || !message) {
-      return res.status(400).json({ error: 'Missing recipient phone number or message' });
+    const { to, message, image_path, image_url } = req.body;
+    if (!to || (!message && !image_path && !image_url)) {
+      return res.status(400).json({ error: 'Missing recipient phone number or content' });
     }
 
     if (!isConnected || !sock) {
@@ -103,7 +103,20 @@ app.post('/send', async (req, res) => {
     const cleanNumber = to.replace(/[^0-9]/g, '');
     const jid = `${cleanNumber}@s.whatsapp.net`;
 
-    await sock.sendMessage(jid, { text: message });
+    if (image_path && fs.existsSync(image_path)) {
+      const imageBuffer = fs.readFileSync(image_path);
+      await sock.sendMessage(jid, {
+        image: imageBuffer,
+        caption: message || ''
+      });
+    } else if (image_url) {
+      await sock.sendMessage(jid, {
+        image: { url: image_url },
+        caption: message || ''
+      });
+    } else {
+      await sock.sendMessage(jid, { text: message });
+    }
 
     console.log(`📨 [WhatsApp Gateway] Message delivered to ${cleanNumber}`);
     return res.json({ success: true, delivered_to: cleanNumber });
