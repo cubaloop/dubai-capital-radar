@@ -8,15 +8,17 @@ import {
   Clock, 
   Mail, 
   User, 
-  ArrowRight,
-  ShieldCheck,
-  AlertTriangle,
-  Image as ImageIcon,
-  MapPin,
-  Calendar,
-  Phone,
-  Play,
-  Check
+  ArrowRight, 
+  ShieldCheck, 
+  AlertTriangle, 
+  Image as ImageIcon, 
+  MapPin, 
+  Calendar, 
+  Phone, 
+  Play, 
+  Check,
+  ExternalLink,
+  Loader2
 } from 'lucide-react';
 import { OutreachCampaign, TriageResponse } from '../types';
 import { apiService } from '../services/api';
@@ -38,6 +40,10 @@ export const CampaignManager: React.FC = () => {
   const [isLaunchingMiami, setIsLaunchingMiami] = useState<boolean>(false);
   const [miamiStatusMsg, setMiamiStatusMsg] = useState<string | null>(null);
   const [selectedLeadPreview, setSelectedLeadPreview] = useState<MiamiLead | null>(null);
+  
+  // Per-lead send state
+  const [sendingLeadPhone, setSendingLeadPhone] = useState<string | null>(null);
+  const [sentLeads, setSentLeads] = useState<Record<string, boolean>>({});
 
   // Triage state
   const [testSender, setTestSender] = useState<string>('Alexander Wright');
@@ -75,10 +81,41 @@ export const CampaignManager: React.FC = () => {
       const res = await fetch('/api/campaigns/miami-event/launch', { method: 'POST' });
       const data = await res.json();
       setMiamiStatusMsg(`✅ ¡${data.message || 'Campaña iniciada para los 13 leads con imagen adjunta'}!`);
+      // Mark all as sent in local state
+      const updated: Record<string, boolean> = {};
+      miamiLeads.forEach(l => updated[l.phone] = true);
+      setSentLeads(prev => ({ ...prev, ...updated }));
     } catch (err: any) {
       setMiamiStatusMsg(`❌ Error al iniciar campaña: ${err.message}`);
     } finally {
       setIsLaunchingMiami(false);
+    }
+  };
+
+  const handleSendSingleLead = async (lead: MiamiLead) => {
+    try {
+      setSendingLeadPhone(lead.phone);
+      const payload = {
+        to: lead.phone,
+        message: lead.sample_message,
+        image_path: '/app/whatsapp-gateway/uploads/dubai_miami_event.jpg'
+      };
+      const res = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSentLeads(prev => ({ ...prev, [lead.phone]: true }));
+        setMiamiStatusMsg(`✅ Mensaje + Flyer enviado con éxito a ${lead.name} (${lead.phone})`);
+      } else {
+        setMiamiStatusMsg(`⚠️ Error enviando a ${lead.name}: ${data.error || 'Fallo de entrega'}`);
+      }
+    } catch (err: any) {
+      setMiamiStatusMsg(`❌ Error: ${err.message}`);
+    } finally {
+      setSendingLeadPhone(null);
     }
   };
 
@@ -136,53 +173,102 @@ export const CampaignManager: React.FC = () => {
               className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-600 hover:to-emerald-500 text-slate-950 font-black px-6 py-3.5 rounded-xl shadow-lg shadow-emerald-500/25 transition-all active:scale-95 text-xs font-mono uppercase tracking-wider disabled:opacity-50"
             >
               <Send className="w-4 h-4" />
-              <span>{isLaunchingMiami ? 'Despachando...' : `Enviar a los ${miamiLeads.length || 13} Leads`}</span>
+              <span>{isLaunchingMiami ? 'Despachando Todos...' : `Enviar a los ${miamiLeads.length || 13} Leads en Secuencia`}</span>
             </button>
           </div>
         </div>
 
         {miamiStatusMsg && (
-          <div className="bg-emerald-950/90 border border-emerald-500 text-emerald-200 text-xs p-3.5 rounded-xl font-mono text-center shadow-lg">
+          <div className="bg-emerald-950/90 border border-emerald-500 text-emerald-200 text-xs p-3.5 rounded-xl font-mono text-center shadow-lg animate-fade-in">
             {miamiStatusMsg}
           </div>
         )}
 
         {/* Lead Table + Message Preview Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-4 border-t border-slate-800">
-          {/* Leads List (7 cols) */}
+          {/* Leads List with Individual Send Action (7 cols) */}
           <div className="lg:col-span-7 space-y-3">
             <div className="flex justify-between items-center text-xs font-mono text-slate-400">
-              <span>Lista de Leads Registrados ({miamiLeads.length})</span>
-              <span className="text-gold-400">Canal: WhatsApp Directo</span>
+              <span>Lista de Leads ({miamiLeads.length}) • Control Individual y Directo</span>
+              <span className="text-gold-400">Canal: WhatsApp Gateway</span>
             </div>
 
-            <div className="max-h-72 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-              {miamiLeads.map((lead) => (
-                <div
-                  key={lead.index}
-                  onClick={() => setSelectedLeadPreview(lead)}
-                  className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between text-xs ${
-                    selectedLeadPreview?.phone === lead.phone
-                      ? 'bg-gold-500/10 border-gold-500/60 shadow-md shadow-gold-500/10'
-                      : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 rounded-full bg-slate-800 text-gold-400 font-mono font-bold flex items-center justify-center text-[10px]">
-                      {lead.index}
-                    </div>
-                    <div>
-                      <div className="font-bold text-white">{lead.name}</div>
-                      <div className="text-[11px] text-slate-400 font-mono">{lead.email}</div>
-                    </div>
-                  </div>
+            <div className="max-h-80 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+              {miamiLeads.map((lead) => {
+                const isSent = sentLeads[lead.phone];
+                const isSendingThis = sendingLeadPhone === lead.phone;
+                const waDirectLink = `https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(lead.sample_message)}`;
 
-                  <div className="text-right font-mono">
-                    <span className="text-emerald-400 font-bold block">{lead.phone}</span>
-                    <span className="text-[10px] text-slate-500">Listo para despacho</span>
+                return (
+                  <div
+                    key={lead.index}
+                    onClick={() => setSelectedLeadPreview(lead)}
+                    className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 text-xs ${
+                      selectedLeadPreview?.phone === lead.phone
+                        ? 'bg-gold-500/10 border-gold-500/60 shadow-md shadow-gold-500/10'
+                        : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-full bg-slate-800 text-gold-400 font-mono font-bold flex items-center justify-center text-[10px]">
+                        {lead.index}
+                      </div>
+                      <div>
+                        <div className="font-bold text-white flex items-center gap-2">
+                          <span>{lead.name}</span>
+                          {isSent && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-800 font-mono">
+                              <Check className="w-3 h-3" /> Enviado
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-400 font-mono">{lead.phone}</div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      {/* Individual Send Button */}
+                      <button
+                        onClick={() => handleSendSingleLead(lead)}
+                        disabled={isSendingThis}
+                        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          isSent
+                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-700 hover:bg-emerald-900'
+                            : 'bg-gold-500 hover:bg-gold-400 text-slate-950 shadow-md shadow-gold-500/20'
+                        } disabled:opacity-50`}
+                      >
+                        {isSendingThis ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <span>Enviando...</span>
+                          </>
+                        ) : isSent ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-400" />
+                            <span>Reenviar</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-3 h-3" />
+                            <span>Enviar</span>
+                          </>
+                        )}
+                      </button>
+
+                      {/* Direct WA Web / App Link Fallback */}
+                      <a
+                        href={waDirectLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-emerald-950 hover:text-emerald-300 text-slate-400 border border-slate-700 transition-colors"
+                        title="Abrir Chat Directo en WhatsApp Web/App"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -207,6 +293,17 @@ export const CampaignManager: React.FC = () => {
                 <div className="flex items-center gap-2 text-[11px] text-slate-400 bg-slate-900 p-2.5 rounded-lg border border-slate-800">
                   <ImageIcon className="w-4 h-4 text-gold-400 shrink-0" />
                   <span>Imagen adjunta: <strong>Flyer Hilton Garden Miramar</strong></span>
+                </div>
+
+                <div className="pt-2 flex gap-2">
+                  <button
+                    onClick={() => handleSendSingleLead(selectedLeadPreview)}
+                    disabled={sendingLeadPhone === selectedLeadPreview.phone}
+                    className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-500/20 disabled:opacity-50"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Enviar a {selectedLeadPreview.name}</span>
+                  </button>
                 </div>
               </div>
             ) : (
