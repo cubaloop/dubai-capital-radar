@@ -184,13 +184,24 @@ export const WhatsAppQRModal: React.FC<WhatsAppQRModalProps> = ({ isOpen, onClos
               </ol>
             </div>
 
-            <button
-              onClick={fetchStatus}
-              disabled={isLoading}
-              className="inline-flex items-center gap-1.5 text-xs text-gold-400 hover:text-gold-300 font-semibold"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} /> Refrescar QR
-            </button>
+            <div className="flex items-center justify-center gap-4">
+              <button
+                onClick={fetchStatus}
+                disabled={isLoading}
+                className="inline-flex items-center gap-1.5 text-xs text-gold-400 hover:text-gold-300 font-semibold"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} /> Refrescar QR
+              </button>
+
+              <button
+                onClick={handleLogout}
+                disabled={isLoading}
+                className="inline-flex items-center gap-1.5 text-xs text-rose-400 hover:text-rose-300 font-semibold"
+                title="Borra tokens viejos y crea un QR 100% nuevo"
+              >
+                <LogOut className="w-3.5 h-3.5" /> Generar Nuevo QR Limpio
+              </button>
+            </div>
           </div>
         )}
       </div>

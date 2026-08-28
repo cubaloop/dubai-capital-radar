@@ -5,7 +5,8 @@ import QRCode from 'qrcode';
 import makeWASocket, { 
   DisconnectReason, 
   useMultiFileAuthState, 
-  fetchLatestBaileysVersion 
+  fetchLatestBaileysVersion,
+  Browsers
 } from '@whiskeysockets/baileys';
 import fs from 'fs';
 import path from 'path';
@@ -140,8 +141,13 @@ async function startWhatsApp() {
     logger: pino({ level: 'silent' }),
     printQRInTerminal: true,
     auth: state,
+    browser: Browsers.macOS('Desktop'),
+    syncFullHistory: false,
     generateHighQualityLinkPreview: true,
-    // Reconnect options for stability
+    markOnlineOnConnect: true,
+    connectTimeoutMs: 60000,
+    defaultQueryTimeoutMs: 60000,
+    keepAliveIntervalMs: 25000,
     retryRequestDelayMs: 2000,
     maxMsgRetryCount: 5,
   });
