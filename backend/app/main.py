@@ -487,6 +487,7 @@ def classify_reply(request: TriageRequest):
 from .inventory.project_parser import parse_project_from_text, is_developer_or_launch_message
 from .outreach.ai_agent import classify_message_intent, generate_ai_response
 from .content.social_generator import generate_daily_social_pack
+from .outreach.telegram_notifier import notify_hot_prospect_reply, notify_developer_launch
 
 INGESTED_PROJECTS_FEED: List[Dict[str, Any]] = []
 
@@ -513,6 +514,15 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
             parsed_project["detected_at"] = payload.get("timestamp")
             INGESTED_PROJECTS_FEED.insert(0, parsed_project)
             print(f"[Auto-Ingestion] New project parsed: {parsed_project.get('project_name')} by {parsed_project.get('developer')}")
+            
+            # Send instant Telegram alert to broker
+            await notify_developer_launch(
+                project_name=parsed_project.get("project_name") or "Nuevo Lanzamiento",
+                developer=parsed_project.get("developer") or "Desarrolladora Dubai",
+                price_aed=parsed_project.get("starting_price_aed"),
+                payment_plan=parsed_project.get("payment_plan")
+            )
+
             return {
                 "status": "project_ingested",
                 "project_name": parsed_project.get("project_name"),
@@ -522,11 +532,24 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
 
     # 2. Prospect conversation triage
     intent_data = await classify_message_intent(text)
+    intent = intent_data.get("intent", "info_request")
+    urgency = intent_data.get("urgency", "low")
+
+    # If lead shows high intent, objection to resolve, or ready to buy -> trigger Telegram alert!
+    if intent in ["ready_to_buy", "interested", "scheduling", "objection_price", "objection_trust", "objection_spouse"] or urgency in ["high", "medium"]:
+        await notify_hot_prospect_reply(
+            lead_name=f"Lead (+{sender})",
+            lead_phone=f"+{sender}",
+            message=text,
+            intent=intent,
+            country="España / Internacional"
+        )
+
     return {
         "status": "prospect_message_processed",
         "sender": sender,
-        "intent": intent_data.get("intent"),
-        "urgency": intent_data.get("urgency"),
+        "intent": intent,
+        "urgency": urgency,
         "notify_human": intent_data.get("notify_human", False)
     }
 
