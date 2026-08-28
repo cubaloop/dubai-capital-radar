@@ -453,6 +453,32 @@ async def launch_miami_event_campaign(background_tasks: BackgroundTasks):
         "message": f"Campana iniciada con exito en segundo plano para los {len(MIAMI_EVENT_LEADS)} leads con imagen adjunta y pausas de seguridad anti-baneo."
     }
 
+# --- SPAIN REACTIVATION CAMPAIGN (112 LEADS EN EUROS Y M²) ---
+from .outreach.spain_campaign import SPAIN_LEADS_DATA, build_spain_reactivation_message
+
+@app.get("/api/campaigns/spain-reactivation/leads")
+def get_spain_reactivation_leads():
+    return {
+        "campaign_name": "Reactivación España Feb (112 Leads)",
+        "currency": "EUR (€)",
+        "surface_unit": "m²",
+        "total_leads": len(SPAIN_LEADS_DATA),
+        "leads": [
+            {
+                "index": i + 1,
+                "name": lead["name"],
+                "phone": lead["phone"],
+                "email": lead.get("email", ""),
+                "objective": lead.get("objective", ""),
+                "timeline": lead.get("timeline", ""),
+                "notes": lead.get("notes", ""),
+                "personalized_message": build_spain_reactivation_message(lead)
+            }
+            for i, lead in enumerate(SPAIN_LEADS_DATA)
+        ]
+    }
+
+
 @app.post("/api/triage/classify", response_model=TriageResponse)
 def classify_reply(request: TriageRequest):
     return triage_incoming_response(request)
