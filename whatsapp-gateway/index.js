@@ -177,14 +177,54 @@ async function startWhatsApp() {
           fs.mkdirSync(AUTH_DIR, { recursive: true });
         }
       }
-    } else if (connection === 'open') {
-      isConnected = true;
-      currentQR = null;
-      connectedNumber = sock.user?.id?.split(':')[0] || 'Linked Phone';
-      lastActivityAt = Date.now();
-      console.log(`[WhatsApp] Connected as +${connectedNumber}`);
-      // Backup immediately after connecting
-      await uploadAuthToSupabase();
+    }
+  });
+
+  // Listen to incoming messages for Developer Launch auto-ingestion & Prospect AI replies
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return;
+
+    for (const msg of messages) {
+      if (!msg.message || msg.key.fromMe) continue;
+
+      const remoteJid = msg.key.remoteJid || '';
+      const isGroup = remoteJid.endsWith('@g.us');
+      const senderNumber = remoteJid.replace(/[^0-9]/g, '');
+
+      // Extract text content from various message structures
+      const textContent = msg.message.conversation ||
+                          msg.message.extendedTextMessage?.text ||
+                          msg.message.imageMessage?.caption ||
+                          msg.message.documentMessage?.caption ||
+                          msg.message.documentMessage?.fileName || '';
+
+      const hasDocument = !!msg.message.documentMessage;
+      const documentFileName = msg.message.documentMessage?.fileName || null;
+
+      if (!textContent && !hasDocument) continue;
+
+      console.log(`[WhatsApp Inbound] Message received from ${senderNumber} (${isGroup ? 'Group' : 'Direct'})`);
+
+      // Forward asynchronously to Python backend webhook
+      try {
+        fetch('http://127.0.0.1:8000/api/whatsapp/inbound-webhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sender: senderNumber,
+            jid: remoteJid,
+            is_group: isGroup,
+            text: textContent,
+            has_document: hasDocument,
+            document_file_name: documentFileName,
+            timestamp: msg.messageTimestamp
+          })
+        }).catch(err => {
+          // Non-blocking log
+        });
+      } catch (err) {
+        // Silent catch
+      }
     }
   });
 }

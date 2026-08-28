@@ -457,6 +457,67 @@ async def launch_miami_event_campaign(background_tasks: BackgroundTasks):
 def classify_reply(request: TriageRequest):
     return triage_incoming_response(request)
 
+# --- INBOUND WHATSAPP AI INGESTION & AUTO-TRIAGE WEBHOOK ---
+from .inventory.project_parser import parse_project_from_text, is_developer_or_launch_message
+from .outreach.ai_agent import classify_message_intent, generate_ai_response
+from .content.social_generator import generate_daily_social_pack
+
+INGESTED_PROJECTS_FEED: List[Dict[str, Any]] = []
+
+@app.post("/api/whatsapp/inbound-webhook")
+async def handle_whatsapp_inbound(payload: Dict[str, Any]):
+    """
+    Receives incoming WhatsApp messages in real-time.
+    1. If from developer/launch group -> Gemini parses project facts and adds to inventory knowledge.
+    2. If from prospect -> Gemini classifies intent & generates personalized reply context.
+    """
+    text = payload.get("text", "")
+    sender = payload.get("sender", "")
+    is_group = payload.get("is_group", False)
+
+    if not text:
+        return {"status": "ignored", "reason": "empty_content"}
+
+    # 1. Developer project launch detection
+    if is_developer_or_launch_message(text, is_group=is_group):
+        parsed_project = await parse_project_from_text(text)
+        if parsed_project:
+            parsed_project["sender"] = sender
+            parsed_project["is_group"] = is_group
+            parsed_project["detected_at"] = payload.get("timestamp")
+            INGESTED_PROJECTS_FEED.insert(0, parsed_project)
+            print(f"[Auto-Ingestion] New project parsed: {parsed_project.get('project_name')} by {parsed_project.get('developer')}")
+            return {
+                "status": "project_ingested",
+                "project_name": parsed_project.get("project_name"),
+                "developer": parsed_project.get("developer"),
+                "starting_price_aed": parsed_project.get("starting_price_aed")
+            }
+
+    # 2. Prospect conversation triage
+    intent_data = await classify_message_intent(text)
+    return {
+        "status": "prospect_message_processed",
+        "sender": sender,
+        "intent": intent_data.get("intent"),
+        "urgency": intent_data.get("urgency"),
+        "notify_human": intent_data.get("notify_human", False)
+    }
+
+@app.get("/api/inventory/ingested-launches")
+def get_ingested_launches():
+    """Returns all project updates automatically ingested from WhatsApp groups/chats."""
+    return {
+        "total_ingested": len(INGESTED_PROJECTS_FEED),
+        "projects": INGESTED_PROJECTS_FEED[:20]
+    }
+
+@app.get("/api/content/daily-pack")
+async def get_daily_content_pack(lang: str = "es"):
+    """Generates daily organic social media pack (WhatsApp Status, LinkedIn, Instagram)."""
+    return await generate_daily_social_pack(language=lang)
+
+
 # --- STATIC FILES & SINGLE PAGE APP (SPA) ROUTING ---
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
