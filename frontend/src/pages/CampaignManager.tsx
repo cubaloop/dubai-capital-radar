@@ -100,8 +100,10 @@ export const CampaignManager: React.FC = () => {
         message: msg
       };
       
-      // If miami event, attach flyer
-      if (activeCampaignTab === 'miami') {
+      // Attach appropriate flyer
+      if (activeCampaignTab === 'spain') {
+        payload.image_path = '/app/whatsapp-gateway/uploads/dubai_madrid_event.jpg';
+      } else if (activeCampaignTab === 'miami') {
         payload.image_path = '/app/whatsapp-gateway/uploads/dubai_miami_event.jpg';
       }
 
@@ -113,7 +115,7 @@ export const CampaignManager: React.FC = () => {
       const data = await res.json();
       if (data.success) {
         setSentLeads(prev => ({ ...prev, [lead.phone]: true }));
-        setStatusMsg(`✅ Mensaje enviado con éxito a ${lead.name} (${lead.phone})`);
+        setStatusMsg(`✅ Invitación a Madrid Expo enviada con éxito a ${lead.name} (${lead.phone})`);
       } else {
         setStatusMsg(`⚠️ Error enviando a ${lead.name}: ${data.error || 'Fallo de entrega'}`);
       }
@@ -121,6 +123,23 @@ export const CampaignManager: React.FC = () => {
       setStatusMsg(`❌ Error: ${err.message}`);
     } finally {
       setSendingLeadPhone(null);
+    }
+  };
+
+  const handleLaunchBatchSequence = async () => {
+    try {
+      setIsLaunchingBatch(true);
+      const endpoint = activeCampaignTab === 'spain'
+        ? '/api/campaigns/spain-reactivation/launch'
+        : '/api/campaigns/miami-event/launch';
+      
+      const res = await fetch(endpoint, { method: 'POST' });
+      const data = await res.json();
+      setStatusMsg(`🚀 ${data.message || 'Campaña iniciada en segundo plano con pausas de seguridad'}`);
+    } catch (err: any) {
+      setStatusMsg(`❌ Error: ${err.message}`);
+    } finally {
+      setIsLaunchingBatch(false);
     }
   };
 
@@ -195,7 +214,7 @@ export const CampaignManager: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
@@ -203,9 +222,18 @@ export const CampaignManager: React.FC = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Buscar por nombre, tel o nota..."
-                className="bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-gold-500 font-mono w-64"
+                className="bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-gold-500 font-mono w-56"
               />
             </div>
+
+            <button
+              onClick={handleLaunchBatchSequence}
+              disabled={isLaunchingBatch}
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-600 text-slate-950 font-black px-4 py-2 rounded-xl shadow-lg shadow-emerald-500/25 transition-all active:scale-95 text-xs font-mono uppercase tracking-wider disabled:opacity-50"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>{isLaunchingBatch ? 'Despachando...' : `Despachar a Todos (${filteredLeads.length})`}</span>
+            </button>
           </div>
         </div>
 

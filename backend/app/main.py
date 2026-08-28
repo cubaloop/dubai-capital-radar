@@ -453,13 +453,21 @@ async def launch_miami_event_campaign(background_tasks: BackgroundTasks):
         "message": f"Campana iniciada con exito en segundo plano para los {len(MIAMI_EVENT_LEADS)} leads con imagen adjunta y pausas de seguridad anti-baneo."
     }
 
-# --- SPAIN REACTIVATION CAMPAIGN (112 LEADS EN EUROS Y M²) ---
-from .outreach.spain_campaign import SPAIN_LEADS_DATA, build_spain_reactivation_message
+# --- SPAIN MADRID PROPERTY EXPO CAMPAIGN (112 LEADS EN EUROS Y M²) ---
+from .outreach.spain_campaign import (
+    SPAIN_LEADS_DATA,
+    build_madrid_expo_invitation,
+    dispatch_spain_event_campaign,
+    CAMPAIGN_PROGRESS as SPAIN_PROGRESS
+)
 
 @app.get("/api/campaigns/spain-reactivation/leads")
 def get_spain_reactivation_leads():
     return {
-        "campaign_name": "Reactivación España Feb (112 Leads)",
+        "campaign_name": "Dubai Property Expo Madrid (112 Leads)",
+        "event_dates": "9 y 10 Septiembre (10:00 AM - 8:00 PM)",
+        "event_location": "Novotel Madrid Center",
+        "attached_flyer": "/static/dubai_madrid_event.jpg",
         "currency": "EUR (€)",
         "surface_unit": "m²",
         "total_leads": len(SPAIN_LEADS_DATA),
@@ -472,10 +480,22 @@ def get_spain_reactivation_leads():
                 "objective": lead.get("objective", ""),
                 "timeline": lead.get("timeline", ""),
                 "notes": lead.get("notes", ""),
-                "personalized_message": build_spain_reactivation_message(lead)
+                "personalized_message": build_madrid_expo_invitation(lead)
             }
             for i, lead in enumerate(SPAIN_LEADS_DATA)
         ]
+    }
+
+@app.get("/api/campaigns/spain-reactivation/status")
+def get_spain_campaign_status():
+    return SPAIN_PROGRESS
+
+@app.post("/api/campaigns/spain-reactivation/launch")
+async def launch_spain_campaign(background_tasks: BackgroundTasks):
+    background_tasks.add_task(dispatch_spain_event_campaign)
+    return {
+        "success": True,
+        "message": f"Campaña de invitación a Dubai Property Expo Madrid iniciada para los {len(SPAIN_LEADS_DATA)} leads con flyer adjunto y pausas anti-baneo."
     }
 
 
