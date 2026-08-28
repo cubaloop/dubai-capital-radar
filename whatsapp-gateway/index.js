@@ -21,7 +21,6 @@ const AUTH_DIR = path.join(process.cwd(), 'whatsapp_auth');
 // ─── Supabase Session Persistence ────────────────────────────────────────────
 const SUPABASE_URL = process.env.SUPABASE_URL || null;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || null;
-const SUPABASE_BUCKET = 'whatsapp-auth';
 const AUTH_BACKUP_ENABLED = !!(SUPABASE_URL && SUPABASE_KEY);
 
 if (!fs.existsSync(AUTH_DIR)) {
@@ -32,65 +31,72 @@ async function uploadAuthToSupabase() {
   if (!AUTH_BACKUP_ENABLED) return;
   try {
     const files = fs.readdirSync(AUTH_DIR);
+    if (!files.length) return;
+
+    // Bundle all auth files into one JSON payload for atomic persistence
+    const bundle = {};
     for (const file of files) {
       const filePath = path.join(AUTH_DIR, file);
-      const content = fs.readFileSync(filePath, 'utf-8');
-      const base64 = Buffer.from(content).toString('base64');
-      
-      await fetch(`${SUPABASE_URL}/storage/v1/object/${SUPABASE_BUCKET}/${file}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/octet-stream',
-          'x-upsert': 'true'
-        },
-        body: base64
-      });
+      bundle[file] = fs.readFileSync(filePath, 'utf-8');
     }
-    console.log(`[Session Backup] Auth files backed up to Supabase (${files.length} files)`);
+
+    // Save to Supabase REST endpoint (whatsapp_sessions table)
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/whatsapp_sessions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'apikey': SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({
+        key: 'active_session',
+        value: JSON.stringify(bundle),
+        phone: connectedNumber || 'unknown'
+      })
+    });
+
+    if (res.ok) {
+      console.log(`[Session Backup] ✅ Auth session bundle backed up to Supabase (${files.length} keys)`);
+    } else {
+      console.log(`[Session Backup] Notice: Table whatsapp_sessions status ${res.status}`);
+    }
   } catch (err) {
-    console.error('[Session Backup] Failed to backup auth:', err.message);
+    console.error('[Session Backup] Backup error:', err.message);
   }
 }
 
 async function restoreAuthFromSupabase() {
   if (!AUTH_BACKUP_ENABLED) {
-    console.log('[Session Restore] Supabase not configured - using local auth only');
+    console.log('[Session Restore] Supabase not configured - using local auth');
     return false;
   }
   try {
-    const listRes = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${SUPABASE_BUCKET}`, {
-      method: 'POST',
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/whatsapp_sessions?key=eq.active_session&select=*`, {
       headers: {
         'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ prefix: '', limit: 100 })
-    });
-    
-    if (!listRes.ok) {
-      console.log('[Session Restore] No backup found in Supabase - fresh start');
-      return false;
-    }
-    
-    const files = await listRes.json();
-    if (!files || files.length === 0) {
-      console.log('[Session Restore] No auth files in Supabase - fresh start');
-      return false;
-    }
-    
-    for (const file of files) {
-      const downloadRes = await fetch(
-        `${SUPABASE_URL}/storage/v1/object/${SUPABASE_BUCKET}/${file.name}`,
-        { headers: { 'Authorization': `Bearer ${SUPABASE_KEY}` } }
-      );
-      if (downloadRes.ok) {
-        const base64 = await downloadRes.text();
-        const content = Buffer.from(base64, 'base64').toString('utf-8');
-        fs.writeFileSync(path.join(AUTH_DIR, file.name), content, 'utf-8');
+        'apikey': SUPABASE_KEY
       }
+    });
+
+    if (!res.ok) {
+      console.log('[Session Restore] No session table found in Supabase - starting fresh');
+      return false;
     }
-    console.log(`[Session Restore] Restored ${files.length} auth files from Supabase`);
+
+    const rows = await res.json();
+    if (!rows || !rows.length || !rows[0].value) {
+      console.log('[Session Restore] No previous session bundle in Supabase - starting fresh');
+      return false;
+    }
+
+    const bundle = JSON.parse(rows[0].value);
+    const fileKeys = Object.keys(bundle);
+    for (const file of fileKeys) {
+      fs.writeFileSync(path.join(AUTH_DIR, file), bundle[file], 'utf-8');
+    }
+
+    console.log(`[Session Restore] ✅ Restored ${fileKeys.length} session auth keys from Supabase`);
     return true;
   } catch (err) {
     console.error('[Session Restore] Restore failed:', err.message);

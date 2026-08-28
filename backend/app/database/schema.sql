@@ -112,12 +112,18 @@ ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE campaigns     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE signals       ENABLE ROW LEVEL SECURITY;
 
--- Allow service role full access (your backend uses service role key)
-CREATE POLICY "service_role_all" ON leads         FOR ALL USING (true);
-CREATE POLICY "service_role_all" ON conversations FOR ALL USING (true);
-CREATE POLICY "service_role_all" ON campaigns     FOR ALL USING (true);
-CREATE POLICY "service_role_all" ON signals       FOR ALL USING (true);
+-- 7. WHATSAPP SESSIONS TABLE (Atomic Auth State Persistence)
+CREATE TABLE IF NOT EXISTS whatsapp_sessions (
+    key         TEXT PRIMARY KEY,
+    value       TEXT NOT NULL,
+    phone       TEXT,
+    updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE whatsapp_sessions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "service_role_all" ON whatsapp_sessions FOR ALL USING (true);
 
 -- ============================================================
 -- Done! Your schema is ready.
 -- ============================================================
+
