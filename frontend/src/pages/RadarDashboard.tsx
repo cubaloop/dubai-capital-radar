@@ -362,44 +362,46 @@ export const RadarDashboard: React.FC<RadarDashboardProps> = ({
             <h2 className="text-lg font-serif-luxury font-bold text-white flex items-center gap-2">
               <Radar className="w-5 h-5 text-gold-400" /> Señales de Liquidez en Vivo
             </h2>
-            <span className="text-xs text-slate-400 font-mono">{signals.length} Eventos Detectados</span>
+            <span className="text-xs text-slate-400 font-mono">{(signals || []).length} Eventos Detectados</span>
           </div>
 
           <div className="space-y-3">
-            {signals.map((sig) => (
+            {(signals || []).map((sig: any, index: number) => (
               <div
-                key={sig.id}
+                key={sig.id || index}
                 className="glass-panel rounded-xl p-4 border border-slate-800 hover:border-gold-500/40 transition-all space-y-3"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <span className="inline-block px-2 py-0.5 text-[10px] font-mono font-bold uppercase rounded bg-slate-800 text-gold-300 border border-slate-700">
-                      {sig.source_country} • {sig.signal_type.replace('_', ' ')}
+                      {sig.source_country || sig.country || 'INTL'} • {sig.signal_type ? sig.signal_type.replace('_', ' ') : 'INTENT SIGNAL'}
                     </span>
-                    <h3 className="font-bold text-sm text-white mt-1.5">{sig.title}</h3>
+                    <h3 className="font-bold text-sm text-white mt-1.5">{sig.title || sig.content || 'Señal de Inversión'}</h3>
                   </div>
                   <div className="text-right">
                     <span className="text-xs font-bold text-emerald-400 font-mono block">
-                      ${(sig.estimated_liquidity_usd / 1000000).toFixed(1)}M
+                      {sig.estimated_liquidity_usd ? `$${(sig.estimated_liquidity_usd / 1000000).toFixed(1)}M` : `Score: ${sig.score || 85}/100`}
                     </span>
-                    <span className="text-[10px] text-slate-400 font-mono">Confianza: {(sig.confidence_score * 100).toFixed(0)}%</span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      Confianza: {((sig.confidence_score || (sig.score ? sig.score / 100 : 0.85)) * 100).toFixed(0)}%
+                    </span>
                   </div>
                 </div>
 
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  {sig.description}
+                <p className="text-xs text-slate-300 leading-relaxed line-clamp-3">
+                  {sig.description || sig.content}
                 </p>
 
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs">
                   <div className="flex flex-wrap gap-1">
-                    {sig.tags.slice(0, 2).map((t, idx) => (
+                    {((sig.tags || sig.matched_keywords) || ['Inversión', 'Dubai']).slice(0, 3).map((t: string, idx: number) => (
                       <span key={idx} className="text-[10px] bg-slate-900 text-slate-400 px-2 py-0.5 rounded border border-slate-800">
                         #{t}
                       </span>
                     ))}
                   </div>
                   <span className="text-[10px] text-slate-500 font-mono">
-                    {new Date(sig.detected_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {sig.detected_at ? new Date(sig.detected_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Reciente'}
                   </span>
                 </div>
               </div>

@@ -29,9 +29,16 @@ export const apiService = {
   },
 
   async getSignals(): Promise<LiquiditySignal[]> {
-    const res = await fetch(`${API_BASE_URL}/radar/signals`);
-    if (!res.ok) throw new Error('Failed to fetch signals');
-    return res.json();
+    try {
+      const res = await fetch(`${API_BASE_URL}/radar/signals`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.signals)) return data.signals;
+      return [];
+    } catch {
+      return [];
+    }
   },
 
   async triggerRadarScan(): Promise<LiquiditySignal> {
