@@ -6,7 +6,6 @@ import os
 import uuid
 
 from .models.schemas import (
-    LiquiditySignal,
     ProspectProfile,
     DossierResponse,
     OutreachCampaign,
@@ -15,7 +14,7 @@ from .models.schemas import (
     TriageResponse,
     TaxComparison
 )
-from .collectors.radar_worker import radar_engine
+from .collectors.radar_worker import intent_radar
 from .enrichment.profiler import enrich_signal_to_prospect, get_preset_prospects
 from .financial_engine.tax_model import calculate_tax_arbitrage, TAX_RATES_DATABASE
 from .inventory.projects import get_all_projects, match_projects_for_budget
@@ -184,30 +183,32 @@ def toggle_autopilot():
 
 # --- RADAR & SIGNALS ENDPOINTS ---
 
-@app.get("/api/radar/signals", response_model=List[LiquiditySignal])
-def get_signals():
-    return radar_engine.get_latest_signals()
 
-@app.post("/api/radar/scan", response_model=LiquiditySignal)
+# --- RADAR v2.0 - REAL INTENT SIGNALS ENDPOINTS ---
+
+@app.get("/api/radar/signals")
+async def get_signals():
+    """Run a fresh radar scan and return real intent signals from Reddit and social platforms."""
+    try:
+        signals = await intent_radar.run_full_scan()
+        return {"signals": signals, "count": len(signals), "source": "live_social_scan"}
+    except Exception as e:
+        return {"signals": [], "count": 0, "error": str(e)}
+
+@app.post("/api/radar/scan")
 async def trigger_radar_scan():
-    global AUTOPILOT_ENABLED, AUTOPILOT_DISPATCH_COUNT
-    new_sig = radar_engine.trigger_live_scan()
-    # Auto enrich into a prospect
-    prospect = enrich_signal_to_prospect(new_sig)
-    PROSPECTS_STORE[prospect.id] = prospect
+    """Trigger a new radar scan manually."""
+    try:
+        signals = await intent_radar.run_full_scan()
+        return {
+            "status": "scan_complete",
+            "new_signals": len(signals),
+            "top_signal": signals[0] if signals else None
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
-    # If Autopilot is enabled: automatically generate dossier and dispatch multi-channel outreach!
-    if AUTOPILOT_ENABLED:
-        dossier = build_dossier(prospect)
-        DOSSIERS_STORE[dossier.slug] = dossier
-        DOSSIERS_STORE[dossier.dossier_id] = dossier
-        campaign = create_outreach_campaign(prospect, dossier)
-        prospect.status = "contacted"
-        AUTOPILOT_DISPATCH_COUNT += 1
-        if prospect.phone and campaign.whatsapp_message:
-            await dispatch_whatsapp_direct(prospect.phone, campaign.whatsapp_message)
 
-    return new_sig
 
 # --- PROSPECTS & ENRICHMENT ---
 
