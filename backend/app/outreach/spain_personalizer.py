@@ -1,11 +1,14 @@
 """
-Deep Semantic Lead Personalizer for Dubai Property Expo Madrid
-Crafts a unique, nuanced, individualized message for every one of the 112 Spain leads
-taking into account their exact previous objections, notes, family situation, timeline, and budget.
+Direct High-Impact Madrid Expo Personalizer
+Creates punchy, direct messages that:
+1. Ignore any war/geopolitical mention completely.
+2. Directly reference their specific previous interest/budget/notes.
+3. Present the unique opportunity of having our team as personal advisors FREE in Madrid for 2 days.
+4. Include event details & exclusive perks (Golden Visa gratis, 15-20% off, Property Management gratis).
+5. Invite to confirm attendance for VIP list.
 """
 import json
 import os
-import re
 
 LEADS_FILE = os.path.join(os.path.dirname(__file__), "spain_campaign_leads.json")
 
@@ -13,87 +16,91 @@ def clean_first_name(full_name: str) -> str:
     parts = full_name.strip().split()
     if not parts:
         return "Hola"
-    # Filter titles
     first = parts[0]
     if first.lower() in ["dr.", "dr", "dña", "dñ.", "abg", "abg."]:
-        return parts[1] if len(parts) > 1 else "Estimado/a"
+        return parts[1] if len(parts) > 1 else "Hola"
     return first.capitalize()
 
-def generate_bespoke_message(lead: dict) -> str:
+def generate_direct_message(lead: dict) -> str:
     name = clean_first_name(lead.get("name", ""))
     notes = (lead.get("notes") or "").lower()
     objective = (lead.get("objective") or "").lower()
-    timeline = (lead.get("timeline") or "").lower()
     
-    # 1. Tailored contextual opening & reference to previous discussion
-    lead_specific_hook = ""
-    
+    # 1. Direct, specific reference to their previous interest
+    interest_reference = ""
     if "flipping" in notes or "300k" in notes:
-        lead_specific_hook = "Recuerdo que estuvimos evaluando opciones orientadas a revalorización rápida (flipping) sobre 300.000€ y acordamos hacer una pausa por la coyuntura de esos días."
+        interest_reference = "Recuerdo perfectamente tu interés en oportunidades de revalorización rápida (flipping) sobre 300.000€."
     elif "160k" in notes or ("cash" in notes and "buyer" in notes):
-        lead_specific_hook = "Sé que tu prioridad era una unidad de entrada accesible (estudio sobre 150.000€ - 160.000€ / 40-45 m²) como compra al contado para rentabilizar de inmediato."
-    elif "hijos" in notes or "esposa" in notes or "familia" in notes or "chalet" in notes:
-        lead_specific_hook = "Recuerdo que tu objetivo era una vivienda espaciosa (3-4 dormitorios tipo chalet / townhouse) para mudarte con tu familia y tus hijos en un plazo aproximado de un año."
+        interest_reference = "Recuerdo que buscabas una unidad de entrada accesible (estudio sobre 150.000€ - 160.000€ / 40-45 m²) para rentabilizar al contado."
+    elif "hijos" in notes or "esposa" in notes or "familia" in notes or "chalet" in notes or "downhouse" in notes:
+        interest_reference = "Recuerdo que tu interés estaba enfocado en una vivienda amplia (tipo chalet / townhouse de 3-4 dormitorios) para mudarte con tu familia."
     elif "esposa le dijo que no" in notes:
-        lead_specific_hook = "Recuerdo que en su momento estuviste viendo opciones off-plan sobre 200.000€ y decidieron no avanzar en conjunto. Te contacto con novedades que facilitan mucho la decisión familiar."
+        interest_reference = "Sé que estuviste viendo opciones off-plan sobre 200.000€ y querías ver el momento ideal para tomar la decisión familiar."
     elif "exportador de frutas" in notes or "empresa" in notes:
-        lead_specific_hook = "Sé que valoras la diversificación patrimonial en activos refugio y la optimización fiscal internacional para tu capital."
+        interest_reference = "Sé que buscas diversificación patrimonial en activos seguros en dólares y optimización fiscal."
     elif "grupo de inversores" in notes or "100k" in notes:
-        lead_specific_hook = "Sé que gestionas un grupo de inversores buscando tickets desde 100.000€ con alta rentabilidad neta libre de impuestos."
+        interest_reference = "Sé que gestionas un grupo de inversores buscando tickets desde 100.000€ con alta rentabilidad neta."
     elif "venda su propiedad" in notes:
-        lead_specific_hook = "Recuerdo que estabas pendiente de la venta de un inmueble para reinvertir en activos más rentables y seguros."
+        interest_reference = "Recuerdo que estabas planeando reinvertir capital tras la venta de un inmueble en España."
     elif "2br venice" in notes or "venice" in notes:
-        lead_specific_hook = "Recuerdo tu interés específico en tipologías de 2 dormitorios en proyectos estilo resort con canales de agua."
+        interest_reference = "Recuerdo tu interés en proyectos estilo resort con canales de agua de 2 dormitorios."
     elif "off plan" in notes or "off-plan" in notes:
-        lead_specific_hook = "Sé que tu idea era entrar en fase off-plan con un 10-20% y pagar cuotas cómodas durante la construcción para luego rentar o vender."
+        interest_reference = "Sé que tu objetivo era entrar en proyectos off-plan con pagos escalonados y rentabilizar luego."
     elif "renta" in notes or "alquiler" in notes or "propósito de inversión" in objective:
-        lead_specific_hook = "Sé que tu objetivo principal es rentabilizar capital con retornos del 8-9% neto anual libre de IRPF y plusvalías."
+        interest_reference = "Sé que tu prioridad es rentabilizar capital con retornos del 8-9% neto anual libre de IRPF."
     elif "reubicación" in objective or "residencia" in objective:
-        lead_specific_hook = "Sé que tu interés principal estaba enfocado en la residencia permanente en Dubai y las ventajas de calidad de vida y seguridad para ti."
+        interest_reference = "Sé que tu objetivo principal era obtener la residencia permanente y calidad de vida en Dubai."
     else:
-        lead_specific_hook = "Te escribo porque en febrero solicitaste información sobre inversiones en Dubai a través de nuestro anuncio en España."
+        interest_reference = "Recuerdo tu interés cuando nos consultaste sobre inversiones inmobiliarias en Dubai."
 
-    # 2. Tailored benefit based on timeline/profile
-    profile_benefit = ""
-    if "reubicación" in objective or "residencia" in objective or "hijos" in notes:
-        profile_benefit = "• 🛂 **Golden Visa de 10 Años 100% GRATIS** para ti y toda tu familia\n• 🏠 Comunidades residenciales cerca de colegios internacionales\n• 🏷️ **Descuentos exclusivos del 15% al 20%** durante el evento"
+    # 2. Tailored bullet points
+    if "reubicación" in objective or "residencia" in objective or "hijos" in notes or "familia" in notes:
+        benefits = """• 🛂 <b>Golden Visa de 10 Años 100% GRATIS</b> para ti y toda tu familia
+• 🏷️ <b>Descuentos del 15% al 20%</b> exclusivos en el evento
+• 🏠 Comunidades residenciales listas y en construcción cerca de colegios
+• Planes de pago directos desde 1% mensual sin intereses"""
     elif "flipping" in notes or "300k" in notes:
-        profile_benefit = "• 🏷️ **15% a 20% de Descuento directo** en fases de prelanzamiento\n• 📈 Proyectos con plusvalías estimadas del 40-50% a entrega\n• 🛂 **Golden Visa de 10 Años GRATIS** con tu inversión"
+        benefits = """• 🏷️ <b>Descuentos del 15% al 20%</b> en prelanzamientos para maximizar margen
+• 📈 Proyectos de alta revalorización (Emaar, DAMAC, Binghatti)
+• 🛂 <b>Golden Visa de 10 Años GRATIS</b>
+• Planes de pago escalonados sin intereses"""
     else:
-        profile_benefit = "• 🏷️ **Descuentos del 15% al 20%** en unidades seleccionadas\n• 🏠 **Gestión de alquiler (Property Management) 100% GRATIS**\n• 🛂 **Golden Visa de 10 Años GRATIS**\n• Planes de pago desde 1% mensual sin intereses bancarios"
+        benefits = """• 🏷️ <b>15% a 20% de Descuento exclusivo</b> en unidades seleccionadas
+• 🏠 <b>Gestión de alquiler (Property Management) 100% GRATIS</b>
+• 🛂 <b>Golden Visa de 10 Años GRATIS</b> con tu inversión
+• Planes de pago desde 1% mensual sin hipoteca bancaria"""
 
     msg = f"""Hola {name},
 
-Te escribo directamente desde nuestro equipo asesor de Dubai. {lead_specific_hook}
+Te escribo directamente desde nuestro equipo asesor de Dubai. {interest_reference}
 
-Sé que con la incertidumbre y las noticias que hubo en la región en febrero todo se puso en pausa (totalmente comprensible). Te contacto con una gran noticia: **estaremos presentando en Madrid nuestro evento presencial oficial DUBAI PROPERTY EXPO**.
+Te contacto porque tienes una **oportunidad única**: por solo dos días estaremos en España con nuestro equipo de consultores y representantes directos de las principales desarrolladoras de Dubai para asesorarte **completamente gratis y en persona**.
+
+Presentaremos en Madrid el evento oficial **DUBAI PROPERTY EXPO**:
 
 📅 **Cuándo:** 9 y 10 de Septiembre (10:00 AM a 8:00 PM)
 📍 **Dónde:** Hotel Novotel Madrid Center (4 estrellas)
 
-Estaremos con directivos y representantes oficiales de las principales desarrolladoras de Dubai (Emaar, DAMAC, Sobha, Binghatti). Tendremos condiciones exclusivas **únicamente para los asistentes**:
+Tendremos condiciones y ventajas que solo aplican durante el evento:
+{benefits}
 
-{profile_benefit}
+La entrada y asesoría personalizada son **100% gratuitas**, pero el aforo en el salón VIP del Novotel es limitado.
 
-La entrada es **100% gratuita**, pero el aforo en el salón privado del Novotel es limitado para mantener la atención personalizada.
-
-¿Te gustaría asistir? Respóndeme por aquí para confirmarte en la lista de invitados VIP y reservarte el acceso.
+¿Te gustaría asistir? Solo respóndeme por aquí para confirmarte en la **lista de invitados VIP** y reservarte el acceso.
 
 *(Te adjunto la invitación oficial en imagen)* ⬇️"""
 
     return msg.strip()
 
-def process_and_save_all():
+def update_all_leads():
     with open(LEADS_FILE, "r", encoding="utf-8") as f:
         leads = json.load(f)
 
     for l in leads:
-        l["personalized_message"] = generate_bespoke_message(l)
+        l["personalized_message"] = generate_direct_message(l)
 
     with open(LEADS_FILE, "w", encoding="utf-8") as f:
         json.dump(leads, f, ensure_ascii=False, indent=2)
 
-    print(f"✅ Generated bespoke customized messages for all {len(leads)} Spain leads!")
-
 if __name__ == "__main__":
-    process_and_save_all()
+    update_all_leads()

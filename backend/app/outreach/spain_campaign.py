@@ -1,7 +1,7 @@
 """
 Dubai Property Expo Madrid - VIP Invitation & Reactivation Campaign
 Invites the 112 Spain leads to the in-person event at Novotel Madrid Center (Sept 9 & 10).
-Formats in EUR (€) and m², references their historical interest/notes, and attaches the official flyer.
+Uses the direct personalizer without any mention of the Gulf war.
 """
 import json
 import os
@@ -9,6 +9,7 @@ import asyncio
 import random
 import httpx
 from typing import List, Dict, Any
+from .spain_personalizer import generate_direct_message
 
 LEADS_FILE = os.path.join(os.path.dirname(__file__), "spain_campaign_leads.json")
 GATEWAY_URL = os.getenv("WHATSAPP_GATEWAY_URL", "http://127.0.0.1:3001")
@@ -21,47 +22,7 @@ def load_spain_leads() -> List[Dict[str, Any]]:
         return json.load(f)
 
 def build_madrid_expo_invitation(lead: Dict[str, Any]) -> str:
-    """
-    Builds a high-conversion, personalized WhatsApp message inviting the lead
-    to the Dubai Property Expo in Madrid (Novotel Madrid Center, Sept 9 & 10).
-    """
-    raw_name = lead.get("name", "").strip()
-    first_name = raw_name.split()[0] if raw_name else "Hola"
-    notes = lead.get("notes", "").lower()
-
-    # Specific historical reference based on previous conversation
-    custom_reference = ""
-    if "flipping" in notes or "300k" in notes:
-        custom_reference = "Recuerdo que en su momento estuvimos viendo opciones sobre 300.000€ enfocadas a revalorización y rentabilidad."
-    elif "160k" in notes or "studio" in notes:
-        custom_reference = "Recuerdo que tu interés era una unidad accesible de entrada sobre 150.000€ - 160.000€ (40-45 m²) con alta rentabilidad neta."
-    elif "200k" in notes or "casa" in notes or "chalet" in notes or "mudarse" in notes:
-        custom_reference = "Sé que buscabas una tipología amplia (100-140 m²) con plan de pago cómodo para residencia o uso propio."
-    elif "renta" in notes or "alquiler" in notes:
-        custom_reference = "Sé que tu prioridad era maximizar la rentabilidad neta por alquiler libre de impuestos."
-
-    message = f"""Hola {first_name},
-
-Te escribo directamente porque en febrero estuviste evaluando opciones de inversión en Dubai con nosotros. {custom_reference}
-
-Sé que con las noticias e incertidumbre que hubo en la región en ese momento todo se puso en pausa. Te contacto con una gran noticia: **estaremos presentando en Madrid nuestro evento presencial exclusivo DUBAI PROPERTY EXPO**.
-
-📅 **Cuándo:** 9 y 10 de Septiembre (de 10:00 AM a 8:00 PM)
-📍 **Dónde:** Hotel Novotel Madrid Center (4 estrellas)
-
-Estaremos con el equipo internacional y representantes directos de las principales desarrolladoras de Dubai. Tendremos beneficios exclusivos **únicamente para los asistentes al evento**:
-• 🛂 **Golden Visa de 10 Años 100% GRATIS**
-• 🏷️ **Descuentos exclusivos del 15% al 20%**
-• 🏠 **Gestión de alquiler (Property Management) GRATIS**
-• Planes de pago directos desde 1% mensual sin intereses
-
-La entrada es **100% gratuita**, pero el aforo en el salón VIP del Novotel es limitado.
-
-¿Te gustaría asistir? Solo confírmame por aquí para anotarte en la lista de invitados VIP y reservarte el acceso.
-
-*(Te adjunto la invitación oficial en imagen)* ⬇️"""
-
-    return message.strip()
+    return generate_direct_message(lead)
 
 SPAIN_LEADS_DATA = load_spain_leads()
 
@@ -77,7 +38,7 @@ CAMPAIGN_PROGRESS = {
 async def dispatch_spain_event_campaign():
     """
     Dispatches the Madrid Expo invitation with image attached
-    to all Spain leads with human-like delays (60-180 seconds) to prevent bans.
+    to all Spain leads with human-like delays (60-150 seconds) to prevent bans.
     """
     global CAMPAIGN_PROGRESS
     CAMPAIGN_PROGRESS["status"] = "running"
@@ -93,7 +54,7 @@ async def dispatch_spain_event_campaign():
             name = lead.get("name", "Inversor")
             CAMPAIGN_PROGRESS["current_lead"] = f"{name} ({phone})"
             
-            message_text = build_madrid_expo_invitation(lead)
+            message_text = generate_direct_message(lead)
             
             payload = {
                 "to": phone,
