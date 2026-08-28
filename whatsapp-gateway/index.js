@@ -183,6 +183,14 @@ async function startWhatsApp() {
           fs.mkdirSync(AUTH_DIR, { recursive: true });
         }
       }
+    } else if (connection === 'open') {
+      isConnected = true;
+      currentQR = null;
+      connectedNumber = sock.user?.id?.split(':')[0] || 'Linked Phone';
+      lastActivityAt = Date.now();
+      console.log(`✅ [WhatsApp Gateway] Connected successfully as +${connectedNumber}`);
+      // Backup immediately after connecting
+      await uploadAuthToSupabase();
     }
   });
 
