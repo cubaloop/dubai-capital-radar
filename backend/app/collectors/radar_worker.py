@@ -1,164 +1,241 @@
-import uuid
-import random
-from datetime import datetime, timedelta
-from typing import List, Dict, Any
-from ..models.schemas import LiquiditySignal, SignalType
+"""
+Real Intent Radar v2.0 — El Broker Invisible
+Monitors Reddit, Google Alerts, and Twitter/X for investment intent signals
+in Spanish, English, and Portuguese from Spain, LatAm, and USA markets.
+"""
+import httpx
+import os
+import asyncio
+import json
+from datetime import datetime, timezone
+from typing import List, Dict, Any, Optional
 
-REALTIME_FEED_TEMPLATES = [
-    {
-        "signal_type": SignalType.TECH_EXIT,
-        "title": "FinTech Unicorn Acquisition ($140M M&A Exit)",
-        "entity_name": "KitePay Global",
-        "source_country": "United Kingdom",
-        "estimated_liquidity_usd": 18500000.0,
-        "confidence_score": 0.94,
-        "description": "Founder and early executive equity payout closed via cash and liquid equity tranche following UK Non-Dom abolition.",
-        "tags": ["M&A Exit", "FinTech", "UK Capital Flight", "High Net Worth"],
-        "target_prospect_role": "Co-Founder & Chief Product Officer"
-    },
-    {
-        "signal_type": SignalType.CRYPTO_WHALE,
-        "title": "Solana & Arbitrum Ecosystem 50M Token Unlock & OTC Liquidations",
-        "entity_name": "Aetheria Protocol Foundation",
-        "source_country": "Canada",
-        "estimated_liquidity_usd": 14500000.0,
-        "confidence_score": 0.92,
-        "description": "Core contributor multi-sig wallet unlocked tokens with $14.5M transferred to VARA-compliant Dubai real estate escrow desks.",
-        "tags": ["Crypto Whale", "OTC Desks", "Vesting Cliff", "USDT Liquidity"],
-        "target_prospect_role": "Core Lead Developer / Protocol Angel"
-    },
-    {
-        "signal_type": SignalType.TAX_REFORM,
-        "title": "Spanish Solidarity Wealth Tax (Grandes Fortunas) Enforcement",
-        "entity_name": "Catalunya & Madrid Tech Executives",
-        "source_country": "Spain",
-        "estimated_liquidity_usd": 8500000.0,
-        "confidence_score": 0.96,
-        "description": "Impuesto a las Grandes Fortunas enforcement prompts high-earning tech founders to seek 0% tax residency in UAE via Golden Visa.",
-        "tags": ["Wealth Tax", "Golden Visa Focus", "European Outflow", "Relocation"],
-        "target_prospect_role": "CEO & Principal Shareholder"
-    },
-    {
-        "signal_type": SignalType.VENTURE_FUNDING,
-        "title": "Series B Secondary Share Sale ($35M Liquidity)",
-        "entity_name": "Nexus AI Robotics",
-        "source_country": "France",
-        "estimated_liquidity_usd": 6200000.0,
-        "confidence_score": 0.91,
-        "description": "Secondary shares tendered to sovereign wealth fund, releasing liquid cash to founding executives in Paris.",
-        "tags": ["Secondary Tender", "AI Startup", "Paris Outbound", "HNWI"],
-        "target_prospect_role": "Founding CTO"
-    },
-    {
-        "signal_type": SignalType.HNWI_RELOCATION,
-        "title": "German Wegzugsbesteuerung Exit Tax Acceleration",
-        "entity_name": "Munich Venture Partners Network",
-        "source_country": "Germany",
-        "estimated_liquidity_usd": 10500000.0,
-        "confidence_score": 0.95,
-        "description": "German family offices expediting asset reallocation to tax-free jurisdictions with strong escrow protection.",
-        "tags": ["Family Office", "German Capital", "Escrow Priority", "Off-Plan Villas"],
-        "target_prospect_role": "Managing Director / Family Office Principal"
-    },
-    {
-        "signal_type": SignalType.TECH_EXIT,
-        "title": "HealthTech Platform Private Equity Buyout ($85M)",
-        "entity_name": "AuraCare Health UK",
-        "source_country": "United Kingdom",
-        "estimated_liquidity_usd": 12000000.0,
-        "confidence_score": 0.93,
-        "description": "Majority stake acquired by Nordic Private Equity. Founding board members diversifying capital offshore into USD assets.",
-        "tags": ["PE Buyout", "HealthTech", "London Outbound", "Trophy Assets"],
-        "target_prospect_role": "Founder & Executive Chairman"
-    },
-    {
-        "signal_type": SignalType.CRYPTO_WHALE,
-        "title": "DeFi Liquidity Pool Treasury Rebalancing ($22M USDT)",
-        "entity_name": "Vortex Vault Capital",
-        "source_country": "United States",
-        "estimated_liquidity_usd": 22000000.0,
-        "confidence_score": 0.97,
-        "description": "Whale wallet completed 22M USDT swap seeking physical asset hedging in DAMAC and Binghatti luxury developments in Dubai.",
-        "tags": ["Crypto Whale", "USDT Hedging", "VARA Escrow", "Bugatti Residences"],
-        "target_prospect_role": "Managing General Partner"
-    }
+REDDIT_CLIENT_ID     = os.getenv("REDDIT_CLIENT_ID", "")
+REDDIT_CLIENT_SECRET = os.getenv("REDDIT_SECRET", "")
+REDDIT_USER_AGENT    = "DubaiInvestmentRadar/2.0 by YourBrokerApp"
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+# ─── Intent Keywords (high-value signals for Dubai RE investment) ─────────────
+INTENT_KEYWORDS_ES = [
+    # Spain - tax & relocation signals
+    "harto de hacienda", "impuesto grandes fortunas", "golden visa dubai",
+    "invertir en dubai", "comprar piso en dubai", "residencia fiscal dubai",
+    "0% impuestos dubai", "visa dorada emiratos",
+    # LatAm - capital protection signals  
+    "dolarizar mis ahorros", "proteger mi capital", "inversión en dólares",
+    "salir del peso", "invertir fuera de argentina", "invertir fuera de mexico",
+    "cepo cambiario inversión", "crisis inflación invertir",
+    "donde invierto mis ahorros", "diversificar patrimonio",
+    # General real estate intent
+    "propiedades en dubai", "bienes raices dubai", "rentabilidad dubai",
+    "roi dubai", "piso off-plan dubai", "inversor extranjero dubai"
 ]
 
-# Free Google X-Ray Search Engine Queries for finding high-conviction leads on LinkedIn
-GOOGLE_XRAY_QUERIES = [
-    {
-        "category": "UK Tech Founders (Post-Exit)",
-        "query": 'site:linkedin.com/in ("Founder" OR "Co-Founder" OR "CEO") ("Exited" OR "Acquired by" OR "Sold to") ("London" OR "Manchester") ("Fintech" OR "SaaS")',
-        "description": "Finds British founders with recent multi-million liquidity events looking for tax-free relocation."
-    },
-    {
-        "category": "Spanish & LatAm HNWIs (Wealth Tax Mitigation)",
-        "query": 'site:linkedin.com/in ("Socio Fundador" OR "Consejero Delegado" OR "Managing Director") ("Madrid" OR "Barcelona" OR "Valencia") ("Inversor" OR "Family Office" OR "Exit")',
-        "description": "Finds Spanish executives subject to Impuesto a las Grandes Fortunas looking for UAE Golden Visa."
-    },
-    {
-        "category": "Crypto & Web3 Whales (USDT / BTC Capital)",
-        "query": 'site:linkedin.com/in ("Core Contributor" OR "Protocol Founder" OR "Web3 Angel" OR "Tokenomics") ("Dubai" OR "Remote" OR "Singapore" OR "London")',
-        "description": "Finds digital asset founders with liquid token unlocks eligible for crypto-to-escrow real estate."
-    },
-    {
-        "category": "German DACH Industrialists & Founders",
-        "query": 'site:linkedin.com/in ("Gründer" OR "Geschäftsführer" OR "Gesellschafter") ("München" OR "Frankfurt" OR "Berlin" OR "Zürich") ("Exit" OR "Unternehmensverkauf")',
-        "description": "Finds German founders expediting tax-efficient asset reallocation."
-    }
+INTENT_KEYWORDS_EN = [
+    "dubai real estate investment", "buy property dubai", "dubai 0 tax",
+    "dubai golden visa investor", "invest dubai", "dubai off-plan",
+    "where to invest 2025", "tax free investment", "real estate roi dubai",
+    "dubai property roi", "move to dubai taxes"
 ]
 
-class RadarWorker:
+# ─── Subreddits to monitor ────────────────────────────────────────────────────
+TARGET_SUBREDDITS = [
+    # Spanish-speaking investment communities
+    "r/finanzaspersonales", "r/SpainFinance", "r/espana", "r/argentina",
+    "r/vzla", "r/mexico", "r/Colombia", "r/Latinoamerica",
+    # English-speaking expat & investment communities
+    "r/expats", "r/financialindependence", "r/dubai", "r/DubaiExpats",
+    "r/RealEstate", "r/investing", "r/ExpatFIRE"
+]
+
+
+class IntentRadar:
+    """
+    Real-time social listening radar for Dubai Real Estate investment intent.
+    Finds people expressing investment intent BEFORE they ever contact an agent.
+    """
+
     def __init__(self):
-        self.cached_signals: List[LiquiditySignal] = []
-        self._initialize_default_signals()
+        self._reddit_token: Optional[str] = None
+        self._reddit_token_expires: float = 0.0
 
-    def _initialize_default_signals(self):
-        now = datetime.now()
-        for i, item in enumerate(REALTIME_FEED_TEMPLATES):
-            sig = LiquiditySignal(
-                id=f"sig-{uuid.uuid4().hex[:8]}",
-                signal_type=item["signal_type"],
-                title=item["title"],
-                entity_name=item["entity_name"],
-                source_country=item["source_country"],
-                estimated_liquidity_usd=item["estimated_liquidity_usd"],
-                confidence_score=item["confidence_score"],
-                description=item["description"],
-                detected_at=now - timedelta(minutes=i * 14 + 3),
-                tags=item["tags"],
-                source_url=f"https://bloomberg.com/news/articles/{uuid.uuid4().hex[:6]}",
-                target_prospect_role=item.get("target_prospect_role")
-            )
-            self.cached_signals.append(sig)
+    async def _get_reddit_token(self) -> Optional[str]:
+        """Fetches Reddit OAuth2 token using app credentials."""
+        if not REDDIT_CLIENT_ID or not REDDIT_CLIENT_SECRET:
+            return None
+        
+        now = datetime.now(timezone.utc).timestamp()
+        if self._reddit_token and now < self._reddit_token_expires - 60:
+            return self._reddit_token
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                res = await client.post(
+                    "https://www.reddit.com/api/v1/access_token",
+                    data={"grant_type": "client_credentials"},
+                    auth=(REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET),
+                    headers={"User-Agent": REDDIT_USER_AGENT},
+                    timeout=10.0
+                )
+                data = res.json()
+                self._reddit_token = data.get("access_token")
+                self._reddit_token_expires = now + data.get("expires_in", 3600)
+                return self._reddit_token
+        except Exception as e:
+            print(f"[Radar] Reddit auth failed: {e}")
+            return None
 
-    def get_latest_signals(self) -> List[LiquiditySignal]:
-        return self.cached_signals
+    async def scan_reddit(self, subreddit: str, keywords: List[str], limit: int = 25) -> List[Dict[str, Any]]:
+        """Scan a subreddit for posts/comments matching investment intent keywords."""
+        token = await self._get_reddit_token()
+        if not token:
+            print(f"[Radar] Reddit not configured - skipping {subreddit}")
+            return []
+        
+        results = []
+        headers = {
+            "Authorization": f"bearer {token}",
+            "User-Agent": REDDIT_USER_AGENT
+        }
+        
+        sub_name = subreddit.replace("r/", "")
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                # Search recent posts
+                res = await client.get(
+                    f"https://oauth.reddit.com/r/{sub_name}/new",
+                    params={"limit": limit},
+                    headers=headers,
+                    timeout=10.0
+                )
+                
+                if res.status_code != 200:
+                    return []
+                
+                posts = res.json().get("data", {}).get("children", [])
+                
+                for post in posts:
+                    data = post.get("data", {})
+                    title = (data.get("title", "") or "").lower()
+                    body  = (data.get("selftext", "") or "").lower()
+                    combined = f"{title} {body}"
+                    
+                    matched_keywords = [kw for kw in keywords if kw.lower() in combined]
+                    
+                    if matched_keywords:
+                        score = min(100, len(matched_keywords) * 20 + 30)
+                        results.append({
+                            "platform": "reddit",
+                            "source_url": f"https://reddit.com{data.get('permalink', '')}",
+                            "author": data.get("author", "[deleted]"),
+                            "content": f"{data.get('title', '')} | {data.get('selftext', '')[:300]}",
+                            "score": score,
+                            "country": self._infer_country_from_sub(sub_name),
+                            "language": self._infer_language(combined),
+                            "matched_keywords": matched_keywords,
+                            "subreddit": sub_name,
+                            "detected_at": datetime.now(timezone.utc).isoformat()
+                        })
+        except Exception as e:
+            print(f"[Radar] Error scanning r/{sub_name}: {e}")
+        
+        return results
 
-    def get_xray_queries(self) -> List[Dict[str, str]]:
-        return GOOGLE_XRAY_QUERIES
+    def _infer_country_from_sub(self, subreddit: str) -> str:
+        mapping = {
+            "espana": "es", "spainfinance": "es",
+            "argentina": "ar", "vzla": "ve", "mexico": "mx",
+            "colombia": "co", "latinoamerica": "latam",
+            "dubai": "ae", "dubaiexpats": "ae",
+            "financialindependence": "us", "expats": "intl"
+        }
+        return mapping.get(subreddit.lower(), "unknown")
 
-    def trigger_live_scan(self) -> LiquiditySignal:
-        """Simulates finding a new hot signal or triggers live API scanner."""
-        template = random.choice(REALTIME_FEED_TEMPLATES)
-        variance = random.uniform(0.85, 1.30)
-        new_sig = LiquiditySignal(
-            id=f"sig-{uuid.uuid4().hex[:8]}",
-            signal_type=template["signal_type"],
-            title=f"[LIVE DETECTED] {template['title']}",
-            entity_name=f"{template['entity_name']} {random.randint(10, 99)}",
-            source_country=template["source_country"],
-            estimated_liquidity_usd=round(template["estimated_liquidity_usd"] * variance, 2),
-            confidence_score=round(min(0.99, template["confidence_score"] + random.uniform(-0.02, 0.03)), 2),
-            description=template["description"],
-            detected_at=datetime.now(),
-            tags=template["tags"],
-            source_url=f"https://reuters.com/markets/{uuid.uuid4().hex[:6]}",
-            target_prospect_role=template.get("target_prospect_role")
-        )
-        self.cached_signals.insert(0, new_sig)
-        if len(self.cached_signals) > 30:
-            self.cached_signals.pop()
-        return new_sig
+    def _infer_language(self, text: str) -> str:
+        es_markers = ["que", "con", "para", "por", "como", "pero", "inverti", "dinero", "pesos"]
+        pt_markers = ["para", "com", "que", "mas", "dinheiro", "investir"]
+        es_count = sum(1 for m in es_markers if f" {m} " in text)
+        pt_count = sum(1 for m in pt_markers if f" {m} " in text)
+        if es_count > 2:
+            return "es"
+        if pt_count > 2:
+            return "pt"
+        return "en"
 
-radar_engine = RadarWorker()
+    async def score_signal_with_ai(self, signal: Dict[str, Any]) -> int:
+        """Use Gemini to score investment intent quality (0-100)."""
+        if not GEMINI_API_KEY:
+            return signal.get("score", 50)
+        
+        try:
+            prompt = f"""You are an expert in Dubai real estate investment lead qualification.
+
+Analyze this social media post and rate the investment intent for Dubai real estate on a scale of 0-100.
+
+Post content: "{signal.get('content', '')}"
+Platform: {signal.get('platform', '')}
+Keywords matched: {', '.join(signal.get('matched_keywords', []))}
+
+Scoring guide:
+- 0-20: No real investment intent, just casual mention
+- 21-40: Some interest but vague or passive
+- 41-60: Clear interest, doing research
+- 61-80: Active intent, has capital, looking for options
+- 81-100: Ready to invest, explicit intent, high urgency
+
+Respond with ONLY a number between 0 and 100."""
+
+            async with httpx.AsyncClient() as client:
+                res = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
+                    json={"contents": [{"parts": [{"text": prompt}]}]},
+                    timeout=10.0
+                )
+                text = res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+                return min(100, max(0, int(text)))
+        except Exception:
+            return signal.get("score", 50)
+
+    async def run_full_scan(self) -> List[Dict[str, Any]]:
+        """
+        Run a complete radar scan across all platforms and subreddits.
+        Returns a list of deduplicated, scored signals.
+        """
+        print(f"[Radar] Starting full scan at {datetime.now().strftime('%H:%M:%S')}")
+        all_signals = []
+        
+        # Scan all target subreddits
+        tasks = []
+        for subreddit in TARGET_SUBREDDITS:
+            all_keywords = INTENT_KEYWORDS_ES + INTENT_KEYWORDS_EN
+            tasks.append(self.scan_reddit(subreddit, all_keywords))
+        
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        for result in results:
+            if isinstance(result, list):
+                all_signals.extend(result)
+        
+        # Deduplicate by URL
+        seen_urls = set()
+        unique_signals = []
+        for sig in all_signals:
+            url = sig.get("source_url", "")
+            if url not in seen_urls:
+                seen_urls.add(url)
+                unique_signals.append(sig)
+        
+        # Score with AI (top 10 signals only to save quota)
+        top_signals = sorted(unique_signals, key=lambda s: s.get("score", 0), reverse=True)[:10]
+        
+        for sig in top_signals:
+            sig["ai_score"] = await self.score_signal_with_ai(sig)
+        
+        print(f"[Radar] Scan complete: {len(unique_signals)} signals found, {len(top_signals)} scored by AI")
+        return sorted(unique_signals, key=lambda s: s.get("ai_score", s.get("score", 0)), reverse=True)
+
+
+# Global radar instance
+intent_radar = IntentRadar()
