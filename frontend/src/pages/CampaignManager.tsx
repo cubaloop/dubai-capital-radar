@@ -416,12 +416,12 @@ export const CampaignManager: React.FC = () => {
         </div>
       )}
 
-      {/* Batch Automation Control Panel - 3D White Card */}
-      <div className="card-3d rounded-3xl p-4 sm:p-6 border border-slate-200/90 shadow-xl space-y-4 bg-white">
+      {/* Batch Automation Control Panel - 3D Light Blue Card */}
+      <div className="card-3d-blue rounded-3xl p-4 sm:p-6 border border-sky-200/90 shadow-xl space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-mono uppercase font-bold text-gold-700">Control de Envío Automático</span>
+              <span className="text-xs font-mono uppercase font-bold text-sky-800">Control de Envío Automático</span>
               {batchStatus?.status === 'running' && (
                 <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-mono animate-pulse">
                   ● Enviando en Segundo Plano
@@ -539,12 +539,12 @@ export const CampaignManager: React.FC = () => {
         )}
       </div>
 
-      {/* Main Campaign Workstation Grid */}
-      <div className="card-3d rounded-3xl p-4 sm:p-7 border border-slate-200/90 shadow-xl space-y-6 bg-white">
+      {/* Main Campaign Workstation Grid - Light Blue Panel */}
+      <div className="card-3d-blue rounded-3xl p-4 sm:p-7 border border-sky-200/90 shadow-xl space-y-6">
         {/* Campaign Info & Filter Bar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-sky-200/80">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100/90 text-amber-900 border border-amber-300/80 font-mono text-[11px] font-bold uppercase">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-100 text-sky-900 border border-sky-300/80 font-mono text-[11px] font-bold uppercase">
               {selectedCampaign?.category || 'Campaña'}
             </div>
             <h2 className="text-lg sm:text-2xl font-bold text-slate-900 font-serif-luxury mt-1.5 leading-tight">
@@ -564,12 +564,12 @@ export const CampaignManager: React.FC = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Buscar en campaña..."
-                className="bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 focus:outline-none focus:border-gold-500 font-mono w-full sm:w-52 shadow-inner"
+                className="bg-white border border-sky-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-500 font-mono w-full sm:w-52 shadow-inner"
               />
             </div>
 
             {/* Status Tabs */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-mono">
+            <div className="flex items-center gap-1 bg-sky-100/70 p-1 rounded-xl border border-sky-200 text-xs font-mono">
               <button
                 onClick={() => setStatusFilter('all')}
                 className={`px-3 py-1.5 rounded-lg transition ${
@@ -598,7 +598,7 @@ export const CampaignManager: React.FC = () => {
 
             <button
               onClick={() => selectedCampaignId && fetchLeads(selectedCampaignId)}
-              className="p-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900"
+              className="p-2 rounded-xl bg-white border border-sky-200 text-slate-600 hover:text-slate-900 shadow-sm"
               title="Recargar leads"
             >
               <RefreshCw className={`w-4 h-4 ${isLoadingLeads ? 'animate-spin' : ''}`} />
@@ -606,21 +606,21 @@ export const CampaignManager: React.FC = () => {
           </div>
         </div>
 
-        {/* AI Bot Instructions Card for this Campaign */}
-        <div className="card-3d-gold rounded-3xl p-4 sm:p-6 border border-gold-400/50 shadow-xl space-y-4 relative overflow-hidden bg-gradient-to-br from-amber-50/50 via-white to-amber-50/20">
-          <div className="absolute top-0 right-0 -mt-8 -mr-8 w-40 h-40 bg-gold-500/10 rounded-full blur-3xl pointer-events-none" />
+        {/* AI Bot Instructions Card for this Campaign - Light Blue Panel */}
+        <div className="card-3d rounded-3xl p-4 sm:p-6 border border-sky-300 shadow-md space-y-4 relative overflow-hidden bg-gradient-to-br from-sky-100/90 via-white to-sky-50/70">
+          <div className="absolute top-0 right-0 -mt-8 -mr-8 w-40 h-40 bg-sky-400/10 rounded-full blur-3xl pointer-events-none" />
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gold-500/20 text-gold-700 flex items-center justify-center font-bold text-lg shadow-inner">
-                <Sparkles className="w-5 h-5 text-gold-600 animate-pulse" />
+              <div className="w-10 h-10 rounded-2xl bg-sky-500/20 text-sky-700 flex items-center justify-center font-bold text-lg shadow-inner">
+                <Sparkles className="w-5 h-5 text-sky-600 animate-pulse" />
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-base font-bold text-slate-900 font-serif-luxury">
                     Instrucciones del Bot de IA para esta Campaña
                   </h3>
-                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-mono font-bold">
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-900 border border-sky-300 font-mono font-bold">
                     {selectedCampaign?.name || 'Campaña Activa'}
                   </span>
                 </div>
@@ -632,14 +632,14 @@ export const CampaignManager: React.FC = () => {
 
             <button
               onClick={() => setIsPromptPanelOpen(!isPromptPanelOpen)}
-              className="text-xs font-mono text-gold-800 hover:text-gold-900 flex items-center gap-1 self-end sm:self-auto px-3 py-1.5 rounded-xl bg-white border border-gold-300/80 shadow-sm transition"
+              className="text-xs font-mono text-sky-800 hover:text-sky-900 flex items-center gap-1 self-end sm:self-auto px-3 py-1.5 rounded-xl bg-white border border-sky-300 shadow-sm transition"
             >
               {isPromptPanelOpen ? 'Ocultar Panel ▲' : 'Configurar Bot ▼'}
             </button>
           </div>
 
           {isPromptPanelOpen && (
-            <div className="space-y-4 pt-2 border-t border-amber-200/80 animate-fade-in">
+            <div className="space-y-4 pt-2 border-t border-sky-200 animate-fade-in">
               {/* Quick Preset Chips */}
               <div className="space-y-1.5">
                 <span className="text-[11px] font-mono text-slate-500 block">Plantillas Rápidas (Haz clic para insertar):</span>
@@ -649,7 +649,7 @@ export const CampaignManager: React.FC = () => {
                       key={idx}
                       type="button"
                       onClick={() => setCampaignAiPrompt(preset.text)}
-                      className="text-[11px] font-mono px-3 py-1.5 rounded-xl bg-white text-slate-700 hover:text-gold-800 hover:bg-gold-50/50 border border-slate-200 hover:border-gold-400 shadow-sm transition-all flex items-center gap-1.5 active:scale-95"
+                      className="text-[11px] font-mono px-3 py-1.5 rounded-xl bg-white text-slate-700 hover:text-sky-900 hover:bg-sky-50 border border-sky-200 hover:border-sky-400 shadow-sm transition-all flex items-center gap-1.5 active:scale-95"
                     >
                       <span>{preset.label}</span>
                     </button>
@@ -664,7 +664,7 @@ export const CampaignManager: React.FC = () => {
                   value={campaignAiPrompt}
                   onChange={(e) => setCampaignAiPrompt(e.target.value)}
                   placeholder="Ej: Quiero que además del contexto del excel les menciones que tenemos nuevas ofertas a partir de 50K en el evento X del hotel Y los días A y B, y que me confirmen asistencia..."
-                  className="w-full bg-slate-50 border border-slate-300 focus:border-gold-500 rounded-2xl p-4 text-xs text-slate-900 placeholder-slate-400 focus:outline-none leading-relaxed custom-scrollbar transition font-sans shadow-inner"
+                  className="w-full bg-white border border-sky-300 focus:border-sky-500 rounded-2xl p-4 text-xs text-slate-900 placeholder-slate-400 focus:outline-none leading-relaxed custom-scrollbar transition font-sans shadow-inner"
                 />
               </div>
 
@@ -719,8 +719,8 @@ export const CampaignManager: React.FC = () => {
                     onClick={() => setSelectedLeadPreview(lead)}
                     className={`p-3.5 sm:p-4 rounded-2xl transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
                       selectedLeadPreview?.id === lead.id
-                        ? 'bg-amber-50/70 border-2 border-gold-500 shadow-md shadow-gold-500/15'
-                        : 'card-3d hover:border-slate-300'
+                        ? 'bg-sky-100/90 border-2 border-sky-500 shadow-md shadow-sky-500/15'
+                        : 'bg-white card-3d hover:border-sky-300'
                     }`}
                   >
                     <div className="flex items-start gap-3 min-w-0">
@@ -821,9 +821,9 @@ export const CampaignManager: React.FC = () => {
             </div>
 
             {selectedLeadPreview ? (
-              <div className="card-3d rounded-3xl p-4 sm:p-5 border border-slate-200/90 space-y-4 shadow-xl relative bg-white">
+              <div className="card-3d-blue rounded-3xl p-4 sm:p-5 border border-sky-200/90 space-y-4 shadow-xl relative">
                 {/* Contact Header with Edit Action */}
-                <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                <div className="flex items-center justify-between gap-3 pb-3 border-b border-sky-200/80">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center font-mono text-base shadow-sm">
                       {selectedLeadPreview.name.charAt(0)}
@@ -842,7 +842,7 @@ export const CampaignManager: React.FC = () => {
                       }
                       setIsEditingLeadMsg(!isEditingLeadMsg);
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 hover:border-gold-500 text-slate-700 hover:text-gold-800 text-[11px] font-mono transition"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-sky-200 hover:border-sky-400 text-slate-700 hover:text-sky-900 text-[11px] font-mono transition shadow-sm"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                     <span>{isEditingLeadMsg ? 'Cancelar' : 'Editar Texto'}</span>
@@ -853,20 +853,20 @@ export const CampaignManager: React.FC = () => {
                 <div className="space-y-3">
                   {isEditingLeadMsg ? (
                     <div className="space-y-2.5 animate-fade-in">
-                      <div className="text-[11px] font-mono text-gold-700 font-bold flex items-center gap-1">
+                      <div className="text-[11px] font-mono text-sky-800 font-bold flex items-center gap-1">
                         <span>✏️ Editando mensaje para {selectedLeadPreview.name.split(' ')[0]}:</span>
                       </div>
                       <textarea
                         rows={8}
                         value={editedLeadMsgText}
                         onChange={(e) => setEditedLeadMsgText(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-300 rounded-2xl p-3.5 text-xs text-slate-900 leading-relaxed font-sans focus:outline-none focus:ring-1 focus:ring-gold-500 custom-scrollbar shadow-inner"
+                        className="w-full bg-white border border-sky-300 rounded-2xl p-3.5 text-xs text-slate-900 leading-relaxed font-sans focus:outline-none focus:ring-1 focus:ring-sky-500 custom-scrollbar shadow-inner"
                       />
                       <div className="flex items-center justify-end gap-2">
                         <button
                           type="button"
                           onClick={() => setIsEditingLeadMsg(false)}
-                          className="px-3.5 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-mono"
+                          className="px-3.5 py-1.5 rounded-xl bg-white text-slate-700 hover:bg-slate-100 text-xs font-mono border border-sky-200"
                         >
                           Cancelar
                         </button>
@@ -874,7 +874,7 @@ export const CampaignManager: React.FC = () => {
                           type="button"
                           onClick={handleSaveIndividualMessage}
                           disabled={isSavingLeadMsg}
-                          className="px-4 py-1.5 rounded-xl bg-gold-500 hover:bg-gold-400 text-slate-950 font-bold text-xs font-mono flex items-center gap-1.5 shadow active:scale-95 disabled:opacity-50"
+                          className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-gold-500 to-amber-400 hover:from-gold-400 text-slate-950 font-bold text-xs font-mono flex items-center gap-1.5 shadow active:scale-95 disabled:opacity-50"
                         >
                           {isSavingLeadMsg ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -886,8 +886,8 @@ export const CampaignManager: React.FC = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-[#f0f2f5] border border-slate-200 rounded-2xl p-3.5 space-y-2">
-                      <div className="bg-white border border-slate-200/80 rounded-2xl rounded-tl-none p-3.5 text-xs text-slate-800 leading-relaxed font-sans whitespace-pre-line shadow-sm max-h-72 overflow-y-auto custom-scrollbar">
+                    <div className="bg-[#e2edfa] border border-sky-200 rounded-2xl p-3.5 space-y-2">
+                      <div className="bg-white border border-sky-200/80 rounded-2xl rounded-tl-none p-3.5 text-xs text-slate-800 leading-relaxed font-sans whitespace-pre-line shadow-sm max-h-72 overflow-y-auto custom-scrollbar">
                         {selectedLeadPreview.personalized_message}
                       </div>
                     </div>

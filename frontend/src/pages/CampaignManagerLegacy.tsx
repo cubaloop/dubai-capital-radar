@@ -194,12 +194,12 @@ export const CampaignManagerLegacy: React.FC = () => {
         </div>
       )}
 
-      {/* Main Campaign Workstation - 3D Elevated Luxury Container */}
-      <div className="card-3d rounded-3xl p-3 sm:p-7 border border-slate-200/90 shadow-xl space-y-5 sm:space-y-6">
+      {/* Main Campaign Workstation - 3D Light Blue Luxury Container */}
+      <div className="card-3d-blue rounded-3xl p-3 sm:p-7 border border-sky-200/90 shadow-xl space-y-5 sm:space-y-6">
         {/* Campaign Info Bar */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 pb-4 sm:pb-5 border-b border-slate-200/80">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 pb-4 sm:pb-5 border-b border-sky-200/80">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100/90 text-amber-900 border border-amber-300/80 font-mono text-[11px] font-bold uppercase">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-100 text-sky-900 border border-sky-300/80 font-mono text-[11px] font-bold uppercase">
               {activeCampaignTab === 'spain' ? '🇪🇸 Campaña España Feb Video Ads' : '🇺🇸 Campaña Evento VIP Miami'}
             </div>
             <h2 className="text-base sm:text-2xl font-bold text-slate-900 font-serif-luxury mt-1.5 leading-tight break-words">
@@ -222,7 +222,7 @@ export const CampaignManagerLegacy: React.FC = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Buscar por nombre, tel o nota..."
-                className="bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 focus:outline-none focus:border-gold-500 font-mono w-full sm:w-60 shadow-inner"
+                className="bg-white border border-sky-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-500 font-mono w-full sm:w-60 shadow-inner"
               />
             </div>
 
@@ -262,9 +262,9 @@ export const CampaignManagerLegacy: React.FC = () => {
                     key={lead.index}
                     onClick={() => setSelectedLeadPreview(lead)}
                     className={`p-3 sm:p-3.5 rounded-2xl transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 text-xs w-full ${
-                      isSelected
-                        ? 'bg-amber-50/70 border-2 border-gold-500 shadow-md shadow-gold-500/15'
-                        : 'card-3d hover:border-slate-300'
+                      selectedLeadPreview?.phone === lead.phone
+                        ? 'bg-sky-100/90 border-2 border-sky-500 shadow-md shadow-sky-500/15'
+                        : 'bg-white card-3d hover:border-sky-300'
                     }`}
                   >
                     <div className="flex items-start gap-2.5 min-w-0 flex-1">
@@ -349,9 +349,9 @@ export const CampaignManagerLegacy: React.FC = () => {
             </div>
 
             {selectedLeadPreview ? (
-              <div className="card-3d rounded-3xl p-4 sm:p-5 border border-slate-200/90 space-y-4 shadow-xl relative bg-white">
+              <div className="card-3d-blue rounded-3xl p-4 sm:p-5 border border-sky-200/90 space-y-4 shadow-xl relative">
                 {/* Contact Header */}
-                <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-3 pb-3 border-b border-sky-200/80">
                   <div className="w-10 h-10 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center font-mono shadow-sm">
                     {selectedLeadPreview.name.charAt(0)}
                   </div>
@@ -363,8 +363,8 @@ export const CampaignManagerLegacy: React.FC = () => {
 
                 {/* WhatsApp Chat Bubble (Light WhatsApp theme) */}
                 <div className="space-y-3">
-                  <div className="bg-[#f0f2f5] border border-slate-200 rounded-2xl p-4 space-y-2">
-                    <div className="bg-white border border-slate-200/80 rounded-2xl rounded-tl-none p-3.5 text-xs text-slate-800 leading-relaxed font-sans whitespace-pre-line shadow-sm">
+                  <div className="bg-[#e2edfa] border border-sky-200 rounded-2xl p-4 space-y-2">
+                    <div className="bg-white border border-sky-200/80 rounded-2xl rounded-tl-none p-3.5 text-xs text-slate-800 leading-relaxed font-sans whitespace-pre-line shadow-sm">
                       {selectedLeadPreview.personalized_message || selectedLeadPreview.sample_message}
                     </div>
                   </div>
