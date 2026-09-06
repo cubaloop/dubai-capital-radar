@@ -144,32 +144,32 @@ export const CampaignManagerLegacy: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 pb-16">
+    <div className="space-y-6 sm:space-y-8 pb-16">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-serif-luxury font-bold text-white">
+      <div className="space-y-1">
+        <h1 className="text-xl sm:text-3xl font-serif-luxury font-bold text-slate-900 leading-tight">
           Gestor de Campañas & Outreach WhatsApp
         </h1>
-        <p className="text-sm text-slate-300 mt-1 max-w-2xl">
+        <p className="text-xs sm:text-sm text-slate-600 max-w-2xl">
           Supervisión de secuencias de reactivación, métricas culturales (Euros / m²) y control individual por lead.
         </p>
       </div>
 
       {/* Campaign Selector Tabs */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
         <button
           onClick={() => {
             setActiveCampaignTab('spain');
             if (spainLeads.length > 0) setSelectedLeadPreview(spainLeads[0]);
           }}
-          className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold font-mono transition-all ${
+          className={`flex items-center justify-between sm:justify-start gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-xs font-bold font-mono transition-all ${
             activeCampaignTab === 'spain'
-              ? 'bg-gold-500 text-slate-950 shadow-lg shadow-gold-500/20 scale-102'
-              : 'bg-slate-900 text-slate-300 border border-slate-800 hover:border-gold-500/40'
+              ? 'bg-gradient-to-r from-amber-500 to-gold-500 text-slate-950 shadow-lg shadow-gold-500/25 scale-[1.01]'
+              : 'card-3d text-slate-700 hover:border-gold-400/80 hover:text-slate-900'
           }`}
         >
           <span>🇪🇸 Reactivación España ({spainLeads.length} Leads)</span>
-          <span className="px-2 py-0.5 rounded-full bg-slate-950/40 text-[10px] font-mono">EUR (€) & m²</span>
+          <span className="px-2 py-0.5 rounded-full bg-slate-950/15 text-[10px] font-mono">EUR (€) & m²</span>
         </button>
 
         <button
@@ -177,59 +177,59 @@ export const CampaignManagerLegacy: React.FC = () => {
             setActiveCampaignTab('miami');
             if (miamiLeads.length > 0) setSelectedLeadPreview(miamiLeads[0]);
           }}
-          className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold font-mono transition-all ${
+          className={`flex items-center justify-between sm:justify-start gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-xs font-bold font-mono transition-all ${
             activeCampaignTab === 'miami'
-              ? 'bg-gold-500 text-slate-950 shadow-lg shadow-gold-500/20 scale-102'
-              : 'bg-slate-900 text-slate-300 border border-slate-800 hover:border-gold-500/40'
+              ? 'bg-gradient-to-r from-amber-500 to-gold-500 text-slate-950 shadow-lg shadow-gold-500/25 scale-[1.01]'
+              : 'card-3d text-slate-700 hover:border-gold-400/80 hover:text-slate-900'
           }`}
         >
           <span>🇺🇸 Evento Presencial Miami ({miamiLeads.length} Leads)</span>
-          <span className="px-2 py-0.5 rounded-full bg-slate-950/40 text-[10px] font-mono">Flyer Adjunto</span>
+          <span className="px-2 py-0.5 rounded-full bg-slate-950/15 text-[10px] font-mono">Flyer Adjunto</span>
         </button>
       </div>
 
       {statusMsg && (
-        <div className="bg-emerald-950/90 border border-emerald-500 text-emerald-200 text-xs p-3.5 rounded-xl font-mono text-center shadow-lg animate-fade-in">
+        <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs p-3.5 rounded-2xl font-mono text-center shadow-md animate-fade-in">
           {statusMsg}
         </div>
       )}
 
-      {/* Main Campaign Workstation */}
-      <div className="glass-panel-gold rounded-3xl p-6 sm:p-8 border border-gold-500/40 space-y-6">
+      {/* Main Campaign Workstation - 3D Elevated Luxury Container */}
+      <div className="card-3d rounded-3xl p-4 sm:p-7 border border-slate-200/90 shadow-xl space-y-6">
         {/* Campaign Info Bar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-200/80">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gold-500/20 text-gold-300 font-mono text-[11px] font-bold uppercase">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100/90 text-amber-900 border border-amber-300/80 font-mono text-[11px] font-bold uppercase">
               {activeCampaignTab === 'spain' ? '🇪🇸 Campaña España Feb Video Ads' : '🇺🇸 Campaña Evento VIP Miami'}
             </div>
-            <h2 className="text-xl font-bold text-white font-serif-luxury mt-1">
+            <h2 className="text-lg sm:text-2xl font-bold text-slate-900 font-serif-luxury mt-1.5 leading-tight">
               {activeCampaignTab === 'spain' 
                 ? 'Secuencia Empática de Reactivación Post-Conflicto' 
                 : 'Briefing Presencial Hilton Garden Inn Miramar'}
             </h2>
-            <p className="text-xs text-slate-300 mt-0.5">
+            <p className="text-xs text-slate-600 mt-1">
               {activeCampaignTab === 'spain'
                 ? 'Mensajes adaptados en Euros (€), Metros Cuadrados (m²) y resolución empática de la objeción geopolítica.'
                 : 'Invitación personalizada al salón VIP de Miramar con flyer gráfico adjunto.'}
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            <div className="relative flex-1 sm:flex-initial">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Buscar por nombre, tel o nota..."
-                className="bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-gold-500 font-mono w-56"
+                className="bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 focus:outline-none focus:border-gold-500 font-mono w-full sm:w-60 shadow-inner"
               />
             </div>
 
             <button
               onClick={handleLaunchBatchSequence}
               disabled={isLaunchingBatch}
-              className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-600 text-slate-950 font-black px-4 py-2 rounded-xl shadow-lg shadow-emerald-500/25 transition-all active:scale-95 text-xs font-mono uppercase tracking-wider disabled:opacity-50"
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black px-4 py-2.5 rounded-xl shadow-md shadow-emerald-600/20 transition-all active:scale-95 text-xs font-mono uppercase tracking-wider disabled:opacity-50 shrink-0"
             >
               <Send className="w-3.5 h-3.5" />
               <span>{isLaunchingBatch ? 'Despachando...' : `Despachar a Todos (${filteredLeads.length})`}</span>
@@ -238,62 +238,66 @@ export const CampaignManagerLegacy: React.FC = () => {
         </div>
 
         {/* Two Column Workstation: Leads Table + Real-Time WhatsApp Preview */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
           {/* Left Column: Leads List with Individual Actions (7 cols) */}
           <div className="lg:col-span-7 space-y-3">
-            <div className="flex justify-between items-center text-xs font-mono text-slate-400">
+            <div className="flex justify-between items-center text-xs font-mono text-slate-500">
               <span>Leads Filtrados: {filteredLeads.length} de {currentLeads.length}</span>
-              <span className="text-emerald-400 font-bold">● WhatsApp Gateway Conectado</span>
+              <span className="text-emerald-700 font-bold flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                WhatsApp Conectado
+              </span>
             </div>
 
-            <div className="max-h-[500px] overflow-y-auto space-y-2.5 pr-2 custom-scrollbar">
+            <div className="max-h-[520px] overflow-y-auto space-y-2.5 pr-1 sm:pr-2 custom-scrollbar">
               {filteredLeads.map((lead) => {
                 const isSent = sentLeads[lead.phone];
                 const isSendingThis = sendingLeadPhone === lead.phone;
                 const previewMsg = lead.personalized_message || lead.sample_message || '';
                 const waDirectLink = `https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(previewMsg)}`;
+                const isSelected = selectedLeadPreview?.phone === lead.phone;
 
                 return (
                   <div
                     key={lead.index}
                     onClick={() => setSelectedLeadPreview(lead)}
-                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
-                      selectedLeadPreview?.phone === lead.phone
-                        ? 'bg-gold-500/15 border-gold-500 shadow-md shadow-gold-500/10'
-                        : 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
+                    className={`p-3.5 rounded-2xl transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                      isSelected
+                        ? 'bg-amber-50/70 border-2 border-gold-500 shadow-md shadow-gold-500/15'
+                        : 'card-3d hover:border-slate-300'
                     }`}
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="w-7 h-7 rounded-xl bg-slate-800 text-gold-400 font-mono font-bold flex items-center justify-center text-[11px] shrink-0 mt-0.5">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="w-7 h-7 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 font-mono font-bold flex items-center justify-center text-[11px] shrink-0 mt-0.5">
                         {lead.index}
                       </div>
-                      <div className="space-y-0.5">
-                        <div className="font-bold text-white flex items-center gap-2">
-                          <span>{lead.name}</span>
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="font-bold text-slate-900 flex items-center gap-2 flex-wrap">
+                          <span className="truncate">{lead.name}</span>
                           {isSent && (
-                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded-md border border-emerald-800 font-mono">
+                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-300 font-mono">
                               <Check className="w-3 h-3" /> Enviado
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-slate-400 font-mono">
+                        <div className="text-[11px] text-slate-500 font-mono truncate">
                           {lead.phone} {lead.email ? `• ${lead.email}` : ''}
                         </div>
                         {lead.notes && (
-                          <div className="text-[10px] text-gold-300 font-medium bg-gold-950/40 px-2 py-0.5 rounded border border-gold-800/40 inline-block mt-1">
+                          <div className="text-[10px] text-amber-900 font-medium bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block mt-1 truncate max-w-full">
                             Nota: {lead.notes}
                           </div>
                         )}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0 pt-1 sm:pt-0">
                       <a
                         href={waDirectLink}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all"
+                        className="p-2 rounded-xl bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 border border-slate-200 transition-all"
                         title="Abrir directamente en WhatsApp Web"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
@@ -305,10 +309,10 @@ export const CampaignManagerLegacy: React.FC = () => {
                           handleSendSingleLead(lead);
                         }}
                         disabled={isSendingThis}
-                        className={`px-3.5 py-2 rounded-xl font-bold font-mono text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95 disabled:opacity-50 ${
+                        className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl font-bold font-mono text-xs flex items-center gap-1.5 transition-all shadow-sm active:scale-95 disabled:opacity-50 ${
                           isSent
-                            ? 'bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-700'
-                            : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
+                            ? 'bg-slate-100 hover:bg-slate-200 text-emerald-800 border border-slate-300'
+                            : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
                         }`}
                       >
                         {isSendingThis ? (
@@ -337,31 +341,35 @@ export const CampaignManagerLegacy: React.FC = () => {
 
           {/* Right Column: Live Message Preview in WhatsApp Phone Bubble (5 cols) */}
           <div className="lg:col-span-5 space-y-3">
-            <div className="flex justify-between items-center text-xs font-mono text-slate-400">
-              <span>Vista Previa del Mensaje (WhatsApp)</span>
-              <span className="text-gold-400">{selectedLeadPreview?.name || 'Selecciona un lead'}</span>
+            <div className="flex justify-between items-center text-xs font-mono text-slate-500">
+              <span>Vista Previa del Mensaje</span>
+              <span className="text-gold-700 font-bold truncate max-w-[180px]">
+                {selectedLeadPreview?.name || 'Selecciona un lead'}
+              </span>
             </div>
 
             {selectedLeadPreview ? (
-              <div className="bg-slate-950 rounded-3xl p-5 border border-slate-800 space-y-4 shadow-xl relative">
+              <div className="card-3d rounded-3xl p-4 sm:p-5 border border-slate-200/90 space-y-4 shadow-xl relative bg-white">
                 {/* Contact Header */}
-                <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
-                  <div className="w-10 h-10 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center font-mono">
+                <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+                  <div className="w-10 h-10 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center font-mono shadow-sm">
                     {selectedLeadPreview.name.charAt(0)}
                   </div>
                   <div>
-                    <h4 className="font-bold text-white text-sm">{selectedLeadPreview.name}</h4>
-                    <p className="text-[11px] text-emerald-400 font-mono">{selectedLeadPreview.phone}</p>
+                    <h4 className="font-bold text-slate-900 text-sm">{selectedLeadPreview.name}</h4>
+                    <p className="text-[11px] text-emerald-700 font-mono font-medium">{selectedLeadPreview.phone}</p>
                   </div>
                 </div>
 
-                {/* WhatsApp Chat Bubble */}
+                {/* WhatsApp Chat Bubble (Light WhatsApp theme) */}
                 <div className="space-y-3">
-                  <div className="bg-emerald-950/60 border border-emerald-800/60 rounded-2xl rounded-tl-none p-4 text-xs text-slate-200 leading-relaxed space-y-2.5 font-sans whitespace-pre-line shadow-inner">
-                    {selectedLeadPreview.personalized_message || selectedLeadPreview.sample_message}
+                  <div className="bg-[#f0f2f5] border border-slate-200 rounded-2xl p-4 space-y-2">
+                    <div className="bg-white border border-slate-200/80 rounded-2xl rounded-tl-none p-3.5 text-xs text-slate-800 leading-relaxed font-sans whitespace-pre-line shadow-sm">
+                      {selectedLeadPreview.personalized_message || selectedLeadPreview.sample_message}
+                    </div>
                   </div>
 
-                  <div className="text-right text-[10px] text-slate-500 font-mono">
+                  <div className="text-right text-[10px] text-slate-400 font-mono">
                     Formato: Euros (€) • Metros Cuadrados (m²) • 0% IRPF
                   </div>
                 </div>
@@ -370,7 +378,7 @@ export const CampaignManagerLegacy: React.FC = () => {
                 <button
                   onClick={() => handleSendSingleLead(selectedLeadPreview)}
                   disabled={sendingLeadPhone === selectedLeadPreview.phone}
-                  className="w-full bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-600 text-slate-950 font-black py-3 rounded-2xl text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3 rounded-2xl text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all"
                 >
                   {sendingLeadPhone === selectedLeadPreview.phone ? (
                     <>
@@ -386,7 +394,7 @@ export const CampaignManagerLegacy: React.FC = () => {
                 </button>
               </div>
             ) : (
-              <div className="bg-slate-950 rounded-3xl p-8 border border-slate-800 text-center text-slate-500 text-xs font-mono">
+              <div className="card-3d rounded-3xl p-8 text-center text-slate-400 text-xs font-mono bg-white">
                 Selecciona un lead de la lista para ver su mensaje personalizado.
               </div>
             )}

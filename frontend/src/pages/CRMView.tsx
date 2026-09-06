@@ -165,25 +165,25 @@ export const CRMView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-serif-luxury font-bold text-white flex items-center gap-3">
+          <h1 className="text-2xl sm:text-3xl font-serif-luxury font-bold text-slate-900 flex items-center gap-3">
             <span>CRM Inteligente TDAH</span>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-gold-500/20 text-gold-300 font-mono font-bold">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-gold-500/20 text-gold-700 border border-gold-400 font-mono font-bold">
               Enfoque Máximo
             </span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-300 mt-1">
+          <p className="text-xs sm:text-sm text-slate-600 mt-1">
             Gestión visual sin saturación cognitiva: una tarjeta a la vez o tablero Kanban interactivo.
           </p>
         </div>
 
         {/* View Switcher Buttons */}
-        <div className="flex items-center gap-2 bg-slate-900/90 p-1 rounded-2xl border border-slate-800 self-start md:self-auto">
+        <div className="flex items-center gap-2 bg-white p-1 rounded-2xl border border-slate-200 card-3d self-start md:self-auto">
           <button
             onClick={() => setViewMode('focus')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold font-mono transition ${
               viewMode === 'focus'
                 ? 'bg-gold-500 text-slate-950 shadow-md shadow-gold-500/20'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -194,7 +194,7 @@ export const CRMView: React.FC = () => {
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold font-mono transition ${
               viewMode === 'kanban'
                 ? 'bg-gold-500 text-slate-950 shadow-md shadow-gold-500/20'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
@@ -205,37 +205,37 @@ export const CRMView: React.FC = () => {
 
       {/* Stats Counters Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-1">
-          <div className="text-[11px] font-mono text-slate-400">Total Leads</div>
-          <div className="text-lg font-bold text-white font-mono">{stats.total}</div>
+        <div className="p-3.5 rounded-2xl bg-white border border-slate-200 card-3d space-y-1">
+          <div className="text-[11px] font-mono text-slate-500">Total Leads</div>
+          <div className="text-lg font-bold text-slate-900 font-mono">{stats.total}</div>
         </div>
-        <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-1">
-          <div className="text-[11px] font-mono text-emerald-400">Contactados</div>
-          <div className="text-lg font-bold text-emerald-300 font-mono">{stats.contacted}</div>
+        <div className="p-3.5 rounded-2xl bg-white border border-slate-200 card-3d space-y-1">
+          <div className="text-[11px] font-mono text-emerald-600">Contactados</div>
+          <div className="text-lg font-bold text-emerald-700 font-mono">{stats.contacted}</div>
         </div>
-        <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-1">
-          <div className="text-[11px] font-mono text-rose-400">Sin Contacto (Alerta)</div>
-          <div className="text-lg font-bold text-rose-300 font-mono">{stats.uncontacted}</div>
+        <div className="p-3.5 rounded-2xl bg-white border border-slate-200 card-3d space-y-1">
+          <div className="text-[11px] font-mono text-rose-600">Sin Contacto (Alerta)</div>
+          <div className="text-lg font-bold text-rose-700 font-mono">{stats.uncontacted}</div>
         </div>
-        <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-1">
-          <div className="text-[11px] font-mono text-indigo-400">Citas / Zoom</div>
-          <div className="text-lg font-bold text-indigo-300 font-mono">{stats.appointments}</div>
+        <div className="p-3.5 rounded-2xl bg-white border border-slate-200 card-3d space-y-1">
+          <div className="text-[11px] font-mono text-indigo-600">Citas / Zoom</div>
+          <div className="text-lg font-bold text-indigo-700 font-mono">{stats.appointments}</div>
         </div>
-        <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-1 col-span-2 sm:col-span-1">
-          <div className="text-[11px] font-mono text-gold-400">Cerrados / Ventas</div>
-          <div className="text-lg font-bold text-gold-300 font-mono">{stats.closed}</div>
+        <div className="p-3.5 rounded-2xl bg-white border border-slate-200 card-3d space-y-1 col-span-2 sm:col-span-1">
+          <div className="text-[11px] font-mono text-amber-700">Cerrados / Ventas</div>
+          <div className="text-lg font-bold text-amber-800 font-mono">{stats.closed}</div>
         </div>
       </div>
 
       {/* Notification Toast */}
       {notificationMsg && (
-        <div className="bg-emerald-950/90 border border-emerald-500 text-emerald-200 text-xs p-3.5 rounded-2xl font-mono text-center shadow-lg animate-fade-in">
+        <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs p-3.5 rounded-2xl font-mono text-center shadow-lg animate-fade-in">
           {notificationMsg}
         </div>
       )}
 
       {/* Filters Bar */}
-      <div className="flex flex-wrap items-center gap-3 bg-slate-900/60 p-3.5 rounded-2xl border border-slate-800 backdrop-blur-md">
+      <div className="flex flex-wrap items-center gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 card-3d backdrop-blur-md">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
           <input
@@ -243,7 +243,7 @@ export const CRMView: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar por nombre, teléfono, notas..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-gold-500 font-mono"
+            className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 focus:outline-none focus:border-gold-500 font-mono"
           />
         </div>
 
@@ -251,7 +251,7 @@ export const CRMView: React.FC = () => {
         <select
           value={campaignFilter}
           onChange={(e) => setCampaignFilter(e.target.value)}
-          className="bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded-xl px-3 py-2 font-mono focus:outline-none focus:border-gold-500"
+          className="bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-xl px-3 py-2 font-mono focus:outline-none focus:border-gold-500"
         >
           <option value="all">Todas las Campañas</option>
           {campaignOptions.map((c) => (
@@ -265,7 +265,7 @@ export const CRMView: React.FC = () => {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded-xl px-3 py-2 font-mono focus:outline-none focus:border-gold-500"
+          className="bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-xl px-3 py-2 font-mono focus:outline-none focus:border-gold-500"
         >
           <option value="all">Todas las Etapas</option>
           <option value="CREATED">Nuevos</option>
@@ -283,16 +283,16 @@ export const CRMView: React.FC = () => {
           className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono font-bold transition ${
             adhdAlertOnly
               ? 'bg-rose-600 text-white'
-              : 'bg-slate-950 text-slate-400 border border-slate-800 hover:border-rose-500/50'
+              : 'bg-slate-50 text-slate-700 border border-slate-300 hover:border-rose-500/50'
           }`}
         >
-          <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+          <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
           <span>Alerta TDAH</span>
         </button>
 
         <button
           onClick={fetchLeads}
-          className="p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 hover:text-white transition"
+          className="p-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-600 hover:text-slate-900 transition"
           title="Recargar datos de la base de datos"
         >
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />

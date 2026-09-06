@@ -102,13 +102,13 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
       className="max-w-3xl mx-auto space-y-6"
     >
       {/* Top Deck Counter & Controls */}
-      <div className="flex items-center justify-between bg-slate-900/80 px-5 py-3 rounded-2xl border border-slate-800 backdrop-blur-md">
+      <div className="flex items-center justify-between bg-white px-5 py-3 rounded-2xl border border-slate-200 card-3d backdrop-blur-md">
         <div className="flex items-center gap-3">
-          <span className="text-xs font-mono text-slate-400">
-            Lead <span className="text-white font-bold">{currentIndex + 1}</span> de{' '}
-            <span className="text-white font-bold">{leads.length}</span>
+          <span className="text-xs font-mono text-slate-600">
+            Lead <span className="text-slate-900 font-bold">{currentIndex + 1}</span> de{' '}
+            <span className="text-slate-900 font-bold">{leads.length}</span>
           </span>
-          <span className="text-xs text-gold-400 font-mono font-semibold truncate max-w-[200px]">
+          <span className="text-xs text-gold-700 font-mono font-bold truncate max-w-[200px]">
             {currentLead.campaign_name || currentLead.campaign_id}
           </span>
         </div>
@@ -117,7 +117,7 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
           <button
             onClick={handlePrev}
             disabled={currentIndex === 0}
-            className="p-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition"
             title="Anterior (Deslizar izquierda)"
           >
             <ChevronLeft className="w-5 h-5" />
@@ -125,7 +125,7 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
           <button
             onClick={handleNext}
             disabled={currentIndex === leads.length - 1}
-            className="p-2 rounded-xl bg-gold-500 text-slate-950 font-bold hover:bg-gold-400 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="p-2 rounded-xl bg-gold-500 text-slate-950 font-bold hover:bg-gold-400 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-md"
             title="Siguiente (Deslizar derecha)"
           >
             <ChevronRight className="w-5 h-5" />
@@ -134,11 +134,11 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
       </div>
 
       {/* Main ADHD Focus Card */}
-      <div className="bg-slate-950 rounded-3xl p-6 sm:p-8 border border-gold-500/40 shadow-2xl space-y-6 relative overflow-hidden">
+      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 card-3d-gold space-y-6 relative overflow-hidden">
         {/* Urgent ADHD Alert Banner if never contacted */}
         {isOverdue && (
-          <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-rose-950/70 border border-rose-600/50 text-rose-200 text-xs font-mono">
-            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+          <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-rose-50 border border-rose-300 text-rose-800 text-xs font-mono">
+            <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
             <span>
               ⚡ <b>Alerta TDAH:</b> Este lead aún no ha sido contactado. ¡Toma acción ahora!
             </span>
@@ -146,22 +146,22 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
         )}
 
         {/* Lead Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
           <div>
-            <h2 className="text-2xl font-serif-luxury font-bold text-white flex items-center gap-3">
+            <h2 className="text-2xl font-serif-luxury font-bold text-slate-900 flex items-center gap-3">
               <span>{currentLead.name}</span>
               {currentLead.whatsapp_status === 'sent' && (
-                <span className="text-xs bg-emerald-950 text-emerald-300 border border-emerald-800 px-3 py-1 rounded-full font-mono font-normal inline-flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Enviado ({currentLead.last_sent_type || 'manual'})
+                <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-300 px-3 py-1 rounded-full font-mono font-semibold inline-flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Enviado ({currentLead.last_sent_type || 'manual'})
                 </span>
               )}
             </h2>
-            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 font-mono mt-1">
-              <a href={`tel:${cleanDigits}`} className="hover:text-gold-400 transition flex items-center gap-1">
-                <Phone className="w-3.5 h-3.5 text-gold-400" /> {currentLead.phone}
+            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 font-mono mt-1">
+              <a href={`tel:${cleanDigits}`} className="hover:text-gold-700 transition flex items-center gap-1 font-semibold">
+                <Phone className="w-3.5 h-3.5 text-gold-600" /> {currentLead.phone}
               </a>
               {currentLead.email && (
-                <span className="flex items-center gap-1 text-slate-400">
+                <span className="flex items-center gap-1 text-slate-600">
                   <Mail className="w-3.5 h-3.5" /> {currentLead.email}
                 </span>
               )}
@@ -169,7 +169,7 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-white font-mono uppercase">
+            <span className="px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-300 text-xs font-bold text-slate-800 font-mono uppercase">
               {currentLead.crm_status}
             </span>
           </div>
@@ -177,17 +177,17 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
 
         {/* Lead Context Data Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-          <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
-            <div className="text-slate-400 font-mono">Objetivo</div>
-            <div className="text-white font-semibold">{currentLead.objective || 'Inversión'}</div>
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+            <div className="text-slate-500 font-mono">Objetivo</div>
+            <div className="text-slate-900 font-semibold">{currentLead.objective || 'Inversión'}</div>
           </div>
-          <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
-            <div className="text-slate-400 font-mono">Plazo / Timeline</div>
-            <div className="text-white font-semibold">{currentLead.timeline || 'Próximos meses'}</div>
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+            <div className="text-slate-500 font-mono">Plazo / Timeline</div>
+            <div className="text-slate-900 font-semibold">{currentLead.timeline || 'Próximos meses'}</div>
           </div>
-          <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
-            <div className="text-slate-400 font-mono">Presupuesto</div>
-            <div className="text-gold-400 font-semibold font-mono">
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+            <div className="text-slate-500 font-mono">Presupuesto</div>
+            <div className="text-gold-700 font-bold font-mono">
               {currentLead.budget_eur ? `${currentLead.budget_eur.toLocaleString()} €` : 'A consultar'}
             </div>
           </div>
@@ -195,8 +195,8 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
 
         {/* Historical Notes */}
         {currentLead.notes && (
-          <div className="p-4 rounded-2xl bg-gold-500/10 border border-gold-500/30 text-xs text-gold-200 leading-relaxed">
-            <span className="font-bold font-mono uppercase block text-[10px] text-gold-400 mb-1">
+          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 leading-relaxed">
+            <span className="font-bold font-mono uppercase block text-[10px] text-amber-700 mb-1">
               Notas Previas del Cliente:
             </span>
             {currentLead.notes}
@@ -205,15 +205,15 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
 
         {/* Personalized AI Message Preview & Send Action */}
         <div className="space-y-3 pt-2">
-          <div className="flex items-center justify-between text-xs font-mono text-slate-400">
+          <div className="flex items-center justify-between text-xs font-mono text-slate-500">
             <span>Mensaje Personalizado WhatsApp:</span>
             {currentLead.last_contact_date && (
-              <span className="text-emerald-400">
+              <span className="text-emerald-700 font-semibold">
                 Último contacto: {currentLead.last_contact_date}
               </span>
             )}
           </div>
-          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-line max-h-48 overflow-y-auto custom-scrollbar">
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 leading-relaxed font-sans whitespace-pre-line max-h-48 overflow-y-auto custom-scrollbar">
             {currentLead.personalized_message || 'Sin mensaje generado.'}
           </div>
 
@@ -221,7 +221,7 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
             <button
               onClick={() => onSendWhatsApp(currentLead)}
               disabled={sendingLeadId === currentLead.id}
-              className="w-full bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 text-slate-950 font-black py-3.5 rounded-2xl text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 active:scale-95 transition-all disabled:opacity-50"
+              className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-white font-black py-3.5 rounded-2xl text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 active:scale-95 transition-all disabled:opacity-50"
             >
               {sendingLeadId === currentLead.id ? (
                 <>
@@ -240,24 +240,24 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
               href={waWebLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 font-bold py-3.5 rounded-2xl text-xs font-mono flex items-center justify-center gap-2 transition"
+              className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 font-bold py-3.5 rounded-2xl text-xs font-mono flex items-center justify-center gap-2 transition"
             >
-              <MessageSquare className="w-4 h-4 text-emerald-400" />
+              <MessageSquare className="w-4 h-4 text-emerald-600" />
               <span>Abrir en WhatsApp Web</span>
             </a>
           </div>
         </div>
 
         {/* Quick Stage Transition Buttons */}
-        <div className="space-y-2 pt-3 border-t border-slate-800">
-          <div className="text-[11px] font-mono text-slate-400">Cambiar Etapa con 1 Toque:</div>
+        <div className="space-y-2 pt-3 border-t border-slate-200">
+          <div className="text-[11px] font-mono text-slate-500">Cambiar Etapa con 1 Toque:</div>
           <div className="flex flex-wrap gap-2">
             {STAGE_BUTTONS.map((btn) => (
               <button
                 key={btn.id}
                 onClick={() => onUpdateLeadStatus(currentLead.id, btn.id)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold text-white transition shadow-sm ${btn.color} ${
-                  currentLead.crm_status === btn.id ? 'ring-2 ring-white scale-105' : 'opacity-70 hover:opacity-100'
+                  currentLead.crm_status === btn.id ? 'ring-2 ring-slate-900 scale-105' : 'opacity-80 hover:opacity-100'
                 }`}
               >
                 {btn.label}
@@ -268,25 +268,25 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
 
         {/* Quick Follow-up Reminders */}
         <div className="space-y-2 pt-2">
-          <div className="text-[11px] font-mono text-slate-400 flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-gold-400" /> Programar Recordatorio:
+          <div className="text-[11px] font-mono text-slate-500 flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-gold-600" /> Programar Recordatorio:
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => onSetReminder(currentLead.id, 2)}
-              className="px-3 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-slate-300 font-mono"
+              className="px-3 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-xs text-slate-700 font-mono"
             >
               En 2 Horas
             </button>
             <button
               onClick={() => onSetReminder(currentLead.id, 24)}
-              className="px-3 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-slate-300 font-mono"
+              className="px-3 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-xs text-slate-700 font-mono"
             >
               Mañana (24h)
             </button>
             <button
               onClick={() => onSetReminder(currentLead.id, 72)}
-              className="px-3 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-slate-300 font-mono"
+              className="px-3 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-xs text-slate-700 font-mono"
             >
               En 3 Días
             </button>
@@ -294,7 +294,7 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
         </div>
 
         {/* Add Quick Note */}
-        <div className="space-y-2 pt-3 border-t border-slate-800">
+        <div className="space-y-2 pt-3 border-t border-slate-200">
           <div className="flex gap-2">
             <input
               type="text"
@@ -302,7 +302,7 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
               onChange={(e) => setNewNoteText(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && submitNote()}
               placeholder="Escribe una nota rápida de la llamada..."
-              className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-gold-500 font-sans"
+              className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-4 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-gold-500 font-sans"
             />
             <button
               onClick={submitNote}

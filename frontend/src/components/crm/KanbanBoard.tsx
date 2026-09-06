@@ -60,15 +60,15 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             key={col.id}
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, col.id)}
-            className="flex-shrink-0 w-80 bg-slate-900/60 backdrop-blur-md rounded-2xl p-4 border border-slate-800 flex flex-col space-y-3"
+            className="flex-shrink-0 w-80 bg-white/90 backdrop-blur-md rounded-2xl p-4 border border-slate-200 card-3d flex flex-col space-y-3"
           >
             {/* Column Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
               <div className="flex items-center gap-2">
                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${col.badgeColor}`}>
                   {col.title}
                 </span>
-                <span className="text-xs text-slate-400 font-mono">({colLeads.length})</span>
+                <span className="text-xs text-slate-500 font-mono">({colLeads.length})</span>
               </div>
             </div>
 
@@ -85,35 +85,35 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                     draggable
                     onDragStart={(e) => handleDragStart(e, lead.id)}
                     onClick={() => onSelectLead(lead)}
-                    className="p-4 rounded-xl bg-slate-950/80 hover:bg-slate-900/90 border border-slate-800 hover:border-gold-500/50 transition-all cursor-pointer shadow-lg space-y-2.5 group"
+                    className="p-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 hover:border-gold-500/60 card-3d transition-all cursor-pointer space-y-2.5 group"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div className="font-bold text-sm text-white group-hover:text-gold-300 transition-colors">
+                      <div className="font-bold text-sm text-slate-900 group-hover:text-gold-700 transition-colors">
                         {lead.name}
                       </div>
                       {isSent ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800/80 font-mono">
-                          <CheckCircle2 className="w-3 h-3" /> Enviado
+                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-300 font-mono">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Enviado
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full font-mono">
+                        <span className="inline-flex items-center gap-1 text-[10px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full font-mono border border-slate-200">
                           Pendiente
                         </span>
                       )}
                     </div>
 
-                    <div className="text-xs text-slate-400 font-mono">
+                    <div className="text-xs text-slate-600 font-mono">
                       {lead.phone}
                     </div>
 
                     {lead.notes && (
-                      <div className="text-[11px] text-slate-300 line-clamp-2 bg-slate-900/60 p-2 rounded-lg border border-slate-800/50">
+                      <div className="text-[11px] text-slate-700 line-clamp-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
                         {lead.notes}
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-800/60 text-[11px] text-slate-400">
-                      <span className="truncate max-w-[150px] text-gold-400 font-mono">
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px] text-slate-500">
+                      <span className="truncate max-w-[150px] text-gold-700 font-mono font-semibold">
                         {lead.campaign_name || lead.campaign_id}
                       </span>
                       <div className="flex items-center gap-2">
@@ -122,7 +122,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition"
+                          className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 transition"
                           title="Abrir WhatsApp Web"
                         >
                           <MessageSquare className="w-3.5 h-3.5" />
@@ -132,7 +132,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             e.stopPropagation();
                             onSelectLead(lead);
                           }}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
+                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
                         >
                           <ChevronRight className="w-3.5 h-3.5" />
                         </button>
@@ -143,7 +143,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               })}
 
               {colLeads.length === 0 && (
-                <div className="py-8 text-center text-xs text-slate-600 font-mono">
+                <div className="py-8 text-center text-xs text-slate-400 font-mono">
                   Sin leads en esta etapa
                 </div>
               )}

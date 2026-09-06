@@ -62,10 +62,10 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-gold-500 selection:text-slate-950 font-sans">
+    <div className="min-h-screen marble-bg text-slate-900 flex flex-col selection:bg-gold-500 selection:text-slate-950 font-sans">
       {/* If the prospect is viewing directly via their link, show an exclusive private banking header */}
       {isClientDirectView ? (
-        <header className="sticky top-0 z-50 glass-panel border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md py-3.5 px-4 sm:px-8">
+        <header className="sticky top-0 z-50 glass-panel border-b border-slate-200/80 bg-white/90 backdrop-blur-md py-3.5 px-4 sm:px-8 shadow-sm">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-gold-600 via-gold-400 to-amber-200 flex items-center justify-center shadow-lg shadow-gold-500/20">
@@ -145,7 +145,7 @@ export function App() {
         )}
       </main>
 
-      <footer className="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-400">
+      <footer className="border-t border-slate-200/80 bg-white/75 backdrop-blur-md py-6 text-center text-xs text-slate-500 mt-12 shadow-sm">
         <p className="font-mono">
           Dubai Capital Advisory • Sovereign Wealth & Golden Visa Gateway • DIFC • Dubai Land Department Registered
         </p>
