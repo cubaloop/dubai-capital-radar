@@ -480,11 +480,8 @@ async def regenerate_campaign_lead_messages(campaign_id: str, new_prompt: Option
     leads_to_update = [dict(r) for r in cursor.fetchall()]
     conn.close()
 
-    # 1. Update the first 3 leads immediately so the user sees instant feedback in the UI preview
-    immediate_leads = leads_to_update[:3]
-    background_leads = leads_to_update[3:]
-
-    sem = asyncio.Semaphore(3)
+    # Concurrently generate messages for ALL leads in the campaign
+    sem = asyncio.Semaphore(4)
     async def generate_single(lead_dict):
         async with sem:
             try:
@@ -494,31 +491,14 @@ async def regenerate_campaign_lead_messages(campaign_id: str, new_prompt: Option
                 msg = compose_lead_message_local(lead_dict, active_prompt, camp_name)
             return lead_dict["id"], msg
 
-    immediate_results = await asyncio.gather(*[generate_single(l) for l in immediate_leads])
+    results = await asyncio.gather(*[generate_single(l) for l in leads_to_update])
     
     conn = get_db_connection()
     cursor = conn.cursor()
-    for lead_id, msg in immediate_results:
+    for lead_id, msg in results:
         cursor.execute("UPDATE leads SET personalized_message = ? WHERE id = ?", (msg, lead_id))
     conn.commit()
     conn.close()
-
-    # 2. Queue remaining leads in background with safe pacing to strictly honor 15 RPM
-    if background_leads:
-        async def process_background_batch():
-            for l in background_leads:
-                try:
-                    await asyncio.sleep(2.0)
-                    bg_msg = await compose_lead_message_ai(l, active_prompt, camp_name)
-                    c = get_db_connection()
-                    cur = c.cursor()
-                    cur.execute("UPDATE leads SET personalized_message = ? WHERE id = ?", (bg_msg, l["id"]))
-                    c.commit()
-                    c.close()
-                except Exception as ex:
-                    print(f"[BG Lead AI Error {l.get('id')}]: {ex}")
-
-        asyncio.create_task(process_background_batch())
 
     return {
         "success": True,

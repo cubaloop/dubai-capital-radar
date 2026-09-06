@@ -78,6 +78,8 @@ def compose_lead_message_local(lead: Dict[str, Any], prompt_instructions: str = 
     notes_lower = notes.lower()
     negative_words = ["no interesado", "no interesa", "no está interesado", "descartado", "no contesta", "equivocado", "spam", "mala hora", "no quiere", "baja"]
     is_negative_note = any(w in notes_lower for w in negative_words)
+    ignore_notes = ["asistencia confirmada", "evento vip", "asistió", "asistio", "invitado", "evento"]
+    is_event_note = any(w in notes_lower for w in ignore_notes)
 
     vague_objectives = ["inversión", "inversion", "general", "no especificado", "solo estoy explorando", "explorando", "curiosidad", "viendo"]
     is_vague_objective = any(w in objective.lower() for w in vague_objectives)
@@ -92,43 +94,45 @@ def compose_lead_message_local(lead: Dict[str, Any], prompt_instructions: str = 
         hook = "Te escribo teniendo en mente tu interés en unidades tipo estudio con alta rentabilidad neta por alquiler."
     elif "familia" in notes_lower or "chalet" in notes_lower or "villa" in notes_lower:
         hook = "Te escribo recordando tu búsqueda de propiedades amplias y residenciales."
-    elif notes and len(notes) > 5 and not notes.isdigit() and not is_negative_note:
+    elif notes and len(notes) > 5 and not notes.isdigit() and not is_negative_note and not is_event_note:
         clean_note = notes[0].lower() + notes[1:] if len(notes) > 1 else notes
-        hook = f"Te escribo teniendo presente tu interés previo ({clean_note})."
+        hook = f"Te escribo recordando tu interés en el mercado inmobiliario de Dubai."
     elif objective and not is_vague_objective:
         hook = f"Te escribo recordando tu objetivo enfocado en {objective.lower()}."
     else:
-        hook = "Te contacto directamente desde nuestro equipo asesor de Dubai."
+        hook = ""
 
     # 2. Process Custom Instructions or Fallback
     instructions_clean = (prompt_instructions or "").strip()
     
     if instructions_clean and len(instructions_clean) > 8:
-        # User provided specific custom bot instructions!
         core_instruction = clean_user_instruction_meta(instructions_clean)
         
-        # Check call-to-action type inside instruction
-        inst_lower = instructions_clean.lower()
-        if "online" in inst_lower or "zoom" in inst_lower or "hora y fecha" in inst_lower or "reunión" in inst_lower or "reunion" in inst_lower:
-            cta = "¿Qué día y hora te vendría bien entre esta semana para hacer una breve presentación online y mostrarte los números exactos?"
-        elif "hotel" in inst_lower or "evento" in inst_lower or "asistencia" in inst_lower or "madrid" in inst_lower or "presencial" in inst_lower:
-            cta = "El aforo es exclusivo y limitado. Si te gustaría asistir o recibir el pase VIP, ¿me confirmas por aquí y te reservo tu plaza?"
-        elif "dossier" in inst_lower or "catalogo" in inst_lower or "catálogo" in inst_lower:
-            cta = "¿Te gustaría que te envíe el dossier completo y las fichas técnicas por aquí? Solo respóndeme con un 'Sí'."
-        else:
-            cta = "¿Te gustaría que te comparta los detalles y números de estas opciones? Solo respóndeme por aquí y lo revisamos."
+        # Avoid duplicate greeting if core_instruction starts with greeting
+        if re.match(r"^hola\s+soy\s+david", core_instruction, flags=re.IGNORECASE):
+            core_instruction = re.sub(r"^hola\s+soy\s+david,?\s*", "Soy David, ", core_instruction, flags=re.IGNORECASE)
+        
+        # Check if instruction already has a CTA to avoid duplicating ideas
+        has_cta = any(w in core_instruction.lower() for w in ["zoom", "día y hora", "dia y hora", "disponible", "conectarnos", "reunión", "reunion"])
+        
+        cta = ""
+        if not has_cta:
+            inst_lower = instructions_clean.lower()
+            if "online" in inst_lower or "zoom" in inst_lower or "hora y fecha" in inst_lower or "reunión" in inst_lower or "reunion" in inst_lower:
+                cta = "¿Qué día y hora te vendría bien entre esta semana para hacer una breve presentación online y mostrarte los números exactos?"
+            elif "hotel" in inst_lower or "evento" in inst_lower or "asistencia" in inst_lower or "madrid" in inst_lower or "presencial" in inst_lower:
+                cta = "El aforo es exclusivo y limitado. Si te gustaría asistir o recibir el pase VIP, ¿me confirmas por aquí y te reservo tu plaza?"
+            elif "dossier" in inst_lower or "catalogo" in inst_lower or "catálogo" in inst_lower:
+                cta = "¿Te gustaría que te envíe el dossier completo y las fichas técnicas por aquí? Solo respóndeme con un 'Sí'."
+            else:
+                cta = "¿Te gustaría que te comparta los detalles y números de estas opciones? Solo respóndeme por aquí y lo revisamos."
             
-        body = f"""{hook}
-
-{core_instruction}
-
-{cta}"""
+        parts = [p for p in [hook, core_instruction, cta] if p]
+        body = "\n\n".join(parts)
 
     else:
         # Default high-converting real estate campaign body
-        body = f"""{hook}
-
-Te contacto porque tenemos una oportunidad única: estaremos presentando novedades exclusivas y proyectos con condiciones especiales:
+        body = f"""Te contacto porque tenemos una oportunidad única en Dubai: estuvimos presentando novedades exclusivas y proyectos con condiciones especiales:
 • 🛂 *Golden Visa de 10 Años GRATIS*
 • 🏷️ *Descuentos del 15% al 20%* exclusivos en fases de lanzamiento
 • 🏠 *Gestión de alquiler (Property Management) 100% GRATIS*
@@ -138,15 +142,13 @@ Te contacto porque tenemos una oportunidad única: estaremos presentando novedad
 
     msg = f"""{salutation}
 
-{body}
-
-Un saludo cordial."""
+{body}"""
     return msg.strip()
 
 async def compose_lead_message_ai(lead: Dict[str, Any], prompt_instructions: str, campaign_name: str = "") -> str:
     """
-    Calls Google Gemini (v3.6 Flash / v3.5 Flash) with full broker instructions and lead CRM profile.
-    Includes rate-limit (429) backoff retry and falls back gracefully to local synthesizer.
+    Calls Google Gemini high-quota fast models with strict copywriting guidelines.
+    Never duplicates greetings or mentions old event attendance records.
     """
     import asyncio
     api_key = get_gemini_api_key()
@@ -155,35 +157,36 @@ async def compose_lead_message_ai(lead: Dict[str, Any], prompt_instructions: str
 
     name = lead.get("name", "")
     first_name = format_lead_first_name(name)
-    notes = lead.get("notes", "")
     objective = lead.get("objective", "")
-    timeline = lead.get("timeline", "")
     budget = lead.get("budget_eur") or lead.get("budget_aed") or ""
 
-    system_prompt = f"""Eres David, asesor experto en inversiones y Bienes Raíces en Dubai con trato ejecutivo, cercano y de alto valor.
-Tu objetivo es redactar un mensaje de WhatsApp individual, ultra personalizado, directo y persuasivo para un lead específico.
+    system_prompt = f"""Eres David, asesor experto en inversiones y Bienes Raíces en Dubai.
+Tu objetivo es redactar un mensaje de WhatsApp individual, directo, elegante y de alta conversión para este cliente.
 
-INSTRUCCIONES CLAVE DE LA CAMPAÑA DADAS POR TI (EL BROKER):
+INSTRUCCIONES CLAVE DEL BROKER (DAVID):
 "{prompt_instructions}"
 
-DATOS ESPECÍFICOS DEL LEAD (DEL EXCEL / CRM):
-- Nombre completo: {name} (Llámalo por su nombre de pila: {first_name})
-- Notas históricas o conversación previa: {notes or 'Sin notas previas'}
-- Objetivo de inversión: {objective or 'Inversión'}
-- Plazo: {timeline or 'No especificado'}
+DATOS DEL CLIENTE:
+- Nombre: {name} (Llámalo por su nombre de pila: {first_name})
+- Objetivo: {objective or 'Inversión'}
 - Presupuesto: {budget or 'Flexible'}
 
-REGLAS OBLIGATORIAS:
-1. Saluda cordialmente por su nombre de pila: "Hola {first_name}," o "¿Cómo estás, {first_name}?".
-2. Preséntate con naturalidad en primera persona como David.
-3. Conecta de forma sutil, empática y creíble con su interés previo o notas registradas en el CRM ("{notes}") para que sienta atención 1 a 1 genuina.
-4. Desarrolla las ofertas, ideas y beneficios señalados en las instrucciones (importes de depósito, cuotas mensuales, tipos de propiedades, evento reciente en Miami o ventajas fiscales) con lenguaje seductor y profesional.
-5. NUNCA copies las órdenes de desarrollo textuales del usuario. NUNCA digas "Quiero que le mandes un mensaje", ni "vincula la siguiente idea", ni repitas directivas técnicas. Habla directamente al cliente.
-6. Termina con una llamada a la acción clara para agendar día y hora por Zoom o responder por WhatsApp.
-7. Usa formato nativo de WhatsApp (*negrita* en importes y puntos clave, párrafos cortos y limpios).
-8. Devuelve ÚNICAMENTE el texto exacto del mensaje de WhatsApp, sin introducciones ni notas adicionales."""
+REGLAS ESTRICTAS DE REDACCIÓN:
+1. Comienza saludando únicamente con el nombre de pila: "Hola {first_name}," y a continuación preséntate con naturalidad en primera persona: "Soy David, asesor experto en bienes raíces en Dubai..." o "Te saluda David...". NUNCA dupliques saludos (PROHIBIDO decir "Hola {first_name}... Hola soy David...").
+2. TOTALMENTE PROHIBIDO mencionar "asistencia confirmada al evento", notas técnicas de CRM o decir que asistió al evento VIP (ese registro es una nota interna antigua y no debe mencionarse al cliente). Si se hace referencia a un evento pasado, menciónalo como un evento exclusivo reciente donde presentamos oportunidades de inversión de alto nivel en Dubai.
+3. Desarrolla la propuesta de valor con fluidez, naturalidad y tono consultivo de alto nivel, integrando las condiciones descritas en las instrucciones del broker (planes de pago, depósitos desde 60K USD con 500$ mensuales, propiedades de lujo, 0% impuestos y alta rentabilidad).
+4. NUNCA copies las órdenes de desarrollo textuales del usuario como "Quiero que le mandes un mensaje", "además de la información del excel", ni "vincula la siguiente idea".
+5. Termina con UNA SOLA llamada a la acción clara y directa: consultar qué día y hora le viene bien entre esta semana para conectarse brevemente por Zoom y mostrarle las opciones y su rentabilidad.
+6. NO repitas ideas, saludos ni preguntas al final. Mantén el mensaje limpio, en 3 párrafos cortos formato WhatsApp.
+7. Devuelve ÚNICAMENTE el texto final del mensaje listo para enviar, sin introducciones ni comillas envolventes."""
 
-    models_to_try = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash-lite"]
+    # High-quota, fast models on Google AI Studio free tier
+    models_to_try = [
+        "gemini-3.1-flash-lite",
+        "gemini-3.5-flash-lite",
+        "gemini-flash-latest",
+        "gemini-3.6-flash"
+    ]
     
     for model_name in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
@@ -193,8 +196,8 @@ REGLAS OBLIGATORIAS:
                     res = await client.post(url, json={
                         "contents": [{"parts": [{"text": system_prompt}]}],
                         "generationConfig": {
-                            "temperature": 0.4,
-                            "maxOutputTokens": 2048
+                            "temperature": 0.3,
+                            "maxOutputTokens": 1000
                         }
                     })
                     if res.status_code == 200:
@@ -207,14 +210,14 @@ REGLAS OBLIGATORIAS:
                                 if text:
                                     return text
                     elif res.status_code == 429:
-                        # Rate limit reached on free tier (15 RPM) - backoff and retry
-                        await asyncio.sleep(2.0 * (attempt + 1))
-                        continue
+                        # Rate limit reached - wait 1.5s and retry next model
+                        await asyncio.sleep(1.5)
+                        break
                     elif res.status_code == 404:
-                        break  # Try next model
+                        break
             except Exception as e:
                 print(f"[AI Composer] Gemini call error on {model_name} attempt {attempt}: {e}")
-                await asyncio.sleep(1.5)
+                await asyncio.sleep(1.0)
                 continue
 
     return compose_lead_message_local(lead, prompt_instructions, campaign_name)
