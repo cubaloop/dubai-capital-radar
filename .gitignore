@@ -16,6 +16,12 @@ dist-ssr/
 *.local
 .DS_Store
 
+# Database
+*.db
+*.sqlite
+*.sqlite3
+backend/app/data/*.db
+
 # Logs
 *.log
 npm-debug.log*

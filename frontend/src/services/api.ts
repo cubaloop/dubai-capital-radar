@@ -124,5 +124,93 @@ export const apiService = {
     });
     if (!res.ok) throw new Error('Failed to classify response');
     return res.json();
+  },
+
+  // ─── UNIFIED CRM & DYNAMIC CAMPAIGNS ──────────────────────────────────────────
+
+  async getCrmCampaigns() {
+    const res = await fetch(`${API_BASE_URL}/crm/campaigns`);
+    if (!res.ok) throw new Error('Failed to fetch CRM campaigns');
+    return res.json();
+  },
+
+  async uploadExcelCampaign(formData: FormData) {
+    const res = await fetch(`${API_BASE_URL}/crm/campaigns/upload-excel`, {
+      method: 'POST',
+      body: formData
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Error al subir archivo' }));
+      throw new Error(err.detail || 'Error al subir campaña');
+    }
+    return res.json();
+  },
+
+  async getCampaignLeads(campaignId: string) {
+    const res = await fetch(`${API_BASE_URL}/crm/campaigns/${campaignId}/leads`);
+    if (!res.ok) throw new Error('Failed to fetch campaign leads');
+    return res.json();
+  },
+
+  async sendLeadWhatsApp(leadId: string, payload?: { message?: string; image_path?: string }) {
+    const res = await fetch(`${API_BASE_URL}/crm/leads/${leadId}/send-whatsapp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload || {})
+    });
+    return res.json();
+  },
+
+  async startBatchDispatch(campaignId: string, delaySeconds: number = 8) {
+    const res = await fetch(`${API_BASE_URL}/crm/campaigns/${campaignId}/batch/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ delay_seconds: delaySeconds })
+    });
+    return res.json();
+  },
+
+  async controlBatchDispatch(campaignId: string, action: 'pause' | 'resume' | 'stop') {
+    const res = await fetch(`${API_BASE_URL}/crm/campaigns/${campaignId}/batch/control`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action })
+    });
+    return res.json();
+  },
+
+  async getBatchStatus(campaignId: string) {
+    const res = await fetch(`${API_BASE_URL}/crm/campaigns/${campaignId}/batch/status`);
+    return res.json();
+  },
+
+  async getAllCrmLeads() {
+    const res = await fetch(`${API_BASE_URL}/crm/all-leads`);
+    if (!res.ok) throw new Error('Failed to fetch CRM leads');
+    return res.json();
+  },
+
+  async patchCrmLead(leadId: string, updates: Record<string, any>) {
+    const res = await fetch(`${API_BASE_URL}/crm/leads/${leadId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    return res.json();
+  },
+
+  async addLeadNote(leadId: string, note: { author?: string; content: string; type?: string }) {
+    const res = await fetch(`${API_BASE_URL}/crm/leads/${leadId}/notes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(note)
+    });
+    return res.json();
+  },
+
+  async getLeadNotes(leadId: string) {
+    const res = await fetch(`${API_BASE_URL}/crm/leads/${leadId}/notes`);
+    return res.json();
   }
 };
+

@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
+import { CRMView } from './pages/CRMView';
+import { CampaignManager } from './pages/CampaignManager';
 import { RadarDashboard } from './pages/RadarDashboard';
 import { DossierView } from './pages/DossierView';
-import { CampaignManager } from './pages/CampaignManager';
 import { OffPlanMatcher } from './pages/OffPlanMatcher';
 import { WhatsAppQRModal } from './components/WhatsAppQRModal';
-import { Lock, ShieldCheck, PhoneCall, Calendar } from 'lucide-react';
+import { Lock, ShieldCheck, PhoneCall } from 'lucide-react';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'radar' | 'dossiers' | 'campaigns' | 'inventory'>('radar');
+  const [activeTab, setActiveTab] = useState<'crm' | 'campaigns' | 'radar' | 'dossiers' | 'inventory'>('campaigns');
   const [selectedDossierSlug, setSelectedDossierSlug] = useState<string>('');
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState<boolean>(false);
   const [isClientDirectView, setIsClientDirectView] = useState<boolean>(false);
@@ -49,7 +50,7 @@ export function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleTabChange = (tab: 'radar' | 'dossiers' | 'campaigns' | 'inventory') => {
+  const handleTabChange = (tab: 'crm' | 'campaigns' | 'radar' | 'dossiers' | 'inventory') => {
     setActiveTab(tab);
     setIsClientDirectView(false);
     if (tab === 'dossiers' && selectedDossierSlug) {
@@ -60,7 +61,7 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-gold-500 selection:text-slate-950">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-gold-500 selection:text-slate-950 font-sans">
       {/* If the prospect is viewing directly via their link, show an exclusive private banking header */}
       {isClientDirectView ? (
         <header className="sticky top-0 z-50 glass-panel border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md py-3.5 px-4 sm:px-8">
@@ -108,7 +109,15 @@ export function App() {
         onClose={() => setIsWhatsAppModalOpen(false)} 
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-6 sm:pt-8">
+        {activeTab === 'crm' && (
+          <CRMView />
+        )}
+
+        {activeTab === 'campaigns' && (
+          <CampaignManager />
+        )}
+
         {activeTab === 'radar' && (
           <RadarDashboard 
             onOpenDossier={handleOpenDossier}
@@ -123,10 +132,6 @@ export function App() {
             onBack={() => handleTabChange('radar')} 
             isClientDirectView={isClientDirectView}
           />
-        )}
-
-        {activeTab === 'campaigns' && (
-          <CampaignManager />
         )}
 
         {activeTab === 'inventory' && (

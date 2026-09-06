@@ -1,5 +1,6 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from typing import List, Dict, Any, Optional
 import uvicorn
 import os
@@ -35,6 +36,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files directory for flyers and documents
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 import asyncio
 import httpx
@@ -453,16 +459,181 @@ async def launch_miami_event_campaign(background_tasks: BackgroundTasks):
         "message": f"Campana iniciada con exito en segundo plano para los {len(MIAMI_EVENT_LEADS)} leads con imagen adjunta y pausas de seguridad anti-baneo."
     }
 
-# --- SPAIN MADRID PROPERTY EXPO CAMPAIGN (112 LEADS EN EUROS Y M²) ---
-from .outreach.spain_campaign import (
-    SPAIN_LEADS_DATA,
-    build_madrid_expo_invitation,
-    dispatch_spain_event_campaign,
-    CAMPAIGN_PROGRESS as SPAIN_PROGRESS
+# --- UNIFIED CRM & DYNAMIC CAMPAIGNS API (DATABASE BACKED) ---
+from .database.crm_db import (
+    get_campaigns_list,
+    create_campaign_with_leads,
+    get_leads_by_campaign,
+    get_lead_by_id,
+    mark_lead_whatsapp_sent,
+    update_lead_crm_fields,
+    add_lead_note_db,
+    get_lead_notes_db,
+    get_all_crm_leads
 )
+from .crm.batch_dispatcher import batch_manager
+from .crm.excel_parser import parse_spreadsheet_bytes, map_and_structure_leads
 
+@app.get("/api/crm/campaigns")
+def api_get_campaigns():
+    """Returns list of all campaigns with real-time lead counts and sent stats."""
+    return {"campaigns": get_campaigns_list()}
+
+@app.post("/api/crm/campaigns/upload-excel")
+async def api_upload_excel_campaign(
+    file: UploadFile = File(...),
+    campaign_name: str = Form(...),
+    category: str = Form("General"),
+    campaign_context: str = Form(""),
+    flyer: Optional[UploadFile] = File(None)
+):
+    """
+    Uploads an Excel or CSV file of leads, creates a new campaign,
+    generates personalized AI messages for each lead, and persists to DB.
+    """
+    content = await file.read()
+    raw_rows = parse_spreadsheet_bytes(content, file.filename or "leads.xlsx")
+    if not raw_rows:
+        raise HTTPException(status_code=400, detail="El archivo no contiene filas legibles o está vacío.")
+
+    structured_leads = map_and_structure_leads(raw_rows, campaign_context=campaign_context)
+    if not structured_leads:
+        raise HTTPException(status_code=400, detail="No se pudieron extraer contactos válidos con número de teléfono.")
+
+    # Save flyer if provided
+    flyer_path = ""
+    if flyer and flyer.filename:
+        flyer_content = await flyer.read()
+        flyer_fn = f"flyer_{int(datetime.now().timestamp())}_{flyer.filename}"
+        flyer_dest = os.path.join(STATIC_DIR, flyer_fn)
+        with open(flyer_dest, "wb") as f:
+            f.write(flyer_content)
+        flyer_path = f"/static/{flyer_fn}"
+
+    camp_id = f"camp_{int(datetime.now().timestamp())}"
+    campaign_info = create_campaign_with_leads(
+        campaign_data={
+            "id": camp_id,
+            "name": campaign_name,
+            "category": category,
+            "description": campaign_context or f"Campaña importada ({len(structured_leads)} leads)",
+            "attached_flyer": flyer_path
+        },
+        leads_data=structured_leads
+    )
+
+    return {
+        "success": True,
+        "campaign": campaign_info,
+        "leads_count": len(structured_leads)
+    }
+
+@app.get("/api/crm/campaigns/{campaign_id}/leads")
+def api_get_campaign_leads(campaign_id: str):
+    """Returns all leads for a given campaign with their persistent WhatsApp status."""
+    leads = get_leads_by_campaign(campaign_id)
+    return {"campaign_id": campaign_id, "total": len(leads), "leads": leads}
+
+@app.post("/api/crm/leads/{lead_id}/send-whatsapp")
+async def api_send_lead_whatsapp(lead_id: str, payload: Optional[Dict[str, Any]] = None):
+    """
+    Sends WhatsApp message directly to a single lead with 1-click
+    and registers the timestamp and status permanently in the database.
+    """
+    lead = get_lead_by_id(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead no encontrado")
+
+    phone = lead.get("phone", "")
+    message = (payload and payload.get("message")) or lead.get("personalized_message") or ""
+    image_path = (payload and payload.get("image_path")) or None
+
+    # Fallback to campaign default flyer
+    if not image_path:
+        camp_id = lead.get("campaign_id", "").lower()
+        if "spain" in camp_id or "madrid" in camp_id:
+            image_path = "/app/whatsapp-gateway/uploads/dubai_madrid_event.jpg"
+        elif "miami" in camp_id:
+            image_path = "/app/whatsapp-gateway/uploads/dubai_miami_event.jpg"
+
+    gateway_payload = {
+        "to": phone,
+        "message": message,
+        "image_path": image_path if image_path and os.path.exists(image_path) else None
+    }
+
+    gateway_url = os.getenv("WHATSAPP_GATEWAY_URL", "http://127.0.0.1:3001")
+    try:
+        async with httpx.AsyncClient(timeout=25.0) as client:
+            r = await client.post(f"{gateway_url}/send", json=gateway_payload)
+            data = r.json()
+            if data.get("success"):
+                mark_lead_whatsapp_sent(lead_id, sent_type="manual")
+                return {
+                    "success": True,
+                    "lead_id": lead_id,
+                    "whatsapp_status": "sent",
+                    "last_sent_type": "manual"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": data.get("error", "Error de entrega en pasarela")
+                }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/crm/campaigns/{campaign_id}/batch/start")
+async def api_start_campaign_batch(campaign_id: str, payload: Optional[Dict[str, Any]] = None):
+    """Starts the sequential batch sender for a campaign with persistence."""
+    delay = (payload and payload.get("delay_seconds")) or 8
+    image_path = (payload and payload.get("image_path")) or None
+    status = await batch_manager.start_campaign_batch(campaign_id, delay_seconds=delay, image_path=image_path)
+    return {"success": True, "status": status}
+
+@app.post("/api/crm/campaigns/{campaign_id}/batch/control")
+def api_control_campaign_batch(campaign_id: str, payload: Dict[str, Any]):
+    action = payload.get("action", "")
+    if action == "pause":
+        batch_manager.pause(campaign_id)
+    elif action == "resume":
+        batch_manager.resume(campaign_id)
+    elif action == "stop":
+        batch_manager.stop(campaign_id)
+    return {"success": True, "status": batch_manager.get_status(campaign_id)}
+
+@app.get("/api/crm/campaigns/{campaign_id}/batch/status")
+def api_get_campaign_batch_status(campaign_id: str):
+    return batch_manager.get_status(campaign_id)
+
+@app.get("/api/crm/all-leads")
+def api_get_all_crm_leads():
+    """Returns all leads for the ADHD CRM Kanban and Focus view."""
+    return {"leads": get_all_crm_leads()}
+
+@app.patch("/api/crm/leads/{lead_id}")
+def api_patch_lead(lead_id: str, payload: Dict[str, Any]):
+    success = update_lead_crm_fields(lead_id, payload)
+    return {"success": success}
+
+@app.post("/api/crm/leads/{lead_id}/notes")
+def api_add_lead_note(lead_id: str, payload: Dict[str, Any]):
+    note = add_lead_note_db(
+        lead_id=lead_id,
+        author=payload.get("author", "Agente"),
+        content=payload.get("content", ""),
+        note_type=payload.get("type", "note")
+    )
+    return {"success": True, "note": note}
+
+@app.get("/api/crm/leads/{lead_id}/notes")
+def api_get_lead_notes(lead_id: str):
+    return {"notes": get_lead_notes_db(lead_id)}
+
+# --- BACKWARD COMPATIBLE CAMPAIGN ROUTES (NOW POWERED BY SQLITE PERSISTENCE) ---
 @app.get("/api/campaigns/spain-reactivation/leads")
 def get_spain_reactivation_leads():
+    leads = get_leads_by_campaign("spain_madrid_expo")
     return {
         "campaign_name": "Dubai Property Expo Madrid (112 Leads)",
         "event_dates": "9 y 10 Septiembre (10:00 AM - 8:00 PM)",
@@ -470,32 +641,37 @@ def get_spain_reactivation_leads():
         "attached_flyer": "/static/dubai_madrid_event.jpg",
         "currency": "EUR (€)",
         "surface_unit": "m²",
-        "total_leads": len(SPAIN_LEADS_DATA),
+        "total_leads": len(leads),
         "leads": [
             {
                 "index": i + 1,
-                "name": lead["name"],
-                "phone": lead["phone"],
-                "email": lead.get("email", ""),
-                "objective": lead.get("objective", ""),
-                "timeline": lead.get("timeline", ""),
-                "notes": lead.get("notes", ""),
-                "personalized_message": build_madrid_expo_invitation(lead)
+                "id": l["id"],
+                "name": l["name"],
+                "phone": l["phone"],
+                "email": l.get("email", ""),
+                "objective": l.get("objective", ""),
+                "timeline": l.get("timeline", ""),
+                "notes": l.get("notes", ""),
+                "whatsapp_status": l.get("whatsapp_status", "pending"),
+                "last_contact_date": l.get("last_contact_date"),
+                "last_sent_type": l.get("last_sent_type"),
+                "personalized_message": l.get("personalized_message", "")
             }
-            for i, lead in enumerate(SPAIN_LEADS_DATA)
+            for i, l in enumerate(leads)
         ]
     }
 
 @app.get("/api/campaigns/spain-reactivation/status")
 def get_spain_campaign_status():
-    return SPAIN_PROGRESS
+    return batch_manager.get_status("spain_madrid_expo")
 
 @app.post("/api/campaigns/spain-reactivation/launch")
-async def launch_spain_campaign(background_tasks: BackgroundTasks):
-    background_tasks.add_task(dispatch_spain_event_campaign)
+async def launch_spain_campaign():
+    status = await batch_manager.start_campaign_batch("spain_madrid_expo", delay_seconds=8)
     return {
         "success": True,
-        "message": f"Campaña de invitación a Dubai Property Expo Madrid iniciada para los {len(SPAIN_LEADS_DATA)} leads con flyer adjunto y pausas anti-baneo."
+        "message": "Campaña de invitación a Dubai Property Expo Madrid iniciada con seguimiento en tiempo real y persistencia en base de datos.",
+        "status": status
     }
 
 

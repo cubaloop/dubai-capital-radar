@@ -103,3 +103,72 @@ export interface TriageResponse {
   action_required: string;
   priority_level: string;
 }
+
+// ─── UNIFIED CRM & CAMPAIGN TYPES ─────────────────────────────────────────────
+
+export type CrmLeadStatus =
+  | 'CREATED'
+  | 'CONTACTED'
+  | 'FOLLOW_UP'
+  | 'APPOINTMENT'
+  | 'RESERVATION'
+  | 'CLOSED'
+  | 'LOST';
+
+export interface CrmLead {
+  id: string;
+  campaign_id: string;
+  campaign_name?: string;
+  campaign_category?: string;
+  name: string;
+  phone: string;
+  clean_phone?: string;
+  email?: string;
+  budget_aed?: number | null;
+  budget_eur?: number | null;
+  objective?: string;
+  timeline?: string;
+  notes?: string;
+  crm_status: CrmLeadStatus;
+  whatsapp_status: 'pending' | 'sending' | 'sent' | 'failed';
+  last_contact_date?: string | null;
+  last_sent_type?: 'manual' | 'auto' | null;
+  personalized_message?: string;
+  next_reminder_date?: string | null;
+  created_at: string;
+}
+
+export interface CrmCampaign {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  attached_flyer?: string;
+  created_at: string;
+  total_leads: number;
+  sent_leads: number;
+  pending_leads: number;
+}
+
+export interface LeadNoteItem {
+  id: string;
+  lead_id: string;
+  author: string;
+  content: string;
+  type: string;
+  created_at: string;
+}
+
+export interface BatchDispatchStatus {
+  campaign_id: string;
+  status: 'idle' | 'running' | 'paused' | 'stopped' | 'completed';
+  total: number;
+  sent: number;
+  failed: number;
+  pending: number;
+  current_index: number;
+  current_lead_name: string;
+  current_lead_phone: string;
+  delay_seconds: number;
+  error?: string | null;
+}
