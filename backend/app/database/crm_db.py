@@ -480,10 +480,11 @@ async def regenerate_campaign_lead_messages(campaign_id: str, new_prompt: Option
     leads_to_update = [dict(r) for r in cursor.fetchall()]
     conn.close()
 
-    # Process in parallel with concurrency semaphore (4 concurrent requests to stay within rate limits)
-    sem = asyncio.Semaphore(4)
+    # Process with rate-limit safety (2 concurrent requests staggered to honor 15 RPM quota)
+    sem = asyncio.Semaphore(2)
 
-    async def generate_for_lead(lead_dict):
+    async def generate_for_lead(lead_dict, idx):
+        await asyncio.sleep(idx * 0.5)
         async with sem:
             try:
                 msg = await compose_lead_message_ai(lead_dict, active_prompt, camp_name)
@@ -492,7 +493,7 @@ async def regenerate_campaign_lead_messages(campaign_id: str, new_prompt: Option
                 msg = compose_lead_message_local(lead_dict, active_prompt, camp_name)
             return lead_dict["id"], msg
 
-    results = await asyncio.gather(*[generate_for_lead(l) for l in leads_to_update])
+    results = await asyncio.gather(*[generate_for_lead(l, i) for i, l in enumerate(leads_to_update)])
 
     conn = get_db_connection()
     cursor = conn.cursor()

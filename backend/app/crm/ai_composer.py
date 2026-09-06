@@ -28,17 +28,27 @@ def format_lead_first_name(raw_name: str) -> str:
     return first
 
 def clean_user_instruction_meta(instruction: str) -> str:
-    """Removes meta directives like 'Quiero que les digas que' and trailing 'que me escriba...' so text is natural."""
+    """Removes meta directives and extracts the core pitch."""
     s = instruction.strip()
-    patterns = [
-        r"^(?:por favor\s+)?(?:quiero\s+que\s+(?:le\s+|les\s+)?(?:mandes|envíes|envies|hagas|digas|comentes|avises|expliques|recuerdes|menciones)[^\:]*?(?:vincula(?:s)?|con|la siguiente idea)?:?\s*)",
-        r"^(?:por favor\s+)?(?:quiero\s+que\s+(?:además\s+de[^\.]*\s+|ademas\s+de[^\.]*\s+)?(?:les\s+)?(?:menciones|digas|comentes|avises|expliques|recuerdes)\s+(?:que\s+)?)+",
-        r"^(?:diles\s+que\s+|recuérdales\s+que\s+|recuerdales\s+que\s+|menciónales\s+que\s+|mencionales\s+que\s+|avísales\s+que\s+)",
-        r"^(?:quiero\s+que\s+)",
-        r"^.*?(?:vincula\s+la\s+siguiente\s+idea:?\s*)"
-    ]
-    for p in patterns:
-        s = re.sub(p, "", s, flags=re.IGNORECASE).strip()
+    
+    # If the user explicitly provided the idea/pitch after "idea:" or similar delimiter
+    match_idea = re.search(r"(?:la siguiente idea|esta idea|el siguiente texto|el mensaje)\s*:\s*(.*)", s, flags=re.IGNORECASE | re.DOTALL)
+    if match_idea:
+        s = match_idea.group(1).strip()
+    else:
+        # Check if there is an embedded greeting like "Hola soy David"
+        match_greeting = re.search(r"(Hola\s+soy\s+.*)", s, flags=re.IGNORECASE | re.DOTALL)
+        if match_greeting:
+            s = match_greeting.group(1).strip()
+        else:
+            patterns = [
+                r"^(?:por favor\s+)?(?:quiero\s+que\s+.*?(?:menciones|digas|vincula(?:s)?|escribas|le\s+mandes[^\:]*\:?)\s*)",
+                r"^(?:por favor\s+)?(?:quiero\s+que\s+(?:le\s+|les\s+)?(?:mandes|envíes|envies|hagas|digas|comentes|avises|expliques|recuerdes|menciones)[^\:]*?(?:vincula(?:s)?|con|la siguiente idea)?:?\s*)",
+                r"^(?:diles\s+que\s+|recuérdales\s+que\s+|recuerdales\s+que\s+|menciónales\s+que\s+|mencionales\s+que\s+|avísales\s+que\s+)",
+                r"^(?:quiero\s+que\s+)"
+            ]
+            for p in patterns:
+                s = re.sub(p, "", s, flags=re.IGNORECASE).strip()
     
     # Strip trailing meta instructions directing the bot to ask for something (as the CTA handles it)
     s = re.sub(r"[,;\.]\s*(?:y\s+)?(?:que\s+)?(?:me\s+escriba|me\s+diga|me\s+confirme|les\s+pides|pídeles|pideles)\s+.*$", ".", s, flags=re.IGNORECASE).strip()
@@ -136,8 +146,9 @@ Un saludo cordial."""
 async def compose_lead_message_ai(lead: Dict[str, Any], prompt_instructions: str, campaign_name: str = "") -> str:
     """
     Calls Google Gemini (v3.6 Flash / v3.5 Flash) with full broker instructions and lead CRM profile.
-    Falls back gracefully to local synthesizer if API key is not present or on network error.
+    Includes rate-limit (429) backoff retry and falls back gracefully to local synthesizer.
     """
+    import asyncio
     api_key = get_gemini_api_key()
     if not api_key:
         return compose_lead_message_local(lead, prompt_instructions, campaign_name)
@@ -176,28 +187,34 @@ REGLAS OBLIGATORIAS:
     
     for model_name in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-        try:
-            async with httpx.AsyncClient(timeout=35.0) as client:
-                res = await client.post(url, json={
-                    "contents": [{"parts": [{"text": system_prompt}]}],
-                    "generationConfig": {
-                        "temperature": 0.4,
-                        "maxOutputTokens": 2048
-                    }
-                })
-                if res.status_code == 200:
-                    data = res.json()
-                    candidates = data.get("candidates", [])
-                    if candidates:
-                        parts = candidates[0].get("content", {}).get("parts", [])
-                        if parts and parts[0].get("text"):
-                            text = parts[0]["text"].strip()
-                            if text:
-                                return text
-                elif res.status_code == 404:
-                    continue  # Try next model
-        except Exception as e:
-            print(f"[AI Composer] Gemini call error on {model_name}: {e}")
-            continue
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=35.0) as client:
+                    res = await client.post(url, json={
+                        "contents": [{"parts": [{"text": system_prompt}]}],
+                        "generationConfig": {
+                            "temperature": 0.4,
+                            "maxOutputTokens": 2048
+                        }
+                    })
+                    if res.status_code == 200:
+                        data = res.json()
+                        candidates = data.get("candidates", [])
+                        if candidates:
+                            parts = candidates[0].get("content", {}).get("parts", [])
+                            if parts and parts[0].get("text"):
+                                text = parts[0]["text"].strip()
+                                if text:
+                                    return text
+                    elif res.status_code == 429:
+                        # Rate limit reached on free tier (15 RPM) - backoff and retry
+                        await asyncio.sleep(2.0 * (attempt + 1))
+                        continue
+                    elif res.status_code == 404:
+                        break  # Try next model
+            except Exception as e:
+                print(f"[AI Composer] Gemini call error on {model_name} attempt {attempt}: {e}")
+                await asyncio.sleep(1.5)
+                continue
 
     return compose_lead_message_local(lead, prompt_instructions, campaign_name)
