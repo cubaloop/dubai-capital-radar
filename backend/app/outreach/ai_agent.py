@@ -6,7 +6,11 @@ import os
 import httpx
 from typing import Dict, Any, Optional
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+def get_groq_key() -> str:
+    return os.getenv("GROQ_API_KEY", "").strip()
+
+def get_gemini_key() -> str:
+    return (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
 
 SYSTEM_PROMPT = """Eres el asistente de ventas de un broker experto en Real Estate de Dubai.
 Tu nombre es "Asistente del equipo".
@@ -32,12 +36,12 @@ Mantén el tono profesional pero cercano. Máximo 3 párrafos por respuesta."""
 
 async def classify_message_intent(message: str, lead_context: Optional[Dict] = None) -> Dict[str, Any]:
     """
-    Classify incoming WhatsApp message intent using Gemini.
-    Returns: intent type, urgency level, and suggested action.
+    Classify incoming WhatsApp message intent using Groq (primary) or Gemini.
+    Returns: intent type, urgency level, summary, and suggested action.
     """
-    if not GEMINI_API_KEY:
-        return {"intent": "unknown", "urgency": "low", "action": "manual_review"}
-    
+    groq_key = get_groq_key()
+    gemini_key = get_gemini_key()
+
     context_str = ""
     if lead_context:
         context_str = f"""
@@ -59,26 +63,60 @@ Respond in JSON with these exact fields:
   "urgency": "high" | "medium" | "low",
   "language": "es" | "en" | "pt",
   "notify_human": true | false,
-  "summary": "one-line summary in English"
+  "summary": "one-line summary in Spanish"
 }}
 
 Set notify_human=true if: urgency is high, intent is ready_to_buy, or the message requires human judgment.
 Respond ONLY with valid JSON."""
 
-    try:
-        async with httpx.AsyncClient() as client:
-            res = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
-                json={"contents": [{"parts": [{"text": prompt}]}]},
-                timeout=8.0
-            )
-            text = res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-            # Clean markdown if present
-            text = text.replace("```json", "").replace("```", "").strip()
-            import json
-            return json.loads(text)
-    except Exception as e:
-        return {"intent": "unknown", "urgency": "low", "action": "manual_review", "error": str(e)}
+    # 1. Try Groq
+    if groq_key:
+        for m in ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"]:
+            try:
+                async with httpx.AsyncClient(timeout=6.0) as client:
+                    payload = {
+                        "model": m,
+                        "messages": [
+                            {"role": "system", "content": "You are a real estate conversation classifier. Return only valid JSON."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "temperature": 0.1,
+                        "max_tokens": 500
+                    }
+                    res = await client.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        json=payload,
+                        headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
+                    )
+                    if res.status_code == 200:
+                        raw = res.json()["choices"][0]["message"]["content"].strip()
+                        raw = raw.replace("```json", "").replace("```", "").strip()
+                        import json
+                        return json.loads(raw)
+            except Exception:
+                continue
+
+    # 2. Try Gemini
+    if gemini_key:
+        for model in ["gemini-1.5-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"]:
+            try:
+                async with httpx.AsyncClient(timeout=8.0) as client:
+                    res = await client.post(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={gemini_key}",
+                        json={"contents": [{"parts": [{"text": prompt}]}]}
+                    )
+                    if res.status_code == 200:
+                        text = res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+                        text = text.replace("```json", "").replace("```", "").strip()
+                        import json
+                        return json.loads(text)
+            except Exception:
+                continue
+
+    # Fallback default
+    lower = message.lower()
+    intent = "interested" if any(w in lower for w in ["interesa", "quiero", "precio", "cuanto", "cuánto", "zoom", "llamada", "si", "sí", "hora"]) else "info_request"
+    return {"intent": intent, "urgency": "medium", "language": "es", "notify_human": True, "summary": f"Respuesta recibida: {message[:60]}"}
 
 
 async def generate_ai_response(

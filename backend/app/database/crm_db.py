@@ -94,6 +94,9 @@ def init_crm_db():
         cursor.execute("SELECT COUNT(*) FROM campaigns WHERE id = 'spain_madrid_expo'")
         if cursor.fetchone()[0] == 0:
             seed_spain_campaign(conn)
+        cursor.execute("SELECT COUNT(*) FROM campaigns WHERE id = 'miami_vip_event'")
+        if cursor.fetchone()[0] == 0:
+            seed_initial_campaigns(conn)
 
     conn.close()
 

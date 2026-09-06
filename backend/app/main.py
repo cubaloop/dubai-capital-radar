@@ -817,24 +817,159 @@ from .inventory.project_parser import parse_project_from_text, is_developer_or_l
 from .outreach.ai_agent import classify_message_intent, generate_ai_response
 from .content.social_generator import generate_daily_social_pack
 from .outreach.telegram_notifier import notify_hot_prospect_reply, notify_developer_launch
+from .database.crm_db import get_db_connection, add_lead_note_db
+from .database.supabase_sync import sync_lead_background
+from datetime import datetime
 
 INGESTED_PROJECTS_FEED: List[Dict[str, Any]] = []
+ADMIN_PHONE_DIGITS = "971508379080"
+
+async def handle_admin_copilot(command_text: str, sender_jid: str):
+    """
+    Handles natural language operational inquiries directly from the Super-Admin / Broker (+971508379080).
+    Allows querying lead stats, active replies in the last 24h, campaign progress, etc.
+    """
+    lower = command_text.lower()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    reply_msg = ""
+    
+    # Query 1: Leads that replied or were updated in the last 24h / today
+    if any(k in lower for k in ["respondieron", "respondio", "respuestas", "leads hoy", "ultimas 24", "últimas 24", "cuantos leads", "cuántos leads"]):
+        cursor.execute("""
+        SELECT l.name, l.phone, l.crm_status, l.notes, l.last_contact_date, c.name as campaign_name
+        FROM leads l
+        LEFT JOIN campaigns c ON l.campaign_id = c.id
+        WHERE l.crm_status IN ('INTERESTED', 'HOT', 'REPLIED')
+           OR l.whatsapp_status IN ('replied', 'interested', 'hot')
+        ORDER BY l.last_contact_date DESC NULLS LAST
+        LIMIT 10
+        """)
+        rows = cursor.fetchall()
+        
+        # If no actual replies yet, show recent contacted as fallback
+        if not rows:
+            cursor.execute("""
+            SELECT l.name, l.phone, l.crm_status, l.notes, l.last_contact_date, c.name as campaign_name
+            FROM leads l
+            LEFT JOIN campaigns c ON l.campaign_id = c.id
+            WHERE l.crm_status = 'CONTACTED'
+            ORDER BY l.last_contact_date DESC NULLS LAST
+            LIMIT 5
+            """)
+            rows = cursor.fetchall()
+            is_fallback = True
+        else:
+            is_fallback = False
+        
+        if not rows:
+            reply_msg = "📊 *Reporte Copiloto Dubai Capital Radar*\n\nActualmente no se han registrado respuestas entrantes en las últimas 24h.\nLas campañas activas continúan en seguimiento."
+        else:
+            title = "📊 *Reporte Copiloto Dubai Capital Radar*"
+            sub = f"Leads que respondieron recientemente ({len(rows)} activos):" if not is_fallback else f"Sin respuestas directas hoy. Últimos {len(rows)} contactados:"
+            lines = [f"{title}\n{sub}"]
+            for idx, r in enumerate(rows, 1):
+                clean_name = r["name"] or "Inversor"
+                phone_num = r["phone"] or ""
+                camp = r["campaign_name"] or "General"
+                status = r["crm_status"] or "CONTACTED"
+                notes = (r["notes"] or "").split("\n")[-1]
+                lines.append(f"\n{idx}. *{clean_name}* ({phone_num})\n   • Campaña: _{camp}_\n   • Estado: *{status}*\n   • Nota: {notes[:80] if notes else 'En seguimiento'}")
+            
+            lines.append("\n✅ _Todos los datos están sincronizados en tiempo real con tu CRM y Supabase._")
+            reply_msg = "\n".join(lines)
+            
+    # Query 2: Campaign status summary
+    elif any(k in lower for k in ["campaña", "campana", "estado", "resumen", "total leads"]):
+        cursor.execute("""
+        SELECT c.name, COUNT(l.id) as total,
+               SUM(CASE WHEN l.whatsapp_status = 'sent' THEN 1 ELSE 0 END) as sent,
+               SUM(CASE WHEN l.crm_status IN ('INTERESTED', 'HOT', 'REPLIED') THEN 1 ELSE 0 END) as replied
+        FROM campaigns c
+        LEFT JOIN leads l ON c.id = l.campaign_id
+        GROUP BY c.id
+        """)
+        camps = cursor.fetchall()
+        lines = ["📈 *Resumen Ejecutivo de Campañas:*"]
+        for c in camps:
+            lines.append(f"\n• *{c['name']}*:\n  - Total: {c['total']} leads\n  - Enviados: {c['sent']}\n  - Respuestas: {c['replied']}")
+        reply_msg = "\n".join(lines)
+        
+    else:
+        # Natural response via Groq / Gemini with broker assistant context
+        groq_key = os.getenv("GROQ_API_KEY", "").strip()
+        if groq_key:
+            try:
+                async with httpx.AsyncClient(timeout=8.0) as client:
+                    payload = {
+                        "model": "openai/gpt-oss-120b",
+                        "messages": [
+                            {"role": "system", "content": "Eres el copiloto de IA de David, el Super-Admin del sistema Dubai Capital Radar. Responde de forma muy concisa, profesional y directa en formato WhatsApp."},
+                            {"role": "user", "content": command_text}
+                        ],
+                        "temperature": 0.3,
+                        "max_tokens": 400
+                    }
+                    r = await client.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"})
+                    if r.status_code == 200:
+                        reply_msg = r.json()["choices"][0]["message"]["content"].strip()
+            except Exception:
+                pass
+        
+        if not reply_msg:
+            reply_msg = f"👋 Hola David, recibí tu instrucción: \"{command_text}\". Puedes preguntarme:\n1. '¿Cuántos leads respondieron hoy?'\n2. 'Resumen de campañas'\n3. O reenviarme el PDF/ficha de un nuevo proyecto para indexarlo."
+            
+    conn.close()
+    
+    # Send response back to admin via WhatsApp
+    await dispatch_whatsapp_direct(to_phone=ADMIN_PHONE_DIGITS, message=reply_msg, bypass_shield=True)
+    return {"status": "admin_copilot_replied", "message": reply_msg}
 
 @app.post("/api/whatsapp/inbound-webhook")
 async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     """
     Receives incoming WhatsApp messages in real-time.
-    1. If from developer/launch group -> Gemini parses project facts and adds to inventory knowledge.
-    2. If from prospect -> Gemini classifies intent & generates personalized reply context.
+    0. If from Super-Admin (+971508379080) -> Copilot Mode (Answers queries, executes CRM actions).
+    1. If from developer/launch group -> Groq/Gemini parses project facts and adds to inventory knowledge.
+    2. If from prospect -> Groq/Gemini classifies intent, auto-updates CRM notes & triggers hot lead alerts.
     """
-    text = payload.get("text", "")
-    sender = payload.get("sender", "")
+    text = (payload.get("text") or "").strip()
+    sender = (payload.get("sender") or "").replace("+", "").replace(" ", "").strip()
     is_group = payload.get("is_group", False)
+    jid = payload.get("jid", "")
+
+    # Extract text from base64 PDF if document is attached
+    if payload.get("has_document") and payload.get("document_base64"):
+        try:
+            import base64
+            import io
+            from pypdf import PdfReader
+            pdf_bytes = base64.b64decode(payload["document_base64"])
+            reader = PdfReader(io.BytesIO(pdf_bytes))
+            extracted_pages = []
+            for page in reader.pages[:6]:
+                page_text = page.extract_text()
+                if page_text:
+                    extracted_pages.append(page_text)
+            if extracted_pages:
+                pdf_text = "\n".join(extracted_pages)
+                text = f"{text}\n{pdf_text}".strip() if text else pdf_text
+                print(f"📄 [PDF Extracted] Successfully extracted {len(pdf_text)} characters from {payload.get('document_file_name')}")
+        except Exception as pdf_err:
+            print(f"⚠️ [PDF Extraction Error]: {pdf_err}")
 
     if not text:
         return {"status": "ignored", "reason": "empty_content"}
 
-    # 1. Developer project launch detection
+    # 0. SUPER-ADMIN COPILOT MODE (+971508379080)
+    if sender == ADMIN_PHONE_DIGITS or sender.endswith("508379080"):
+        print(f"[ADMIN COPILOT] Message from Super-Admin: '{text}'")
+        # Check if sending a developer launch or asking a system question
+        if not is_developer_or_launch_message(text, is_group=False):
+            return await handle_admin_copilot(text, jid)
+
+    # 1. DEVELOPER PROJECT LAUNCH DETECTION (Texts or PDFs)
     if is_developer_or_launch_message(text, is_group=is_group):
         parsed_project = await parse_project_from_text(text)
         if parsed_project:
@@ -852,6 +987,18 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
                 payment_plan=parsed_project.get("payment_plan")
             )
 
+            # Also notify Super-Admin on WhatsApp
+            admin_notice = (
+                f"🏗️ *Nuevo Proyecto Ingestado Automáticamente*\n\n"
+                f"• *Proyecto:* {parsed_project.get('project_name')}\n"
+                f"• *Desarrolladora:* {parsed_project.get('developer')}\n"
+                f"• *Precio desde:* {parsed_project.get('starting_price_aed'):,} AED\n"
+                f"• *Plan de Pago:* {parsed_project.get('payment_plan')}\n"
+                f"• *Resumen:* {parsed_project.get('short_summary')}\n\n"
+                f"✅ _Indexado en el inventario para tus agentes de IA._"
+            )
+            await dispatch_whatsapp_direct(to_phone=ADMIN_PHONE_DIGITS, message=admin_notice, bypass_shield=True)
+
             return {
                 "status": "project_ingested",
                 "project_name": parsed_project.get("project_name"),
@@ -859,24 +1006,90 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
                 "starting_price_aed": parsed_project.get("starting_price_aed")
             }
 
-    # 2. Prospect conversation triage
+    # 2. PROSPECT REPLIES & AUTOMATIC CRM RECORD UPDATES
     intent_data = await classify_message_intent(text)
     intent = intent_data.get("intent", "info_request")
     urgency = intent_data.get("urgency", "low")
+    summary = intent_data.get("summary") or text[:70]
 
-    # If lead shows high intent, objection to resolve, or ready to buy -> trigger Telegram alert!
-    if intent in ["ready_to_buy", "interested", "scheduling", "objection_price", "objection_trust", "objection_spouse"] or urgency in ["high", "medium"]:
+    # Search for matching lead in SQLite & Supabase
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Match clean phone digits (suffix matching to handle +1 / 1 / +34 etc.)
+    sender_digits = "".join([c for c in sender if c.isdigit()])
+    cursor.execute("SELECT * FROM leads WHERE clean_phone = ? OR clean_phone LIKE ? OR phone LIKE ?", 
+                   (sender_digits, f"%{sender_digits[-8:]}", f"%{sender_digits[-8:]}%"))
+    matched_lead = cursor.fetchone()
+    
+    lead_name = f"Inversor (+{sender})"
+    updated_in_crm = False
+
+    if matched_lead:
+        lid = matched_lead["id"]
+        lead_name = matched_lead["name"]
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        new_crm_status = "INTERESTED" if intent in ["ready_to_buy", "interested", "scheduling"] else "CONTACTED"
+        note_content = f"💬 [Respuesta WhatsApp]: {text}\n🤖 [IA Triage]: {intent.upper()} - {summary}"
+        
+        # Add note to lead_notes table
+        add_lead_note_db(lid, author="WhatsApp IA Inbound", content=note_content, note_type="reply")
+        
+        # Append to lead notes column and update status
+        existing_notes = (matched_lead["notes"] or "").strip()
+        combined_notes = f"{existing_notes}\n[{now_str[:10]}]: {summary}" if existing_notes else f"[{now_str[:10]}]: {summary}"
+        
+        cursor.execute("""
+        UPDATE leads 
+        SET crm_status = ?,
+            whatsapp_status = 'replied',
+            last_contact_date = ?,
+            notes = ?
+        WHERE id = ?
+        """, (new_crm_status, now_str, combined_notes, lid))
+        conn.commit()
+        
+        # Sync updated lead to Supabase PostgreSQL
+        cursor.execute("SELECT * FROM leads WHERE id = ?", (lid,))
+        fresh_lead = cursor.fetchone()
+        if fresh_lead:
+            sync_lead_background(dict(fresh_lead))
+        updated_in_crm = True
+        print(f"[CRM Auto-Update] Lead '{lead_name}' updated: status={new_crm_status}, note='{summary}'")
+
+    conn.close()
+
+    # If lead shows high intent, objection to resolve, or ready to buy -> trigger Telegram & WhatsApp alerts to broker!
+    is_hot = intent in ["ready_to_buy", "interested", "scheduling", "objection_price", "objection_trust", "objection_spouse"] or urgency in ["high", "medium"]
+    
+    if is_hot:
+        # 1. Telegram Alert
         await notify_hot_prospect_reply(
-            lead_name=f"Lead (+{sender})",
+            lead_name=lead_name,
             lead_phone=f"+{sender}",
             message=text,
             intent=intent,
             country="España / Internacional"
         )
+        
+        # 2. WhatsApp Alert directly to Super-Admin (+971508379080)
+        hot_alert = (
+            f"🔥 *LEAD CALIENTE DETECTADO EN WHATSAPP*\n\n"
+            f"👤 *Cliente:* {lead_name}\n"
+            f"📱 *Teléfono:* +{sender}\n"
+            f"🎯 *Intención:* {intent.upper()}\n"
+            f"💬 *Mensaje:* \"{text}\"\n\n"
+            f"📌 *CRM:* {'✅ Nota y estado actualizados automáticamente' if updated_in_crm else '⚠️ Número no registrado previamente'}\n"
+            f"👉 Abre la app o WhatsApp para responderle de inmediato."
+        )
+        await dispatch_whatsapp_direct(to_phone=ADMIN_PHONE_DIGITS, message=hot_alert, bypass_shield=True)
 
     return {
         "status": "prospect_message_processed",
         "sender": sender,
+        "lead_name": lead_name,
+        "crm_updated": updated_in_crm,
         "intent": intent,
         "urgency": urgency,
         "notify_human": intent_data.get("notify_human", False)

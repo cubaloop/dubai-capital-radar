@@ -6,7 +6,8 @@ import makeWASocket, {
   DisconnectReason, 
   useMultiFileAuthState, 
   fetchLatestBaileysVersion,
-  Browsers
+  Browsers,
+  downloadMediaMessage
 } from '@whiskeysockets/baileys';
 import fs from 'fs';
 import path from 'path';
@@ -246,10 +247,23 @@ async function startWhatsApp() {
                           msg.message.documentMessage?.caption ||
                           msg.message.documentMessage?.fileName || '';
 
-      const hasDocument = !!msg.message.documentMessage;
-      const documentFileName = msg.message.documentMessage?.fileName || null;
-
-      if (!textContent && !hasDocument) continue;
+      let documentBase64 = null;
+      if (hasDocument) {
+        try {
+          const buffer = await downloadMediaMessage(
+            msg,
+            'buffer',
+            {},
+            { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
+          );
+          if (buffer) {
+            documentBase64 = buffer.toString('base64');
+            console.log(`[WhatsApp Inbound] Downloaded document (${buffer.length} bytes): ${documentFileName}`);
+          }
+        } catch (mediaErr) {
+          console.error(`[WhatsApp Inbound] Error downloading document:`, mediaErr.message);
+        }
+      }
 
       console.log(`[WhatsApp Inbound] Message received from ${senderNumber} (${isGroup ? 'Group' : 'Direct'})`);
 
@@ -265,6 +279,7 @@ async function startWhatsApp() {
             text: textContent,
             has_document: hasDocument,
             document_file_name: documentFileName,
+            document_base64: documentBase64,
             timestamp: msg.messageTimestamp
           })
         }).catch(err => {
