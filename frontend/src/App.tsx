@@ -7,6 +7,7 @@ import { DossierView } from './pages/DossierView';
 import { OffPlanMatcher } from './pages/OffPlanMatcher';
 import { WhatsAppQRModal } from './components/WhatsAppQRModal';
 import { AgencySettingsModal } from './components/AgencySettingsModal';
+import { LicenseModal, getLicenseState, getRemainingTrialDays } from './components/LicenseModal';
 import { AuthLandingView } from './pages/AuthLandingView';
 import { Lock, ShieldCheck, PhoneCall } from 'lucide-react';
 
@@ -23,7 +24,14 @@ export function App() {
   const [selectedDossierSlug, setSelectedDossierSlug] = useState<string>('');
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState<boolean>(false);
   const [isAgencyModalOpen, setIsAgencyModalOpen] = useState<boolean>(false);
+  const [isLicenseModalOpen, setIsLicenseModalOpen] = useState<boolean>(false);
+  const [licenseState, setLicenseState] = useState(() => getLicenseState(currentUser?.email));
   const [isClientDirectView, setIsClientDirectView] = useState<boolean>(false);
+
+  // Sync license state when user changes
+  useEffect(() => {
+    setLicenseState(getLicenseState(currentUser?.email));
+  }, [currentUser]);
 
   // Parse direct URL on initial mount and browser navigation
   useEffect(() => {
@@ -123,6 +131,9 @@ export function App() {
           selectedDossierSlug={selectedDossierSlug} 
           onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
           onOpenAgencyModal={() => setIsAgencyModalOpen(true)}
+          onOpenLicenseModal={() => setIsLicenseModalOpen(true)}
+          remainingTrialDays={getRemainingTrialDays(licenseState)}
+          isUnlocked={licenseState.isUnlocked}
           onLogout={handleLogout}
         />
       )}
@@ -135,6 +146,13 @@ export function App() {
       <AgencySettingsModal
         isOpen={isAgencyModalOpen}
         onClose={() => setIsAgencyModalOpen(false)}
+      />
+
+      <LicenseModal
+        isOpen={isLicenseModalOpen}
+        onClose={() => setIsLicenseModalOpen(false)}
+        userEmail={currentUser?.email}
+        onSuccess={() => setLicenseState(getLicenseState(currentUser?.email))}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-6 sm:pt-8">

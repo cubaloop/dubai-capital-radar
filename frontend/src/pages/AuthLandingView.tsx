@@ -40,7 +40,7 @@ export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) =>
           setError('Contraseña inválida. Usa la clave maestra: Dubai2026!');
         }
       } else {
-        // Register new agency
+        // Register new agency (defaults to your master AI advisor until customized)
         const user = {
           email: email.trim(),
           name: name.trim() || 'Nuevo Asesor',
@@ -48,10 +48,10 @@ export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) =>
           agencyName: agencyName.trim() || 'Inmobiliaria VIP'
         };
         localStorage.setItem('dcr_user_session', JSON.stringify(user));
-        // Save agency config
+        // Save agency config defaulting to your advisor persona
         localStorage.setItem('dcr_agency_config', JSON.stringify({
           agencyName: user.agencyName,
-          brokerPersona: user.name,
+          brokerPersona: 'David, Asesor Senior en Inversiones Inmobiliarias Dubai (Por Defecto)',
           targetMarket: 'Dubai (Downtown, Palm, Hills)',
           currency: 'USD ($)',
           phonePrefix: '+971'

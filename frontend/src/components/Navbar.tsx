@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Radar, FileText, Send, Building2, ShieldCheck, Activity, Users, Menu, X, LogOut } from 'lucide-react';
+import { Radar, FileText, Send, Building2, ShieldCheck, Activity, Users, Menu, X, LogOut, Key } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: 'crm' | 'campaigns' | 'radar' | 'dossiers' | 'inventory';
@@ -7,6 +7,9 @@ interface NavbarProps {
   selectedDossierSlug?: string;
   onOpenWhatsAppModal: () => void;
   onOpenAgencyModal?: () => void;
+  onOpenLicenseModal?: () => void;
+  remainingTrialDays?: number;
+  isUnlocked?: boolean;
   onLogout?: () => void;
 }
 
@@ -16,6 +19,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   selectedDossierSlug,
   onOpenWhatsAppModal,
   onOpenAgencyModal,
+  onOpenLicenseModal,
+  remainingTrialDays = 30,
+  isUnlocked = false,
   onLogout
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -97,8 +103,27 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </nav>
 
-          {/* Agency Settings, WhatsApp QR & Mobile Menu Toggle */}
+          {/* Trial Days Countdown, Agency Settings, WhatsApp QR & Mobile Menu Toggle */}
           <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+            {onOpenLicenseModal && (
+              <button
+                onClick={onOpenLicenseModal}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold border transition-all active:scale-95 ${
+                  isUnlocked
+                    ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300'
+                    : remainingTrialDays > 0
+                    ? 'bg-amber-950/80 border-gold-500/50 text-gold-300 shadow-sm shadow-gold-500/10'
+                    : 'bg-red-950 border-red-500 text-red-300 animate-pulse'
+                }`}
+                title={isUnlocked ? 'Licencia Comercial Verificada' : `${remainingTrialDays} días de prueba restantes`}
+              >
+                <Key className="w-3.5 h-3.5" />
+                <span>
+                  {isUnlocked ? 'Licencia Pro' : `${remainingTrialDays}d Gratis`}
+                </span>
+              </button>
+            )}
+
             {onOpenAgencyModal && (
               <button
                 onClick={onOpenAgencyModal}
