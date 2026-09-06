@@ -62,7 +62,7 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen marble-bg text-slate-900 flex flex-col selection:bg-gold-500 selection:text-slate-950 font-sans">
+    <div className="min-h-screen w-full marble-bg text-slate-900 flex flex-col selection:bg-gold-500 selection:text-slate-950 font-sans overflow-x-hidden">
       {/* If the prospect is viewing directly via their link, show an exclusive private banking header */}
       {isClientDirectView ? (
         <header className="sticky top-0 z-50 glass-panel border-b border-slate-200/80 bg-white/90 backdrop-blur-md py-3.5 px-4 sm:px-8 shadow-sm">
