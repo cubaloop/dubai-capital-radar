@@ -345,7 +345,8 @@ app.post('/send', async (req, res) => {
 
       const jid = onWa.jid || `${cleanNumber}@s.whatsapp.net`;
 
-      if (image_path && fs.existsSync(image_path)) {
+      const hasValidImage = image_path && fs.existsSync(image_path) && fs.statSync(image_path).size > 1000;
+      if (hasValidImage) {
         const imageBuffer = fs.readFileSync(image_path);
         await sock.sendMessage(jid, { image: imageBuffer, caption: message || '' });
       } else if (image_url) {

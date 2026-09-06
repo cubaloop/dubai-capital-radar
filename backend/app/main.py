@@ -616,18 +616,21 @@ async def api_send_lead_whatsapp(lead_id: str, payload: Optional[Dict[str, Any]]
     message = (payload and payload.get("message")) or lead.get("personalized_message") or ""
     image_path = (payload and payload.get("image_path")) or None
 
-    # Fallback to campaign default flyer
-    if not image_path:
+    # Only attach image if explicitly valid and > 1000 bytes
+    valid_image = None
+    if image_path and os.path.exists(image_path) and os.path.getsize(image_path) > 1000:
+        valid_image = image_path
+    elif not image_path:
         camp_id = lead.get("campaign_id", "").lower()
         if "spain" in camp_id or "madrid" in camp_id:
-            image_path = "/app/whatsapp-gateway/uploads/dubai_madrid_event.jpg"
-        elif "miami" in camp_id:
-            image_path = "/app/whatsapp-gateway/uploads/dubai_miami_event.jpg"
+            madrid_flyer = "/app/whatsapp-gateway/uploads/dubai_madrid_event.jpg"
+            if os.path.exists(madrid_flyer) and os.path.getsize(madrid_flyer) > 1000:
+                valid_image = madrid_flyer
 
     gateway_payload = {
         "to": phone,
         "message": message,
-        "image_path": image_path if image_path and os.path.exists(image_path) else None
+        "image_path": valid_image
     }
 
     gateway_url = os.getenv("WHATSAPP_GATEWAY_URL", "http://127.0.0.1:3001")
@@ -669,6 +672,18 @@ def api_control_campaign_batch(campaign_id: str, payload: Dict[str, Any]):
     elif action == "stop":
         batch_manager.stop(campaign_id)
     return {"success": True, "status": batch_manager.get_status(campaign_id)}
+
+@app.post("/api/crm/campaigns/{campaign_id}/reset-status")
+def api_reset_campaign_status(campaign_id: str):
+    """Resets all leads in a campaign to pending so they can be dispatched."""
+    from .database.crm_db import get_db_connection
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("UPDATE leads SET whatsapp_status = 'pending', last_sent_type = NULL, last_contact_date = NULL WHERE campaign_id = ?", (campaign_id,))
+    affected = cur.rowcount
+    conn.commit()
+    conn.close()
+    return {"success": True, "reset_count": affected}
 
 @app.get("/api/crm/campaigns/{campaign_id}/batch/status")
 def api_get_campaign_batch_status(campaign_id: str):

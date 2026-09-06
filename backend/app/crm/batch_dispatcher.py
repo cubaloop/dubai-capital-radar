@@ -100,18 +100,20 @@ class CampaignBatchManager:
                 self.state[campaign_id]["current_lead_name"] = name
                 self.state[campaign_id]["current_lead_phone"] = phone
 
-                # Flyer check: if flyer not specified, check default for campaign
-                effective_image = image_path
-                if not effective_image:
+                # Flyer check: only use image if valid and > 1000 bytes
+                effective_image = None
+                if image_path and os.path.exists(image_path) and os.path.getsize(image_path) > 1000:
+                    effective_image = image_path
+                elif not image_path:
                     if "spain" in campaign_id.lower() or "madrid" in campaign_id.lower():
-                        effective_image = "/app/whatsapp-gateway/uploads/dubai_madrid_event.jpg"
-                    elif "miami" in campaign_id.lower():
-                        effective_image = "/app/whatsapp-gateway/uploads/dubai_miami_event.jpg"
+                        madrid_flyer = "/app/whatsapp-gateway/uploads/dubai_madrid_event.jpg"
+                        if os.path.exists(madrid_flyer) and os.path.getsize(madrid_flyer) > 1000:
+                            effective_image = madrid_flyer
 
                 payload = {
                     "to": phone,
                     "message": message,
-                    "image_path": effective_image if effective_image and os.path.exists(effective_image) else None
+                    "image_path": effective_image
                 }
 
                 try:
