@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { Radar, FileText, Send, Building2, ShieldCheck, Activity, Users, Menu, X } from 'lucide-react';
 
 interface NavbarProps {
-  activeTab: 'crm' | 'campaigns' | 'legacy-campaigns' | 'radar' | 'dossiers' | 'inventory';
-  setActiveTab: (tab: 'crm' | 'campaigns' | 'legacy-campaigns' | 'radar' | 'dossiers' | 'inventory') => void;
+  activeTab: 'crm' | 'campaigns' | 'radar' | 'dossiers' | 'inventory';
+  setActiveTab: (tab: 'crm' | 'campaigns' | 'radar' | 'dossiers' | 'inventory') => void;
   selectedDossierSlug?: string;
   onOpenWhatsAppModal: () => void;
 }
@@ -16,7 +16,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const handleNavClick = (tab: 'crm' | 'campaigns' | 'legacy-campaigns' | 'radar' | 'dossiers' | 'inventory') => {
+  const handleNavClick = (tab: 'crm' | 'campaigns' | 'radar' | 'dossiers' | 'inventory') => {
     setActiveTab(tab);
     setIsMobileMenuOpen(false);
   };
@@ -66,19 +66,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Send className="w-4 h-4" />
               <span>WhatsApp & Campañas</span>
-            </button>
-
-            <button
-              onClick={() => handleNavClick('legacy-campaigns')}
-              className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold font-mono transition-all border ${
-                activeTab === 'legacy-campaigns'
-                  ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/25 scale-105'
-                  : 'text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100'
-              }`}
-              title="Sistema anterior con las campañas de España 112 y Miami VIP directas"
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>Sistema Anterior</span>
             </button>
 
             <button
@@ -148,18 +135,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Send className="w-4 h-4" />
             <span>WhatsApp & Campañas</span>
-          </button>
-
-          <button
-            onClick={() => handleNavClick('legacy-campaigns')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold font-mono ${
-              activeTab === 'legacy-campaigns' 
-                ? 'bg-emerald-600 text-white font-black shadow-md' 
-                : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span>Sistema Anterior (España 112 / Miami)</span>
           </button>
 
           <button
