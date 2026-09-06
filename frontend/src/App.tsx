@@ -7,9 +7,18 @@ import { DossierView } from './pages/DossierView';
 import { OffPlanMatcher } from './pages/OffPlanMatcher';
 import { WhatsAppQRModal } from './components/WhatsAppQRModal';
 import { AgencySettingsModal } from './components/AgencySettingsModal';
+import { AuthLandingView } from './pages/AuthLandingView';
 import { Lock, ShieldCheck, PhoneCall } from 'lucide-react';
 
 export function App() {
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem('dcr_user_session');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [activeTab, setActiveTab] = useState<'crm' | 'campaigns' | 'radar' | 'dossiers' | 'inventory'>('campaigns');
   const [selectedDossierSlug, setSelectedDossierSlug] = useState<string>('');
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState<boolean>(false);
@@ -62,6 +71,16 @@ export function App() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('dcr_user_session');
+    setCurrentUser(null);
+  };
+
+  // If user is not logged in and not viewing a confidential dossier direct link, show Auth Landing
+  if (!currentUser && !isClientDirectView) {
+    return <AuthLandingView onLoginSuccess={(u) => setCurrentUser(u)} />;
+  }
+
   return (
     <div className="min-h-screen w-full marble-bg text-slate-900 flex flex-col selection:bg-gold-500 selection:text-slate-950 font-sans overflow-x-hidden">
       {/* If the prospect is viewing directly via their link, show an exclusive private banking header */}
@@ -104,6 +123,7 @@ export function App() {
           selectedDossierSlug={selectedDossierSlug} 
           onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
           onOpenAgencyModal={() => setIsAgencyModalOpen(true)}
+          onLogout={handleLogout}
         />
       )}
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Radar, FileText, Send, Building2, ShieldCheck, Activity, Users, Menu, X } from 'lucide-react';
+import { Radar, FileText, Send, Building2, ShieldCheck, Activity, Users, Menu, X, LogOut } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: 'crm' | 'campaigns' | 'radar' | 'dossiers' | 'inventory';
@@ -7,6 +7,7 @@ interface NavbarProps {
   selectedDossierSlug?: string;
   onOpenWhatsAppModal: () => void;
   onOpenAgencyModal?: () => void;
+  onLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -14,7 +15,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   selectedDossierSlug,
   onOpenWhatsAppModal,
-  onOpenAgencyModal
+  onOpenAgencyModal,
+  onLogout
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -116,6 +118,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>WhatsApp QR</span>
             </button>
 
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-slate-500 hover:text-red-600 hover:bg-red-50 border border-slate-200 text-xs font-mono transition-all"
+                title="Cerrar Sesión"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Salir</span>
+              </button>
+            )}
+
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="p-1.5 sm:p-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900 lg:hidden shrink-0"
@@ -180,6 +193,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Building2 className="w-4 h-4" />
               <span>Configuración Agencia B2B</span>
+            </button>
+          )}
+
+          {onLogout && (
+            <button
+              onClick={() => {
+                onLogout();
+                setIsMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold font-mono text-red-600 hover:bg-red-50"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Cerrar Sesión</span>
             </button>
           )}
         </div>
