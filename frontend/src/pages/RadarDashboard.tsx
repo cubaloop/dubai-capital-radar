@@ -28,12 +28,14 @@ import { apiService } from '../services/api';
 interface RadarDashboardProps {
   onOpenDossier: (slug: string) => void;
   onOpenCampaigns: () => void;
+  onOpenCRM?: () => void;
   onOpenWhatsAppModal: () => void;
 }
 
 export const RadarDashboard: React.FC<RadarDashboardProps> = ({
   onOpenDossier,
   onOpenCampaigns,
+  onOpenCRM,
   onOpenWhatsAppModal
 }) => {
   const [signals, setSignals] = useState<LiquiditySignal[]>([]);
@@ -189,40 +191,30 @@ export const RadarDashboard: React.FC<RadarDashboardProps> = ({
           </div>
         </div>
 
-        {/* CRM Real Estate TDAH Bridge */}
+        {/* CRM Real Estate TDAH Nativamente Integrado */}
         <div className="bg-slate-900/90 border border-gold-500/40 rounded-2xl p-4 flex items-center justify-between shadow-lg shadow-gold-950/20">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gold-500/20 flex items-center justify-center text-gold-400 border border-gold-500/40">
-              <Database className="w-5 h-5" />
+              <Users className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">CRM Real Estate TDAH</span>
-                <span className="px-2 py-0.5 rounded-md bg-gold-950 text-gold-300 text-[10px] font-mono border border-gold-800">SINCRONIZADO</span>
+                <span className="px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-300 text-[10px] font-mono border border-emerald-800">TODO EN UNO</span>
               </div>
               <p className="text-[11px] text-slate-300 mt-0.5">
-                Conectado a: <strong className="text-gold-300">tadh-crm.netlify.app</strong>
+                Integrado nativamente: Deck Focus, Tablero Kanban y gestión de leads.
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={handleSyncCRM}
-              disabled={isSyncingCRM}
-              className="px-3 py-1.5 rounded-lg bg-gold-500 hover:bg-gold-400 text-slate-950 text-xs font-bold transition-all"
+              onClick={() => onOpenCRM && onOpenCRM()}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-gold-500 to-amber-400 hover:from-gold-600 text-slate-950 text-xs font-bold font-mono transition-all shadow-md shadow-gold-500/20"
             >
-              {isSyncingCRM ? 'Sincronizando...' : 'Sincronizar'}
+              Abrir CRM TDAH
             </button>
-            <a
-              href="https://tadh-crm.netlify.app/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
-              title="Abrir CRM en nueva pestaña"
-            >
-              <ExternalLink className="w-4 h-4" />
-            </a>
           </div>
         </div>
       </div>

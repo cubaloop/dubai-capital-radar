@@ -9,7 +9,7 @@ import { WhatsAppQRModal } from './components/WhatsAppQRModal';
 import { Lock, ShieldCheck, PhoneCall } from 'lucide-react';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'crm' | 'campaigns' | 'radar' | 'dossiers' | 'inventory'>('campaigns');
+  const [activeTab, setActiveTab] = useState<'crm' | 'campaigns' | 'radar' | 'dossiers' | 'inventory'>('crm');
   const [selectedDossierSlug, setSelectedDossierSlug] = useState<string>('');
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState<boolean>(false);
   const [isClientDirectView, setIsClientDirectView] = useState<boolean>(false);
@@ -122,6 +122,7 @@ export function App() {
           <RadarDashboard 
             onOpenDossier={handleOpenDossier}
             onOpenCampaigns={handleOpenCampaigns}
+            onOpenCRM={() => handleTabChange('crm')}
             onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
           />
         )}
