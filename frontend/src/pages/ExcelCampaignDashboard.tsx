@@ -23,7 +23,11 @@ import {
   FileText
 } from 'lucide-react';
 
-export const ExcelCampaignDashboard: React.FC = () => {
+interface ExcelDashboardProps {
+  currentUser?: { email: string; agencyName: string };
+}
+
+export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentUser }) => {
   const [campaigns, setCampaigns] = useState<CrmCampaign[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState<CrmCampaign | null>(null);
   const [leads, setLeads] = useState<CrmLead[]>([]);
@@ -69,14 +73,26 @@ export const ExcelCampaignDashboard: React.FC = () => {
   const fetchCampaigns = async () => {
     try {
       setIsLoading(true);
+      const isHomeAgency = currentUser?.agencyName?.toLowerCase().includes('home') || currentUser?.email?.includes('homeproperties');
       const res = await apiService.getCrmCampaigns();
       if (res?.campaigns) {
-        setCampaigns(res.campaigns);
-        if (!selectedCampaign && res.campaigns.length > 0) {
-          setSelectedCampaign(res.campaigns[0]);
-        } else if (selectedCampaign) {
-          const updated = res.campaigns.find((c: CrmCampaign) => c.id === selectedCampaign.id);
-          if (updated) setSelectedCampaign(updated);
+        let availableCampaigns = res.campaigns;
+        if (isHomeAgency) {
+          // For HOME Properties, show only campaigns created by or for them
+          availableCampaigns = res.campaigns.filter((c: CrmCampaign) => 
+            c.name?.toLowerCase().includes('home') || 
+            c.category?.toLowerCase().includes('home')
+          );
+        }
+        setCampaigns(availableCampaigns);
+        if (availableCampaigns.length === 0) {
+          setSelectedCampaign(null);
+          setLeads([]);
+        } else if (!selectedCampaign) {
+          setSelectedCampaign(availableCampaigns[0]);
+        } else {
+          const updated = availableCampaigns.find((c: CrmCampaign) => c.id === selectedCampaign.id);
+          setSelectedCampaign(updated || availableCampaigns[0]);
         }
       }
     } catch (e) {

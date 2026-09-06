@@ -136,6 +136,7 @@ export function App() {
           remainingTrialDays={getRemainingTrialDays(licenseState)}
           isUnlocked={licenseState.isUnlocked}
           onLogout={handleLogout}
+          currentUser={currentUser}
         />
       )}
 
@@ -158,30 +159,21 @@ export function App() {
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-6 sm:pt-8">
         {activeTab === 'crm' && (
-          <CRMView />
+          <CRMView currentUser={currentUser} />
         )}
 
         {activeTab === 'campaigns' && (
-          <CampaignManager />
+          <CampaignManager currentUser={currentUser} />
         )}
 
         {activeTab === 'excels' && (
-          <ExcelCampaignDashboard />
-        )}
-
-        {activeTab === 'radar' && (
-          <RadarDashboard 
-            onOpenDossier={handleOpenDossier}
-            onOpenCampaigns={handleOpenCampaigns}
-            onOpenCRM={() => handleTabChange('crm')}
-            onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
-          />
+          <ExcelCampaignDashboard currentUser={currentUser} />
         )}
 
         {activeTab === 'dossiers' && (
           <DossierView 
             slugOrId={selectedDossierSlug || 'alexander-wright-fintech-demo'} 
-            onBack={() => handleTabChange('radar')} 
+            onBack={() => handleTabChange('campaigns')} 
             isClientDirectView={isClientDirectView}
           />
         )}

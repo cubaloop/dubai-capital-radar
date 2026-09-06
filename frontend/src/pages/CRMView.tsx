@@ -19,7 +19,11 @@ import {
   RefreshCw
 } from 'lucide-react';
 
-export const CRMView: React.FC = () => {
+interface CRMViewProps {
+  currentUser?: { email: string; agencyName: string };
+}
+
+export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
   const [leads, setLeads] = useState<CrmLead[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [viewMode, setViewMode] = useState<'focus' | 'kanban'>('focus');
@@ -38,9 +42,20 @@ export const CRMView: React.FC = () => {
   const fetchLeads = async () => {
     try {
       setIsLoading(true);
+      // If user is H.O.M.E Properties, show isolated workspace for new client
+      const isHomeAgency = currentUser?.agencyName?.toLowerCase().includes('home') || currentUser?.email?.includes('homeproperties');
       const res = await apiService.getAllCrmLeads();
       if (res?.leads) {
-        setLeads(res.leads);
+        if (isHomeAgency) {
+          // Isolated: only show leads specifically uploaded for HOME Properties
+          const homeLeads = res.leads.filter((l: CrmLead) => 
+            l.campaign_name?.toLowerCase().includes('home') || 
+            l.campaign_category?.toLowerCase().includes('home')
+          );
+          setLeads(homeLeads);
+        } else {
+          setLeads(res.leads);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -51,7 +66,7 @@ export const CRMView: React.FC = () => {
 
   useEffect(() => {
     fetchLeads();
-  }, []);
+  }, [currentUser?.email]);
 
   const handleUpdateLeadStatus = async (leadId: string, status: CrmLeadStatus) => {
     // Optimistic UI update

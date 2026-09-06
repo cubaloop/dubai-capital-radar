@@ -11,6 +11,7 @@ interface NavbarProps {
   remainingTrialDays?: number;
   isUnlocked?: boolean;
   onLogout?: () => void;
+  currentUser?: { email: string; name: string; role: string; agencyName: string; logoUrl?: string };
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -22,7 +23,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenLicenseModal,
   remainingTrialDays = 30,
   isUnlocked = false,
-  onLogout
+  onLogout,
+  currentUser
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -36,15 +38,29 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 sm:h-16 gap-2">
           {/* Brand */}
-          <div className="flex items-center space-x-2 cursor-pointer shrink min-w-0" onClick={() => handleNavClick('campaigns')}>
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-gold-400 to-amber-200 flex items-center justify-center shadow-md shadow-gold-500/20 shrink-0">
-              <Radar className="w-4 h-4 sm:w-6 sm:h-6 text-slate-950" />
-            </div>
+          <div className="flex items-center space-x-2.5 cursor-pointer shrink min-w-0" onClick={() => handleNavClick('campaigns')}>
+            {currentUser?.logoUrl ? (
+              <img 
+                src={currentUser.logoUrl} 
+                alt={currentUser.agencyName || 'H.O.M.E Properties'} 
+                className="h-9 sm:h-10 w-auto max-w-[120px] object-contain rounded-lg p-0.5 bg-black" 
+              />
+            ) : (
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-gold-400 to-amber-200 flex items-center justify-center shadow-md shadow-gold-500/20 shrink-0">
+                <Radar className="w-4 h-4 sm:w-6 sm:h-6 text-slate-950" />
+              </div>
+            )}
             <div className="truncate">
               <span className="font-serif-luxury font-bold text-xs sm:text-base tracking-wide text-slate-900 flex items-center gap-1 truncate">
-                <span className="hidden sm:inline">DUBAI CAPITAL</span>
-                <span className="sm:hidden">DUBAI</span>
-                <span className="text-gold-600 font-black">RADAR</span>
+                {currentUser?.agencyName ? (
+                  <span>{currentUser.agencyName}</span>
+                ) : (
+                  <>
+                    <span className="hidden sm:inline">DUBAI CAPITAL</span>
+                    <span className="sm:hidden">DUBAI</span>
+                    <span className="text-gold-600 font-black">RADAR</span>
+                  </>
+                )}
               </span>
               <span className="block text-[8px] sm:text-[10px] text-slate-500 font-mono uppercase tracking-widest hidden md:block">
                 CRM & WhatsApp Outreach
@@ -63,7 +79,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Users className="w-4 h-4" />
-              <span>CRM TDAH</span>
+              <span>CRM Leads</span>
             </button>
 
             <button
@@ -88,18 +104,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <FileSpreadsheet className="w-4 h-4" />
               <span>Gestor Excels</span>
-            </button>
-
-            <button
-              onClick={() => handleNavClick('radar')}
-              className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold font-mono transition-all ${
-                activeTab === 'radar'
-                  ? 'bg-gold-500 text-slate-950 shadow-md shadow-gold-500/20 scale-105'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <Activity className="w-4 h-4" />
-              <span>Radar Señales</span>
             </button>
 
             <button
@@ -208,16 +212,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <FileSpreadsheet className="w-4 h-4" />
             <span>Gestor Excels (Campañas y Leads)</span>
-          </button>
-
-          <button
-            onClick={() => handleNavClick('radar')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold font-mono ${
-              activeTab === 'radar' ? 'bg-gold-500 text-slate-950' : 'text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            <Activity className="w-4 h-4" />
-            <span>Radar Señales & Arbitraje Fiscal</span>
           </button>
 
           <button

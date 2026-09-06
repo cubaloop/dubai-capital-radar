@@ -21,16 +21,38 @@ export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) =>
 
     setTimeout(() => {
       setLoading(false);
-      // Admin master check or custom agency register
+      // Admin master check, HOME Properties agency, or custom agency register
       if (!isRegister) {
+        const cleanEmail = email.trim().toLowerCase();
         if (
-          (email.trim().toLowerCase() === 'admin@dubaicapitalradar.com' && password === 'Dubai2026!') ||
-          (email.trim().toLowerCase() === 'yo@dubaicapitalradar.com' && password === 'Dubai2026!') ||
+          cleanEmail === 'home@homeproperties.ae' ||
+          cleanEmail === 'info@homeproperties.ae' ||
+          cleanEmail === 'admin@homeproperties.ae'
+        ) {
+          const user = {
+            email: cleanEmail,
+            name: 'H.O.M.E Properties Admin',
+            role: 'agency_owner',
+            agencyName: 'H.O.M.E Properties',
+            logoUrl: '/home_properties_logo.jpg'
+          };
+          localStorage.setItem('dcr_user_session', JSON.stringify(user));
+          localStorage.setItem('dcr_agency_config', JSON.stringify({
+            agencyName: 'H.O.M.E Properties',
+            brokerPersona: 'David, Asesor Senior en Inversiones Inmobiliarias Dubai (H.O.M.E Properties)',
+            targetMarket: 'Dubai (Downtown, Palm Jumeirah, Dubai Hills)',
+            currency: 'USD ($)',
+            phonePrefix: '+971'
+          }));
+          onLoginSuccess(user);
+        } else if (
+          (cleanEmail === 'admin@dubaicapitalradar.com' && password === 'Dubai2026!') ||
+          (cleanEmail === 'yo@dubaicapitalradar.com' && password === 'Dubai2026!') ||
           password.length >= 6
         ) {
           const user = {
-            email: email.trim(),
-            name: email.includes('admin') ? 'David (Master Admin)' : 'Agente Inmobiliario',
+            email: cleanEmail,
+            name: cleanEmail.includes('admin') ? 'David (Master Admin)' : 'Agente Inmobiliario',
             role: 'agency_owner',
             agencyName: 'Dubai Capital Advisory'
           };
@@ -69,6 +91,25 @@ export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) =>
       agencyName: 'Dubai Capital Advisory'
     };
     localStorage.setItem('dcr_user_session', JSON.stringify(user));
+    onLoginSuccess(user);
+  };
+
+  const handleQuickHomeLogin = () => {
+    const user = {
+      email: 'home@homeproperties.ae',
+      name: 'H.O.M.E Properties Admin',
+      role: 'agency_owner',
+      agencyName: 'H.O.M.E Properties',
+      logoUrl: '/home_properties_logo.jpg'
+    };
+    localStorage.setItem('dcr_user_session', JSON.stringify(user));
+    localStorage.setItem('dcr_agency_config', JSON.stringify({
+      agencyName: 'H.O.M.E Properties',
+      brokerPersona: 'David, Asesor Senior en Inversiones Inmobiliarias Dubai (H.O.M.E Properties)',
+      targetMarket: 'Dubai (Downtown, Palm Jumeirah, Dubai Hills)',
+      currency: 'USD ($)',
+      phonePrefix: '+971'
+    }));
     onLoginSuccess(user);
   };
 
@@ -247,18 +288,26 @@ export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) =>
           </button>
         </form>
 
-        {/* Master Access Quick Link for You */}
+        {/* Quick Access Links */}
         {!isRegister && (
-          <div className="mt-5 pt-4 border-t border-slate-800 text-center">
+          <div className="mt-5 pt-4 border-t border-slate-800 space-y-2.5 text-center">
+            <button
+              onClick={handleQuickHomeLogin}
+              className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-600/30 via-gold-500/20 to-amber-600/30 border border-gold-500/40 text-gold-300 hover:text-gold-200 text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all hover:border-gold-400"
+            >
+              <img src="/home_properties_logo.jpg" alt="HOME" className="w-5 h-4 object-contain rounded" />
+              <span>Acceso Rápido H.O.M.E Properties (1-Click)</span>
+            </button>
+
             <button
               onClick={handleQuickMasterLogin}
-              className="text-[11px] font-mono text-gold-400/90 hover:text-gold-300 flex items-center justify-center gap-1.5 mx-auto transition-colors"
+              className="text-[11px] font-mono text-slate-400 hover:text-gold-300 flex items-center justify-center gap-1.5 mx-auto transition-colors"
             >
               <Sparkles className="w-3.5 h-3.5 text-gold-400" />
-              <span>Acceso Rápido Administrador Maestro (1-Click)</span>
+              <span>Acceso Administrador Maestro</span>
             </button>
-            <p className="text-[10px] text-slate-500 font-mono mt-1">
-              Credenciales: <code className="text-slate-400">admin@dubaicapitalradar.com</code> / <code className="text-slate-400">Dubai2026!</code>
+            <p className="text-[10px] text-slate-500 font-mono">
+              H.O.M.E: <code className="text-slate-300">home@homeproperties.ae</code> / <code className="text-slate-300">Dubai2026!</code>
             </p>
           </div>
         )}

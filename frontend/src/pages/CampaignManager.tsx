@@ -30,7 +30,11 @@ import {
   Smartphone
 } from 'lucide-react';
 
-export const CampaignManager: React.FC = () => {
+interface CampaignManagerProps {
+  currentUser?: { email: string; agencyName: string };
+}
+
+export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser }) => {
   const [campaigns, setCampaigns] = useState<CrmCampaign[]>([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('spain_madrid_expo');
   const [leads, setLeads] = useState<CrmLead[]>([]);
@@ -83,13 +87,25 @@ export const CampaignManager: React.FC = () => {
   const fetchCampaigns = async () => {
     try {
       setIsLoadingCampaigns(true);
+      const isHomeAgency = currentUser?.agencyName?.toLowerCase().includes('home') || currentUser?.email?.includes('homeproperties');
       const res = await apiService.getCrmCampaigns();
-      if (res?.campaigns && res.campaigns.length > 0) {
-        setCampaigns(res.campaigns);
-        // Default to Spain if available or first
-        if (!selectedCampaignId) {
-          const defaultCamp = res.campaigns.find((c: CrmCampaign) => c.id === 'spain_madrid_expo') || res.campaigns[0];
-          setSelectedCampaignId(defaultCamp.id);
+      if (res?.campaigns) {
+        let availableCampaigns = res.campaigns;
+        if (isHomeAgency) {
+          availableCampaigns = res.campaigns.filter((c: CrmCampaign) => 
+            c.name?.toLowerCase().includes('home') || 
+            c.category?.toLowerCase().includes('home')
+          );
+        }
+        setCampaigns(availableCampaigns);
+        if (availableCampaigns.length > 0) {
+          if (!selectedCampaignId || !availableCampaigns.some((c: CrmCampaign) => c.id === selectedCampaignId)) {
+            setSelectedCampaignId(availableCampaigns[0].id);
+          }
+        } else {
+          setSelectedCampaignId('');
+          setLeads([]);
+          setSelectedLeadPreview(null);
         }
       }
     } catch (err) {
