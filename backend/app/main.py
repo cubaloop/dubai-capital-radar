@@ -344,8 +344,28 @@ async def send_whatsapp_message(payload: Dict[str, str]):
 @app.post("/api/whatsapp/logout")
 async def logout_whatsapp():
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
+        async with httpx.AsyncClient(timeout=5.0) as client:
             res = await client.post(f"{WHATSAPP_GATEWAY_URL}/logout")
+            return res.json()
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/whatsapp/pairing-code")
+async def request_whatsapp_pairing_code(payload: Dict[str, Any]):
+    """Requests an 8-character pairing code to link WhatsApp without camera scanning."""
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            res = await client.post(f"{WHATSAPP_GATEWAY_URL}/pairing-code", json=payload)
+            return res.json()
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/whatsapp/restart")
+async def restart_whatsapp_gateway():
+    """Forces gateway socket restart to generate a fresh QR immediately."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.post(f"{WHATSAPP_GATEWAY_URL}/restart")
             return res.json()
     except Exception as e:
         return {"success": False, "error": str(e)}
