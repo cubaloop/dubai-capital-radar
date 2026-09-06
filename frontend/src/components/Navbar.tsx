@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Radar, FileText, Send, Building2, ShieldCheck, Activity, Users, Menu, X, LogOut, Key } from 'lucide-react';
+import { Radar, FileText, Send, Building2, ShieldCheck, Activity, Users, Menu, X, LogOut, Key, FileSpreadsheet } from 'lucide-react';
 
 interface NavbarProps {
-  activeTab: 'crm' | 'campaigns' | 'radar' | 'dossiers' | 'inventory';
-  setActiveTab: (tab: 'crm' | 'campaigns' | 'radar' | 'dossiers' | 'inventory') => void;
+  activeTab: 'crm' | 'campaigns' | 'excels' | 'radar' | 'dossiers' | 'inventory';
+  setActiveTab: (tab: 'crm' | 'campaigns' | 'excels' | 'radar' | 'dossiers' | 'inventory') => void;
   selectedDossierSlug?: string;
   onOpenWhatsAppModal: () => void;
   onOpenAgencyModal?: () => void;
@@ -26,7 +26,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const handleNavClick = (tab: 'crm' | 'campaigns' | 'radar' | 'dossiers' | 'inventory') => {
+  const handleNavClick = (tab: 'crm' | 'campaigns' | 'excels' | 'radar' | 'dossiers' | 'inventory') => {
     setActiveTab(tab);
     setIsMobileMenuOpen(false);
   };
@@ -76,6 +76,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Send className="w-4 h-4" />
               <span>WhatsApp & Campañas</span>
+            </button>
+
+            <button
+              onClick={() => handleNavClick('excels')}
+              className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold font-mono transition-all ${
+                activeTab === 'excels'
+                  ? 'bg-gold-500 text-slate-950 shadow-md shadow-gold-500/20 scale-105'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Gestor Excels</span>
             </button>
 
             <button
@@ -186,6 +198,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Send className="w-4 h-4" />
             <span>WhatsApp & Campañas</span>
+          </button>
+
+          <button
+            onClick={() => handleNavClick('excels')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold font-mono ${
+              activeTab === 'excels' ? 'bg-gold-500 text-slate-950' : 'text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Gestor Excels (Campañas y Leads)</span>
           </button>
 
           <button

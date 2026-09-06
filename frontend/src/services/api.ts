@@ -234,6 +234,32 @@ export const apiService = {
     });
     if (!res.ok) throw new Error('Error al actualizar el mensaje del lead');
     return res.json();
+  },
+
+  async updateCampaignMeta(campaignId: string, data: { name?: string; category?: string; description?: string }) {
+    const res = await fetch(`${API_BASE_URL}/crm/campaigns/${campaignId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Error al actualizar la campaña');
+    return res.json();
+  },
+
+  async deleteCampaign(campaignId: string) {
+    const res = await fetch(`${API_BASE_URL}/crm/campaigns/${campaignId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error('Error al eliminar la campaña');
+    return res.json();
+  },
+
+  async deleteLead(leadId: string) {
+    const res = await fetch(`${API_BASE_URL}/crm/leads/${leadId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error('Error al eliminar el lead');
+    return res.json();
   }
 };
 

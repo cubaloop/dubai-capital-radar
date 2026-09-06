@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { CRMView } from './pages/CRMView';
 import { CampaignManager } from './pages/CampaignManager';
+import { ExcelCampaignDashboard } from './pages/ExcelCampaignDashboard';
 import { RadarDashboard } from './pages/RadarDashboard';
 import { DossierView } from './pages/DossierView';
 import { OffPlanMatcher } from './pages/OffPlanMatcher';
@@ -20,7 +21,7 @@ export function App() {
       return null;
     }
   });
-  const [activeTab, setActiveTab] = useState<'crm' | 'campaigns' | 'radar' | 'dossiers' | 'inventory'>('campaigns');
+  const [activeTab, setActiveTab] = useState<'crm' | 'campaigns' | 'excels' | 'radar' | 'dossiers' | 'inventory'>('campaigns');
   const [selectedDossierSlug, setSelectedDossierSlug] = useState<string>('');
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState<boolean>(false);
   const [isAgencyModalOpen, setIsAgencyModalOpen] = useState<boolean>(false);
@@ -69,7 +70,7 @@ export function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleTabChange = (tab: 'crm' | 'campaigns' | 'radar' | 'dossiers' | 'inventory') => {
+  const handleTabChange = (tab: 'crm' | 'campaigns' | 'excels' | 'radar' | 'dossiers' | 'inventory') => {
     setActiveTab(tab);
     setIsClientDirectView(false);
     if (tab === 'dossiers' && selectedDossierSlug) {
@@ -162,6 +163,10 @@ export function App() {
 
         {activeTab === 'campaigns' && (
           <CampaignManager />
+        )}
+
+        {activeTab === 'excels' && (
+          <ExcelCampaignDashboard />
         )}
 
         {activeTab === 'radar' && (

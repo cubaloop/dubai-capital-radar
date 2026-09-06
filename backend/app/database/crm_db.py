@@ -524,5 +524,51 @@ async def regenerate_campaign_lead_messages(campaign_id: str, new_prompt: Option
         "ai_used": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
     }
 
+def update_campaign_meta(campaign_id: str, name: Optional[str] = None, category: Optional[str] = None, description: Optional[str] = None) -> bool:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    fields = []
+    vals = []
+    if name is not None:
+        fields.append("name = ?")
+        vals.append(name)
+    if category is not None:
+        fields.append("category = ?")
+        vals.append(category)
+    if description is not None:
+        fields.append("description = ?")
+        vals.append(description)
+    if not fields:
+        conn.close()
+        return False
+    vals.append(campaign_id)
+    query = f"UPDATE campaigns SET {', '.join(fields)} WHERE id = ?"
+    cursor.execute(query, tuple(vals))
+    conn.commit()
+    conn.close()
+    return True
+
+def delete_campaign_db(campaign_id: str) -> bool:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # Delete associated lead notes
+    cursor.execute("DELETE FROM lead_notes WHERE lead_id IN (SELECT id FROM leads WHERE campaign_id = ?)", (campaign_id,))
+    # Delete leads
+    cursor.execute("DELETE FROM leads WHERE campaign_id = ?", (campaign_id,))
+    # Delete campaign
+    cursor.execute("DELETE FROM campaigns WHERE id = ?", (campaign_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+def delete_lead_db(lead_id: str) -> bool:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM lead_notes WHERE lead_id = ?", (lead_id,))
+    cursor.execute("DELETE FROM leads WHERE id = ?", (lead_id,))
+    conn.commit()
+    conn.close()
+    return True
+
 # Initialize on import
 init_crm_db()

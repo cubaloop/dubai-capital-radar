@@ -502,7 +502,10 @@ from .database.crm_db import (
     get_all_crm_leads,
     update_campaign_ai_prompt,
     update_single_lead_message,
-    regenerate_campaign_lead_messages
+    regenerate_campaign_lead_messages,
+    update_campaign_meta,
+    delete_campaign_db,
+    delete_lead_db
 )
 from .crm.batch_dispatcher import batch_manager
 from .crm.excel_parser import parse_spreadsheet_bytes, map_and_structure_leads
@@ -614,6 +617,29 @@ async def api_update_campaign_ai_prompt(
         "gemini_ai_connected": gemini_ok,
         "active_ai_provider": "groq" if groq_ok else ("gemini" if gemini_ok else "local")
     }
+
+@app.patch("/api/crm/campaigns/{campaign_id}")
+def api_update_campaign(campaign_id: str, payload: Dict[str, Any]):
+    """Update campaign metadata (name, category/tag, description)."""
+    name = payload.get("name")
+    category = payload.get("category")
+    description = payload.get("description")
+    success = update_campaign_meta(campaign_id, name=name, category=category, description=description)
+    if not success:
+        raise HTTPException(status_code=400, detail="No se pudo actualizar la campaña")
+    return {"success": True, "campaign": get_campaign_by_id(campaign_id)}
+
+@app.delete("/api/crm/campaigns/{campaign_id}")
+def api_delete_campaign(campaign_id: str):
+    """Deletes a campaign and all associated leads permanently."""
+    success = delete_campaign_db(campaign_id)
+    return {"success": success, "deleted_campaign_id": campaign_id}
+
+@app.delete("/api/crm/leads/{lead_id}")
+def api_delete_lead(lead_id: str):
+    """Deletes an individual lead permanently."""
+    success = delete_lead_db(lead_id)
+    return {"success": success, "deleted_lead_id": lead_id}
 
 @app.patch("/api/crm/leads/{lead_id}/message")
 def api_update_lead_message(lead_id: str, payload: Dict[str, Any]):
