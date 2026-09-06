@@ -21,9 +21,9 @@ COPY backend/requirements.txt ./backend/
 RUN pip install --no-cache-dir -r ./backend/requirements.txt
 
 # Install WhatsApp Gateway dependencies
-COPY whatsapp-gateway/package*.json ./whatsapp-gateway/
+COPY whatsapp-gateway/package.json ./whatsapp-gateway/
 WORKDIR /app/whatsapp-gateway
-RUN npm install --omit=dev
+RUN npm install --omit=dev --no-package-lock
 
 WORKDIR /app
 COPY whatsapp-gateway/ ./whatsapp-gateway/
