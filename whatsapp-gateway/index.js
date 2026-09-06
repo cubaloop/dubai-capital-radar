@@ -20,8 +20,8 @@ const PORT = process.env.WHATSAPP_PORT || 3001;
 const AUTH_DIR = path.join(process.cwd(), 'whatsapp_auth');
 
 // ─── Supabase Session Persistence ────────────────────────────────────────────
-const SUPABASE_URL = process.env.SUPABASE_URL || null;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || null;
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://jyrqzjctkmzdvmraqrcv.supabase.co";
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5cnF6amN0a216ZHZtcmFxcmN2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjI4MTU3NCwiZXhwIjoyMTAxODU3NTc0fQ.jpzy38i_JqhKiLZwNFXESJo62kk4vWvwCVPLpFIyLjc";
 const AUTH_BACKUP_ENABLED = !!(SUPABASE_URL && SUPABASE_KEY);
 
 if (!fs.existsSync(AUTH_DIR)) {
@@ -31,15 +31,15 @@ if (!fs.existsSync(AUTH_DIR)) {
 async function clearAuthFromSupabase() {
   if (!AUTH_BACKUP_ENABLED) return;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/whatsapp_sessions?key=eq.active_session`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/leads?id=eq.whatsapp_auth_session`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${SUPABASE_KEY}`,
         'apikey': SUPABASE_KEY
       },
-      signal: AbortSignal.timeout(3000)
+      signal: AbortSignal.timeout(5000)
     });
-    console.log(`[Session Backup] Deleted active_session from Supabase (status: ${res.status})`);
+    console.log(`[Session Backup] Deleted whatsapp_auth_session from Supabase (status: ${res.status})`);
   } catch (err) {
     console.error('[Session Backup] Error deleting Supabase session:', err.message);
   }
@@ -58,8 +58,8 @@ async function uploadAuthToSupabase() {
       bundle[file] = fs.readFileSync(filePath, 'utf-8');
     }
 
-    // Save to Supabase REST endpoint (whatsapp_sessions table)
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/whatsapp_sessions`, {
+    // Save into Supabase leads table under the dedicated system record 'whatsapp_auth_session'
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${SUPABASE_KEY}`,
@@ -68,17 +68,20 @@ async function uploadAuthToSupabase() {
         'Prefer': 'resolution=merge-duplicates'
       },
       body: JSON.stringify({
-        key: 'active_session',
-        value: JSON.stringify(bundle),
-        phone: connectedNumber || 'unknown'
+        id: 'whatsapp_auth_session',
+        full_name: 'WhatsApp Auth Session',
+        phone: connectedNumber || '971501378020',
+        lead_status: 'SYSTEM',
+        campaign_name: 'system_auth',
+        comments: JSON.stringify(bundle)
       }),
-      signal: AbortSignal.timeout(3000)
+      signal: AbortSignal.timeout(5000)
     });
 
     if (res.ok) {
       console.log(`[Session Backup] ✅ Auth session bundle backed up to Supabase (${files.length} keys)`);
     } else {
-      console.log(`[Session Backup] Notice: Table whatsapp_sessions status ${res.status}`);
+      console.log(`[Session Backup] Supabase backup status: ${res.status}`);
     }
   } catch (err) {
     console.error('[Session Backup] Backup error:', err.message);
@@ -91,26 +94,26 @@ async function restoreAuthFromSupabase() {
     return false;
   }
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/whatsapp_sessions?key=eq.active_session&select=*`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/leads?id=eq.whatsapp_auth_session&select=*`, {
       headers: {
         'Authorization': `Bearer ${SUPABASE_KEY}`,
         'apikey': SUPABASE_KEY
       },
-      signal: AbortSignal.timeout(3000)
+      signal: AbortSignal.timeout(5000)
     });
 
     if (!res.ok) {
-      console.log('[Session Restore] No session table found in Supabase - starting fresh');
+      console.log('[Session Restore] Failed to query Supabase for auth session');
       return false;
     }
 
     const rows = await res.json();
-    if (!rows || !rows.length || !rows[0].value) {
-      console.log('[Session Restore] No previous session bundle in Supabase - starting fresh');
+    if (!rows || !rows.length || !rows[0].comments) {
+      console.log('[Session Restore] No previous session bundle found in Supabase');
       return false;
     }
 
-    const bundle = JSON.parse(rows[0].value);
+    const bundle = JSON.parse(rows[0].comments);
     const fileKeys = Object.keys(bundle);
     for (const file of fileKeys) {
       fs.writeFileSync(path.join(AUTH_DIR, file), bundle[file], 'utf-8');
