@@ -35,7 +35,8 @@ async function clearAuthFromSupabase() {
       headers: {
         'Authorization': `Bearer ${SUPABASE_KEY}`,
         'apikey': SUPABASE_KEY
-      }
+      },
+      signal: AbortSignal.timeout(3000)
     });
     console.log(`[Session Backup] Deleted active_session from Supabase (status: ${res.status})`);
   } catch (err) {
@@ -69,7 +70,8 @@ async function uploadAuthToSupabase() {
         key: 'active_session',
         value: JSON.stringify(bundle),
         phone: connectedNumber || 'unknown'
-      })
+      }),
+      signal: AbortSignal.timeout(3000)
     });
 
     if (res.ok) {
@@ -92,7 +94,8 @@ async function restoreAuthFromSupabase() {
       headers: {
         'Authorization': `Bearer ${SUPABASE_KEY}`,
         'apikey': SUPABASE_KEY
-      }
+      },
+      signal: AbortSignal.timeout(3000)
     });
 
     if (!res.ok) {
@@ -161,9 +164,8 @@ async function startWhatsApp() {
   sock = makeWASocket({
     version,
     logger: pino({ level: 'silent' }),
-    printQRInTerminal: true,
     auth: state,
-    browser: Browsers.macOS('Desktop'),
+    browser: Browsers.ubuntu('Chrome'),
     syncFullHistory: false,
     generateHighQualityLinkPreview: true,
     markOnlineOnConnect: true,
@@ -184,8 +186,16 @@ async function startWhatsApp() {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      currentQR = await QRCode.toDataURL(qr);
-      console.log('[WhatsApp] New QR code generated. Ready for scanning.');
+      currentQR = await QRCode.toDataURL(qr, {
+        width: 360,
+        margin: 4,
+        errorCorrectionLevel: 'M',
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      });
+      console.log('[WhatsApp] New QR code generated (360x360, margin 4, level M). Ready for scanning.');
     }
 
     if (connection === 'close') {
@@ -382,6 +392,38 @@ app.post('/verify-numbers', async (req, res) => {
     return res.json({ results });
   } catch (err) {
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint: Generate 8-digit Pairing Code for phone number (No camera / QR scan needed)
+app.post('/pairing-code', async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) {
+      return res.status(400).json({ success: false, error: 'Falta el número de teléfono' });
+    }
+    const cleanNumber = phone.replace(/[^0-9]/g, '');
+    if (!cleanNumber || cleanNumber.length < 8) {
+      return res.status(400).json({ success: false, error: 'Número inválido. Incluye prefijo de país (ej. 971501378020 o 34600000000).' });
+    }
+    if (isConnected) {
+      return res.json({ success: false, error: `Ya está conectado como +${connectedNumber}` });
+    }
+    if (!sock || typeof sock.requestPairingCode !== 'function') {
+      return res.status(503).json({ success: false, error: 'El servicio WhatsApp se está iniciando. Espera unos segundos e intenta nuevamente.' });
+    }
+    const rawCode = await sock.requestPairingCode(cleanNumber);
+    const formattedCode = rawCode?.match(/.{1,4}/g)?.join('-') || rawCode;
+    console.log(`[WhatsApp] Pairing code generated for +${cleanNumber}: ${formattedCode}`);
+    return res.json({
+      success: true,
+      code: formattedCode,
+      raw_code: rawCode,
+      phone: cleanNumber
+    });
+  } catch (err) {
+    console.error('[WhatsApp] Pairing code error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
