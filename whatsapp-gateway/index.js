@@ -447,8 +447,8 @@ app.post('/logout', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`[WhatsApp Gateway] Running on port ${PORT}`);
+app.listen(PORT, '127.0.0.1', () => {
+  console.log(`[WhatsApp Gateway] Running on 127.0.0.1:${PORT}`);
   console.log(`[Session Backup] Supabase: ${AUTH_BACKUP_ENABLED ? 'ENABLED' : 'DISABLED (set SUPABASE_URL + SUPABASE_SERVICE_KEY)'}`);
   console.log(`[Keep-Alive] Self-ping: ${SELF_URL ? 'ENABLED' : 'DISABLED (set SELF_URL)'}`);
 });
