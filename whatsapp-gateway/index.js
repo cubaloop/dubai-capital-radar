@@ -16,7 +16,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.WHATSAPP_PORT || 3001;
+const GATEWAY_PORT = process.env.WHATSAPP_PORT || 3001;
+const BACKEND_PORT = process.env.BACKEND_PORT || process.env.PORT || 8000;
 const AUTH_DIR = path.join(process.cwd(), 'whatsapp_auth');
 
 // ─── Supabase Session Persistence ────────────────────────────────────────────
@@ -233,7 +234,87 @@ async function startWhatsApp() {
     }
   });
 
-  // Listen to incoming messages for Developer Launch auto-ingestion & Prospect AI replies
+  // Helper: Extract clean phone number without device suffixes (:0, :1) or LID noise
+  function extractPhoneNumber(jid, participant, remoteJidAlt) {
+    const raw = participant || remoteJidAlt || jid || '';
+    const userPart = raw.split('@')[0] || '';
+    const cleanUser = userPart.split(':')[0] || '';
+    return cleanUser.replace(/[^0-9]/g, '');
+  }
+
+  // Helper: Unwrap nested message structures (ephemeral, view-once, buttons, captions)
+  function extractMessageData(rawMsg) {
+    if (!rawMsg || !rawMsg.message) return { text: '', hasDocument: false, documentFileName: null, unwrappedMsg: null };
+
+    let m = rawMsg.message;
+    let depth = 0;
+    while (m && depth < 5) {
+      if (m.ephemeralMessage?.message) {
+        m = m.ephemeralMessage.message;
+      } else if (m.viewOnceMessage?.message) {
+        m = m.viewOnceMessage.message;
+      } else if (m.viewOnceMessageV2?.message) {
+        m = m.viewOnceMessageV2.message;
+      } else if (m.documentWithCaptionMessage?.message) {
+        m = m.documentWithCaptionMessage.message;
+      } else {
+        break;
+      }
+      depth++;
+    }
+
+    const text = (
+      m.conversation ||
+      m.extendedTextMessage?.text ||
+      m.imageMessage?.caption ||
+      m.documentMessage?.caption ||
+      m.videoMessage?.caption ||
+      m.buttonsResponseMessage?.selectedButtonId ||
+      m.listResponseMessage?.singleSelectReply?.selectedRowId ||
+      m.templateButtonReplyMessage?.selectedId ||
+      m.documentMessage?.fileName ||
+      ''
+    ).trim();
+
+    const doc = m.documentMessage || null;
+    return {
+      text,
+      hasDocument: !!doc,
+      documentFileName: doc?.fileName || null,
+      unwrappedMsg: m
+    };
+  }
+
+  // Helper: Resilient webhook forwarding with fallback to internal and public URLs
+  async function forwardToBackendWebhook(payload) {
+    const candidateUrls = [
+      `http://127.0.0.1:${BACKEND_PORT}/api/whatsapp/inbound-webhook`,
+      `http://localhost:${BACKEND_PORT}/api/whatsapp/inbound-webhook`,
+      `http://127.0.0.1:8000/api/whatsapp/inbound-webhook`,
+      `https://dubai-miami-radar.onrender.com/api/whatsapp/inbound-webhook`
+    ];
+
+    for (const targetUrl of candidateUrls) {
+      try {
+        console.log(`[WhatsApp Gateway -> Webhook] Trying ${targetUrl} for ${payload.sender}...`);
+        const res = await fetch(targetUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(15000)
+        });
+        const respText = await res.text();
+        console.log(`✅ [WhatsApp Gateway -> Webhook] Delivered to ${targetUrl} (HTTP ${res.status}): ${respText.substring(0, 100)}`);
+        if (res.ok) return true;
+      } catch (err) {
+        console.warn(`⚠️ [WhatsApp Gateway -> Webhook] Failed at ${targetUrl}: ${err.message}`);
+      }
+    }
+    console.error(`❌ [WhatsApp Gateway -> Webhook] ALL candidate endpoints failed for sender ${payload.sender}`);
+    return false;
+  }
+
+  // Listen to incoming messages for Developer Launch auto-ingestion, Super-Admin copilot & Prospect AI replies
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
 
@@ -242,24 +323,15 @@ async function startWhatsApp() {
 
       const remoteJid = msg.key.remoteJid || '';
       const isGroup = remoteJid.endsWith('@g.us');
-      const senderNumber = remoteJid.replace(/[^0-9]/g, '');
-
-      // Extract text content from various message structures
-      const textContent = msg.message.conversation ||
-                          msg.message.extendedTextMessage?.text ||
-                          msg.message.imageMessage?.caption ||
-                          msg.message.documentMessage?.caption ||
-                          msg.message.documentMessage?.fileName || '';
-
-      // Extract document info if present
-      const hasDocument = !!msg.message.documentMessage;
-      const documentFileName = msg.message.documentMessage?.fileName || null;
+      const senderNumber = extractPhoneNumber(remoteJid, msg.key.participant, msg.key.remoteJidAlt);
+      
+      const { text, hasDocument, documentFileName, unwrappedMsg } = extractMessageData(msg);
 
       let documentBase64 = null;
       if (hasDocument) {
         try {
           const buffer = await downloadMediaMessage(
-            msg,
+            { key: msg.key, message: unwrappedMsg },
             'buffer',
             {},
             { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
@@ -273,31 +345,24 @@ async function startWhatsApp() {
         }
       }
 
-      if (!textContent && !hasDocument) continue;
+      if (!text && !hasDocument) continue;
 
-      console.log(`[WhatsApp Inbound] Message received from ${senderNumber} (${isGroup ? 'Group' : 'Direct'}): ${textContent ? textContent.substring(0, 40) : 'Doc'}`);
+      console.log(`[WhatsApp Inbound] 📩 Received from ${senderNumber} (${isGroup ? 'Group' : 'Direct'} | Push: ${msg.pushName || 'Anon'}): "${text.substring(0, 50)}"`);
 
-      // Forward asynchronously to Python backend webhook
-      try {
-        fetch('http://127.0.0.1:8000/api/whatsapp/inbound-webhook', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sender: senderNumber,
-            jid: remoteJid,
-            is_group: isGroup,
-            text: textContent,
-            has_document: hasDocument,
-            document_file_name: documentFileName,
-            document_base64: documentBase64,
-            timestamp: msg.messageTimestamp
-          })
-        }).catch(err => {
-          // Non-blocking log
-        });
-      } catch (err) {
-        // Silent catch
-      }
+      // Forward to Python backend asynchronously
+      forwardToBackendWebhook({
+        sender: senderNumber,
+        jid: remoteJid,
+        is_group: isGroup,
+        text: text,
+        push_name: msg.pushName || '',
+        has_document: hasDocument,
+        document_file_name: documentFileName,
+        document_base64: documentBase64,
+        timestamp: msg.messageTimestamp
+      }).catch(err => {
+        console.error(`[WhatsApp Inbound] Error in forward webhook handler:`, err.message);
+      });
     }
   });
 }
@@ -473,8 +538,8 @@ app.post('/logout', async (req, res) => {
   }
 });
 
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`[WhatsApp Gateway] Running on 127.0.0.1:${PORT}`);
+app.listen(GATEWAY_PORT, '0.0.0.0', () => {
+  console.log(`[WhatsApp Gateway] Running on 0.0.0.0:${GATEWAY_PORT}`);
   console.log(`[Session Backup] Supabase: ${AUTH_BACKUP_ENABLED ? 'ENABLED' : 'DISABLED (set SUPABASE_URL + SUPABASE_SERVICE_KEY)'}`);
   console.log(`[Keep-Alive] Self-ping: ${SELF_URL ? 'ENABLED' : 'DISABLED (set SELF_URL)'}`);
 });

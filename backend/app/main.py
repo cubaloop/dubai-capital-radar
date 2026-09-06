@@ -58,7 +58,7 @@ AUTOPILOT_DISPATCH_COUNT: int = 0
 from .safety.anti_ban import anti_ban_guard
 from .crm.sync_tadh import crm_bridge
 
-WHATSAPP_GATEWAY_URL = os.getenv("WHATSAPP_GATEWAY_URL", "http://localhost:3001")
+WHATSAPP_GATEWAY_URL = os.getenv("WHATSAPP_GATEWAY_URL", "http://127.0.0.1:3001")
 
 async def dispatch_whatsapp_direct(to_phone: str, message: str, bypass_shield: bool = False):
     """
@@ -71,14 +71,17 @@ async def dispatch_whatsapp_direct(to_phone: str, message: str, bypass_shield: b
             return {"success": False, "throttled": True, "reason": reason}
 
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             res = await client.post(f"{WHATSAPP_GATEWAY_URL}/send", json={"to": to_phone, "message": message})
             data = res.json()
             if data.get("success"):
                 anti_ban_guard.record_send()
                 print(f"📨 [ANTI-BAN SHIELD] Message safely delivered to {to_phone} ({anti_ban_guard.daily_sent_count}/{anti_ban_guard.max_daily_limit} today)")
+            else:
+                print(f"⚠️ [dispatch_whatsapp_direct] Gateway returned error: {data.get('error')}")
             return data
     except Exception as e:
+        print(f"❌ [dispatch_whatsapp_direct] HTTP Exception to {to_phone}: {e}")
         return {"success": False, "error": str(e), "simulated": True}
 
 async def autopilot_daemon():
@@ -835,8 +838,12 @@ async def handle_admin_copilot(command_text: str, sender_jid: str):
     
     reply_msg = ""
     
-    # Query 1: Leads that replied or were updated in the last 24h / today
-    if any(k in lower for k in ["respondieron", "respondio", "respuestas", "leads hoy", "ultimas 24", "últimas 24", "cuantos leads", "cuántos leads"]):
+    # Check intent categories
+    is_leads_inquiry = any(k in lower for k in ["respondieron", "respondio", "respuestas", "leads hoy", "ultimas 24", "últimas 24", "cuantos leads", "cuántos leads", "quienes", "quiénes"])
+    is_summary_inquiry = any(k in lower for k in ["campaña", "campana", "estado", "resumen", "total leads", "reporte", "informe", "metricas", "métricas", "como vamos", "cómo vamos", "status"])
+
+    # Query 1: Specific drill-down into leads that replied / were contacted in last 24h
+    if is_leads_inquiry and not ("resumen de campañ" in lower or "resumen de campana" in lower):
         cursor.execute("""
         SELECT l.name, l.phone, l.crm_status, l.notes, l.last_contact_date, c.name as campaign_name
         FROM leads l
@@ -880,8 +887,8 @@ async def handle_admin_copilot(command_text: str, sender_jid: str):
             lines.append("\n✅ _Todos los datos están sincronizados en tiempo real con tu CRM y Supabase._")
             reply_msg = "\n".join(lines)
             
-    # Query 2: Campaign status summary
-    elif any(k in lower for k in ["campaña", "campana", "estado", "resumen", "total leads"]):
+    # Query 2: Executive Campaign Summary & Overall Pulse
+    elif is_summary_inquiry:
         cursor.execute("""
         SELECT c.name, COUNT(l.id) as total,
                SUM(CASE WHEN l.whatsapp_status = 'sent' THEN 1 ELSE 0 END) as sent,
@@ -891,38 +898,73 @@ async def handle_admin_copilot(command_text: str, sender_jid: str):
         GROUP BY c.id
         """)
         camps = cursor.fetchall()
-        lines = ["📈 *Resumen Ejecutivo de Campañas:*"]
+        lines = ["📈 *Resumen Ejecutivo - Dubai Capital Radar*"]
         for c in camps:
-            lines.append(f"\n• *{c['name']}*:\n  - Total: {c['total']} leads\n  - Enviados: {c['sent']}\n  - Respuestas: {c['replied']}")
+            lines.append(f"\n• *{c['name']}*:\n  - 🎯 Total: {c['total']} leads\n  - 📨 Enviados: {c['sent']}\n  - 💬 Respuestas: {c['replied']}")
+        
+        # Also include recent replied leads preview if any
+        cursor.execute("""
+        SELECT l.name, l.phone, l.crm_status, l.notes
+        FROM leads l
+        WHERE l.crm_status IN ('INTERESTED', 'HOT', 'REPLIED')
+        ORDER BY l.last_contact_date DESC NULLS LAST
+        LIMIT 3
+        """)
+        recent_replies = cursor.fetchall()
+        if recent_replies:
+            lines.append("\n🔥 *Inversores Interesados Recientes:*")
+            for rr in recent_replies:
+                lines.append(f"  • *{rr['name']}* ({rr['phone']}): _{rr['crm_status']}_")
+
+        lines.append("\n🟢 *Bot WhatsApp:* Conectado y en línea (+971501378020)")
         reply_msg = "\n".join(lines)
         
     else:
         # Natural response via Groq / Gemini with broker assistant context
         groq_key = os.getenv("GROQ_API_KEY", "").strip()
+        gemini_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
+        
         if groq_key:
+            for gm in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]:
+                try:
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        payload = {
+                            "model": gm,
+                            "messages": [
+                                {"role": "system", "content": "Eres el copiloto de IA de David, el Super-Admin del sistema Dubai Capital Radar. Responde de forma muy concisa, profesional y directa en formato WhatsApp."},
+                                {"role": "user", "content": command_text}
+                            ],
+                            "temperature": 0.3,
+                            "max_tokens": 400
+                        }
+                        r = await client.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"})
+                        if r.status_code == 200:
+                            reply_msg = r.json()["choices"][0]["message"]["content"].strip()
+                            break
+                except Exception:
+                    pass
+                    
+        if not reply_msg and gemini_key:
             try:
-                async with httpx.AsyncClient(timeout=8.0) as client:
-                    payload = {
-                        "model": "openai/gpt-oss-120b",
-                        "messages": [
-                            {"role": "system", "content": "Eres el copiloto de IA de David, el Super-Admin del sistema Dubai Capital Radar. Responde de forma muy concisa, profesional y directa en formato WhatsApp."},
-                            {"role": "user", "content": command_text}
-                        ],
-                        "temperature": 0.3,
-                        "max_tokens": 400
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    gem_payload = {
+                        "contents": [{"parts": [{"text": f"Eres el copiloto de IA de David en Dubai Capital Radar. Responde en WhatsApp de forma concisa y ejecutiva a su mensaje: {command_text}"}]}]
                     }
-                    r = await client.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"})
+                    r = await client.post(f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}", json=gem_payload)
                     if r.status_code == 200:
-                        reply_msg = r.json()["choices"][0]["message"]["content"].strip()
+                        cand = r.json().get("candidates", [])
+                        if cand:
+                            reply_msg = cand[0]["content"]["parts"][0]["text"].strip()
             except Exception:
                 pass
         
         if not reply_msg:
-            reply_msg = f"👋 Hola David, recibí tu instrucción: \"{command_text}\". Puedes preguntarme:\n1. '¿Cuántos leads respondieron hoy?'\n2. 'Resumen de campañas'\n3. O reenviarme el PDF/ficha de un nuevo proyecto para indexarlo."
+            reply_msg = f"👋 Hola David, recibí tu mensaje: \"{command_text}\". Puedes pedirme:\n1. 📊 *'Resumen de campañas'*\n2. 👥 *'¿Cuántos leads respondieron hoy?'*\n3. 📄 Reenviarme el PDF/ficha técnica de un proyecto para indexarlo."
             
     conn.close()
     
     # Send response back to admin via WhatsApp
+    print(f"🤖 [ADMIN COPILOT] Dispatching reply to Super-Admin ({ADMIN_PHONE_DIGITS}):\n{reply_msg}")
     await dispatch_whatsapp_direct(to_phone=ADMIN_PHONE_DIGITS, message=reply_msg, bypass_shield=True)
     return {"status": "admin_copilot_replied", "message": reply_msg}
 
@@ -963,8 +1005,8 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
         return {"status": "ignored", "reason": "empty_content"}
 
     # 0. SUPER-ADMIN COPILOT MODE (+971508379080)
-    if sender == ADMIN_PHONE_DIGITS or sender.endswith("508379080"):
-        print(f"[ADMIN COPILOT] Message from Super-Admin: '{text}'")
+    if sender == ADMIN_PHONE_DIGITS or "508379080" in sender or sender.endswith("508379080") or "508379080" in jid:
+        print(f"[ADMIN COPILOT] Message from Super-Admin ({sender}): '{text}'")
         # Check if sending a developer launch or asking a system question
         if not is_developer_or_launch_message(text, is_group=False):
             return await handle_admin_copilot(text, jid)
