@@ -6,13 +6,15 @@ interface NavbarProps {
   setActiveTab: (tab: 'crm' | 'campaigns' | 'radar' | 'dossiers' | 'inventory') => void;
   selectedDossierSlug?: string;
   onOpenWhatsAppModal: () => void;
+  onOpenAgencyModal?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
   selectedDossierSlug,
-  onOpenWhatsAppModal
+  onOpenWhatsAppModal,
+  onOpenAgencyModal
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -93,8 +95,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </nav>
 
-          {/* WhatsApp QR Connector Action & Mobile Menu Toggle */}
+          {/* Agency Settings, WhatsApp QR & Mobile Menu Toggle */}
           <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+            {onOpenAgencyModal && (
+              <button
+                onClick={onOpenAgencyModal}
+                className="hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-gold-400 text-[11px] sm:text-xs font-bold border border-gold-500/30 transition-all shadow-sm active:scale-95"
+                title="Configuración de Agencia B2B"
+              >
+                <Building2 className="w-3.5 h-3.5 text-gold-400" />
+                <span>Agencia B2B</span>
+              </button>
+            )}
+
             <button
               onClick={onOpenWhatsAppModal}
               className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] sm:text-xs font-bold transition-all shadow-md shadow-emerald-600/20 active:scale-95 shrink-0"
@@ -156,6 +169,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Building2 className="w-4 h-4" />
             <span>Proyectos Dubai Off-Plan</span>
           </button>
+
+          {onOpenAgencyModal && (
+            <button
+              onClick={() => {
+                onOpenAgencyModal();
+                setIsMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold font-mono text-gold-600 bg-slate-900"
+            >
+              <Building2 className="w-4 h-4" />
+              <span>Configuración Agencia B2B</span>
+            </button>
+          )}
         </div>
       )}
     </header>

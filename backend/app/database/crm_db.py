@@ -11,6 +11,7 @@ import os
 import json
 from datetime import datetime
 from typing import List, Dict, Any, Optional
+from .supabase_sync import sync_lead_background
 
 DB_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 os.makedirs(DB_DIR, exist_ok=True)
@@ -372,7 +373,12 @@ def mark_lead_whatsapp_sent(lead_id: str, sent_type: str = "manual") -> bool:
     ))
     
     conn.commit()
+    # Fetch updated lead and sync to Supabase
+    cursor.execute("SELECT * FROM leads WHERE id = ?", (lead_id,))
+    updated_lead = cursor.fetchone()
     conn.close()
+    if updated_lead:
+        sync_lead_background(dict(updated_lead))
     return True
 
 def update_lead_crm_fields(lead_id: str, updates: Dict[str, Any]) -> bool:
@@ -395,7 +401,13 @@ def update_lead_crm_fields(lead_id: str, updates: Dict[str, Any]) -> bool:
     query = f"UPDATE leads SET {', '.join(set_clauses)} WHERE id = ?"
     cursor.execute(query, tuple(values))
     conn.commit()
+
+    # Sync to Supabase
+    cursor.execute("SELECT * FROM leads WHERE id = ?", (lead_id,))
+    updated_lead = cursor.fetchone()
     conn.close()
+    if updated_lead:
+        sync_lead_background(dict(updated_lead))
     return True
 
 def add_lead_note_db(lead_id: str, author: str, content: str, note_type: str = "note") -> Dict[str, Any]:
@@ -448,7 +460,11 @@ def update_single_lead_message(lead_id: str, new_message: str) -> bool:
     cursor = conn.cursor()
     cursor.execute("UPDATE leads SET personalized_message = ? WHERE id = ?", (new_message, lead_id))
     conn.commit()
+    cursor.execute("SELECT * FROM leads WHERE id = ?", (lead_id,))
+    updated_lead = cursor.fetchone()
     conn.close()
+    if updated_lead:
+        sync_lead_background(dict(updated_lead))
     return True
 
 async def regenerate_campaign_lead_messages(campaign_id: str, new_prompt: Optional[str] = None, only_pending: bool = True) -> Dict[str, Any]:

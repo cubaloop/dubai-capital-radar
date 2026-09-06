@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from typing import List, Dict, Any, Optional
@@ -24,6 +24,7 @@ from .financial_engine.tax_model import calculate_tax_arbitrage, TAX_RATES_DATAB
 from .inventory.projects import get_all_projects, match_projects_for_budget
 from .ai_generator.dossier_agent import build_dossier
 from .outreach.dispatcher import create_outreach_campaign, triage_incoming_response, get_all_campaigns
+from .security.auth import rate_limiter, verify_supabase_user, sanitize_text
 
 app = FastAPI(
     title="Dubai Capital Radar API",
@@ -162,8 +163,10 @@ async def startup_seed():
 def health_check():
     return {
         "status": "healthy",
-        "service": "Dubai Capital Radar Core API",
+        "service": "Dubai Capital Radar Core API (SaaS Engine)",
+        "groq_ai_connected": bool(os.getenv("GROQ_API_KEY")),
         "gemini_ai_connected": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
+        "supabase_connected": bool(os.getenv("SUPABASE_URL") and (os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY"))),
         "cached_signals": len(radar_engine.get_latest_signals()),
         "active_prospects": len(PROSPECTS_STORE),
         "dossiers_generated": len(DOSSIERS_STORE) // 2,
@@ -571,13 +574,19 @@ def api_get_campaign_leads(campaign_id: str):
         "active_ai_provider": "groq" if groq_ok else ("gemini" if gemini_ok else "local")
     }
 
-@app.post("/api/crm/campaigns/{campaign_id}/update-ai-prompt")
-async def api_update_campaign_ai_prompt(campaign_id: str, payload: Dict[str, Any]):
+@app.post("/api/crm/campaigns/{campaign_id}/update-ai-prompt", dependencies=[Depends(rate_limiter(max_requests=20, window_seconds=60))])
+async def api_update_campaign_ai_prompt(
+    campaign_id: str, 
+    payload: Dict[str, Any],
+    user: Optional[Dict[str, Any]] = Depends(verify_supabase_user)
+):
     """
     Updates the natural-language prompt instructions for the campaign AI bot
     and regenerates personalized messages for pending leads.
+    Protected with Anti-Abuse Rate Limiter & Supabase Auth context.
     """
-    prompt = payload.get("prompt_instructions", "").strip()
+    raw_prompt = payload.get("prompt_instructions", "").strip()
+    prompt = sanitize_text(raw_prompt)
     only_pending = payload.get("regenerate_pending_only", True)
     
     result = await regenerate_campaign_lead_messages(
@@ -662,9 +671,13 @@ async def api_send_lead_whatsapp(lead_id: str, payload: Optional[Dict[str, Any]]
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@app.post("/api/crm/campaigns/{campaign_id}/batch/start")
-async def api_start_campaign_batch(campaign_id: str, payload: Optional[Dict[str, Any]] = None):
-    """Starts the sequential batch sender for a campaign with persistence."""
+@app.post("/api/crm/campaigns/{campaign_id}/batch/start", dependencies=[Depends(rate_limiter(max_requests=10, window_seconds=60))])
+async def api_start_campaign_batch(
+    campaign_id: str, 
+    payload: Optional[Dict[str, Any]] = None,
+    user: Optional[Dict[str, Any]] = Depends(verify_supabase_user)
+):
+    """Starts the sequential batch sender for a campaign with persistence and security rate limiting."""
     delay = (payload and payload.get("delay_seconds")) or 8
     image_path = (payload and payload.get("image_path")) or None
     status = await batch_manager.start_campaign_batch(campaign_id, delay_seconds=delay, image_path=image_path)

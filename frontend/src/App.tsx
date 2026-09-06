@@ -6,12 +6,14 @@ import { RadarDashboard } from './pages/RadarDashboard';
 import { DossierView } from './pages/DossierView';
 import { OffPlanMatcher } from './pages/OffPlanMatcher';
 import { WhatsAppQRModal } from './components/WhatsAppQRModal';
+import { AgencySettingsModal } from './components/AgencySettingsModal';
 import { Lock, ShieldCheck, PhoneCall } from 'lucide-react';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'crm' | 'campaigns' | 'radar' | 'dossiers' | 'inventory'>('campaigns');
   const [selectedDossierSlug, setSelectedDossierSlug] = useState<string>('');
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState<boolean>(false);
+  const [isAgencyModalOpen, setIsAgencyModalOpen] = useState<boolean>(false);
   const [isClientDirectView, setIsClientDirectView] = useState<boolean>(false);
 
   // Parse direct URL on initial mount and browser navigation
@@ -101,12 +103,18 @@ export function App() {
           setActiveTab={handleTabChange} 
           selectedDossierSlug={selectedDossierSlug} 
           onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
+          onOpenAgencyModal={() => setIsAgencyModalOpen(true)}
         />
       )}
 
       <WhatsAppQRModal 
         isOpen={isWhatsAppModalOpen} 
         onClose={() => setIsWhatsAppModalOpen(false)} 
+      />
+
+      <AgencySettingsModal
+        isOpen={isAgencyModalOpen}
+        onClose={() => setIsAgencyModalOpen(false)}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-6 sm:pt-8">
