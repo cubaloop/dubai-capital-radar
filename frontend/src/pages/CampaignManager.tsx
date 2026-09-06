@@ -215,7 +215,7 @@ export const CampaignManager: React.FC = () => {
           setCampaigns((prev) => prev.map((c) => (c.id === res.campaign.id ? { ...c, ...res.campaign } : c)));
         }
         if (res.ai_used) {
-          setStatusMsg(`✨ ¡IA Gemini 3.6 Flash activada! Se redactaron ${res.updated_count} mensajes hiper-personalizados para cada cliente.`);
+          setStatusMsg(`✨ ¡IA Groq Ultra-Rápida activada (con Gemini de respaldo)! Se redactaron ${res.updated_count} mensajes hiper-personalizados en tiempo récord.`);
         } else {
           setStatusMsg(`⚡ ¡Instrucciones aplicadas! Se regeneraron ${res.updated_count} mensajes de leads.`);
         }
@@ -671,14 +671,14 @@ export const CampaignManager: React.FC = () => {
                     {selectedCampaign?.name || 'Campaña Activa'}
                   </span>
                   {isAiConnected ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-300 font-mono text-[10px] font-bold shadow-sm">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300 font-mono text-[10px] font-bold shadow-sm">
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                      Gemini 3.6 Flash Conectado
+                      ⚡ Groq LPU (Principal) + Gemini (Respaldo)
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 font-mono text-[10px] font-bold shadow-sm" title="Falta GEMINI_API_KEY en variables de entorno">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 font-mono text-[10px] font-bold shadow-sm" title="Faltan API keys">
                       <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                      Modo Plantilla Local (Sin API Key)
+                      Modo Plantilla Local
                     </span>
                   )}
                 </div>

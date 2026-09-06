@@ -560,11 +560,15 @@ async def api_upload_excel_campaign(
 def api_get_campaign_leads(campaign_id: str):
     """Returns all leads for a given campaign with their persistent WhatsApp status."""
     leads = get_leads_by_campaign(campaign_id)
+    groq_ok = bool(os.getenv("GROQ_API_KEY"))
+    gemini_ok = bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
     return {
         "campaign_id": campaign_id,
         "total": len(leads),
         "leads": leads,
-        "gemini_ai_connected": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+        "groq_ai_connected": groq_ok,
+        "gemini_ai_connected": gemini_ok,
+        "active_ai_provider": "groq" if groq_ok else ("gemini" if gemini_ok else "local")
     }
 
 @app.post("/api/crm/campaigns/{campaign_id}/update-ai-prompt")
@@ -586,13 +590,17 @@ async def api_update_campaign_ai_prompt(campaign_id: str, payload: Dict[str, Any
 
     camp = get_campaign_by_id(campaign_id)
     leads = get_leads_by_campaign(campaign_id)
+    groq_ok = bool(os.getenv("GROQ_API_KEY"))
+    gemini_ok = bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
     return {
         "success": True,
         "campaign": camp,
         "leads": leads,
         "updated_count": result.get("updated_count", 0),
         "ai_used": result.get("ai_used", False),
-        "gemini_ai_connected": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+        "groq_ai_connected": groq_ok,
+        "gemini_ai_connected": gemini_ok,
+        "active_ai_provider": "groq" if groq_ok else ("gemini" if gemini_ok else "local")
     }
 
 @app.patch("/api/crm/leads/{lead_id}/message")

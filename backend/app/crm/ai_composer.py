@@ -10,10 +10,21 @@ import re
 import httpx
 from typing import Dict, Any, Optional
 
+def get_groq_api_key() -> str:
+    return os.getenv("GROQ_API_KEY", "").strip()
+
 def get_gemini_api_key() -> str:
     return (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
 
+def get_active_provider() -> str:
+    if get_groq_api_key():
+        return "groq"
+    elif get_gemini_api_key():
+        return "gemini"
+    return "local"
+
 GEMINI_API_KEY = get_gemini_api_key()
+GROQ_API_KEY = get_groq_api_key()
 
 def format_lead_first_name(raw_name: str) -> str:
     if not raw_name:
@@ -147,12 +158,15 @@ def compose_lead_message_local(lead: Dict[str, Any], prompt_instructions: str = 
 
 async def compose_lead_message_ai(lead: Dict[str, Any], prompt_instructions: str, campaign_name: str = "") -> str:
     """
-    Calls Google Gemini high-quota fast models with strict copywriting guidelines.
-    Never duplicates greetings or mentions old event attendance records.
+    1. PRIMARY: Groq Cloud LPU (Ultra-fast 0.5s generation)
+    2. FALLBACK: Google Gemini (high-quota fast models)
+    3. TERTIARY: Local intelligent copy synthesizer
     """
     import asyncio
-    api_key = get_gemini_api_key()
-    if not api_key:
+    groq_key = get_groq_api_key()
+    gemini_key = get_gemini_api_key()
+
+    if not groq_key and not gemini_key:
         return compose_lead_message_local(lead, prompt_instructions, campaign_name)
 
     name = lead.get("name", "")
@@ -180,44 +194,89 @@ REGLAS ESTRICTAS DE REDACCIÓN:
 6. NO repitas ideas, saludos ni preguntas al final. Mantén el mensaje limpio, en 3 párrafos cortos formato WhatsApp.
 7. Devuelve ÚNICAMENTE el texto final del mensaje listo para enviar, sin introducciones ni comillas envolventes."""
 
-    # High-quota, fast models on Google AI Studio free tier
-    models_to_try = [
-        "gemini-3.1-flash-lite",
-        "gemini-3.5-flash-lite",
-        "gemini-flash-latest",
-        "gemini-3.6-flash"
-    ]
-    
-    for model_name in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-        for attempt in range(3):
+    # ==========================================
+    # 1. PRIMARY: GROQ (Ultra-Fast 0.5s LPU)
+    # ==========================================
+    if groq_key:
+        groq_models = [
+            "openai/gpt-oss-120b",
+            "qwen/qwen3.8-27b",
+            "openai/gpt-oss-20b"
+        ]
+        groq_url = "https://api.groq.com/openai/v1/chat/completions"
+        groq_headers = {
+            "Authorization": f"Bearer {groq_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0"
+        }
+        for m in groq_models:
             try:
-                async with httpx.AsyncClient(timeout=12.0) as client:
-                    res = await client.post(url, json={
-                        "contents": [{"parts": [{"text": system_prompt}]}],
-                        "generationConfig": {
-                            "temperature": 0.3,
-                            "maxOutputTokens": 1000
-                        }
-                    })
-                    if res.status_code == 200:
-                        data = res.json()
-                        candidates = data.get("candidates", [])
-                        if candidates:
-                            parts = candidates[0].get("content", {}).get("parts", [])
-                            if parts and parts[0].get("text"):
-                                text = parts[0]["text"].strip()
-                                if text:
-                                    return text
-                    elif res.status_code == 429:
-                        # Rate limit reached - wait 1.5s and retry next model
-                        await asyncio.sleep(1.5)
-                        break
-                    elif res.status_code == 404:
-                        break
+                async with httpx.AsyncClient(timeout=8.0) as client:
+                    payload = {
+                        "model": m,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": f"Por favor redacta el mensaje de WhatsApp para {name} siguiendo estrictamente las instrucciones."}
+                        ],
+                        "temperature": 0.3,
+                        "max_tokens": 800
+                    }
+                    r = await client.post(groq_url, json=payload, headers=groq_headers)
+                    if r.status_code == 200:
+                        data = r.json()
+                        content = data["choices"][0]["message"]["content"].strip()
+                        if content:
+                            print(f"[AI Composer] ✅ Message generated via Groq ({m}) for {name}")
+                            return content
             except Exception as e:
-                print(f"[AI Composer] Gemini call error on {model_name} attempt {attempt}: {e}")
-                await asyncio.sleep(1.0)
+                print(f"[AI Composer] Groq error on {m}: {e}")
                 continue
 
+    # ==========================================
+    # 2. SECONDARY: GOOGLE GEMINI (Fallback)
+    # ==========================================
+    if gemini_key:
+        models_to_try = [
+            "gemini-3.1-flash-lite",
+            "gemini-3.5-flash-lite",
+            "gemini-flash-latest",
+            "gemini-3.6-flash"
+        ]
+        
+        for model_name in models_to_try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
+            for attempt in range(2):
+                try:
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        res = await client.post(url, json={
+                            "contents": [{"parts": [{"text": system_prompt}]}],
+                            "generationConfig": {
+                                "temperature": 0.3,
+                                "maxOutputTokens": 1000
+                            }
+                        })
+                        if res.status_code == 200:
+                            data = res.json()
+                            candidates = data.get("candidates", [])
+                            if candidates:
+                                parts = candidates[0].get("content", {}).get("parts", [])
+                                if parts and parts[0].get("text"):
+                                    text = parts[0]["text"].strip()
+                                    if text:
+                                        print(f"[AI Composer] ✅ Message generated via Gemini ({model_name}) for {name}")
+                                        return text
+                        elif res.status_code == 429:
+                            await asyncio.sleep(1.0)
+                            break
+                        elif res.status_code == 404:
+                            break
+                except Exception as e:
+                    print(f"[AI Composer] Gemini call error on {model_name} attempt {attempt}: {e}")
+                    await asyncio.sleep(1.0)
+                    continue
+
+    # ==========================================
+    # 3. TERTIARY: LOCAL INTELLIGENT FALLBACK
+    # ==========================================
+    print(f"[AI Composer] ℹ️ Fallback to local copy for {name}")
     return compose_lead_message_local(lead, prompt_instructions, campaign_name)
