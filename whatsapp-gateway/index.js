@@ -27,6 +27,22 @@ if (!fs.existsSync(AUTH_DIR)) {
   fs.mkdirSync(AUTH_DIR, { recursive: true });
 }
 
+async function clearAuthFromSupabase() {
+  if (!AUTH_BACKUP_ENABLED) return;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/whatsapp_sessions?key=eq.active_session`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'apikey': SUPABASE_KEY
+      }
+    });
+    console.log(`[Session Backup] Deleted active_session from Supabase (status: ${res.status})`);
+  } catch (err) {
+    console.error('[Session Backup] Error deleting Supabase session:', err.message);
+  }
+}
+
 async function uploadAuthToSupabase() {
   if (!AUTH_BACKUP_ENABLED) return;
   try {
@@ -107,7 +123,6 @@ async function restoreAuthFromSupabase() {
 
 let sock = null;
 let currentQR = null;
-let qrGeneratedAt = null;
 let isConnected = false;
 let connectedNumber = null;
 let lastActivityAt = Date.now();
@@ -148,7 +163,7 @@ async function startWhatsApp() {
     logger: pino({ level: 'silent' }),
     printQRInTerminal: true,
     auth: state,
-    browser: Browsers.ubuntu('Chrome'),
+    browser: Browsers.macOS('Desktop'),
     syncFullHistory: false,
     generateHighQualityLinkPreview: true,
     markOnlineOnConnect: true,
@@ -169,32 +184,23 @@ async function startWhatsApp() {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      currentQR = await QRCode.toDataURL(qr, {
-        margin: 3,
-        scale: 8,
-        color: {
-          dark: '#000000',
-          light: '#ffffff'
-        }
-      });
-      qrGeneratedAt = Date.now();
-      console.log('[WhatsApp] New fresh QR code generated. Ready for scanning.');
+      currentQR = await QRCode.toDataURL(qr);
+      console.log('[WhatsApp] New QR code generated. Ready for scanning.');
     }
 
     if (connection === 'close') {
       isConnected = false;
       connectedNumber = null;
-      currentQR = null;
-      qrGeneratedAt = null;
       const code = lastDisconnect?.error?.output?.statusCode;
       const shouldReconnect = code !== DisconnectReason.loggedOut;
       console.log(`[WhatsApp] Connection closed (code: ${code}). Reconnecting: ${shouldReconnect}`);
       if (shouldReconnect) {
-        const delay = code === 428 ? 8000 : 3000; // Back off on stream error
+        const delay = code === 428 ? 10000 : 3000; // Back off on stream error
         setTimeout(startWhatsApp, delay);
       } else {
-        // Logged out - clear Supabase backup & local auth, then restart fresh
-        console.log('[WhatsApp] Logged out - clearing session backup and restarting fresh socket');
+        // Logged out - clear Supabase backup & local auth
+        console.log('[WhatsApp] Logged out - clearing session backup');
+        await clearAuthFromSupabase();
         if (fs.existsSync(AUTH_DIR)) {
           fs.rmSync(AUTH_DIR, { recursive: true, force: true });
           fs.mkdirSync(AUTH_DIR, { recursive: true });
@@ -204,7 +210,6 @@ async function startWhatsApp() {
     } else if (connection === 'open') {
       isConnected = true;
       currentQR = null;
-      qrGeneratedAt = null;
       connectedNumber = sock.user?.id?.split(':')[0] || 'Linked Phone';
       lastActivityAt = Date.now();
       console.log(`✅ [WhatsApp Gateway] Connected successfully as +${connectedNumber}`);
@@ -281,89 +286,19 @@ app.get('/healthz', (req, res) => {
 
 app.get('/status', (req, res) => {
   lastActivityAt = Date.now();
-  const isQrValid = currentQR && qrGeneratedAt && (Date.now() - qrGeneratedAt < 25000);
   res.json({
     connected: isConnected,
     phone: connectedNumber,
-    has_qr: !!isQrValid
+    has_qr: !!currentQR
   });
 });
 
 app.get('/qr', (req, res) => {
-  const isQrValid = currentQR && qrGeneratedAt && (Date.now() - qrGeneratedAt < 25000);
-  const expiresIn = (currentQR && qrGeneratedAt) ? Math.max(0, Math.floor((25000 - (Date.now() - qrGeneratedAt)) / 1000)) : 0;
-  
-  // If QR is expired and not connected, restart socket to generate fresh pairing QR
-  if (!isQrValid && !isConnected && currentQR) {
-    currentQR = null;
-    qrGeneratedAt = null;
-    console.log('[WhatsApp] Stale QR detected, restarting socket for fresh pairing QR...');
-    try { if (sock) sock.end(undefined); } catch (e) {}
-    setTimeout(startWhatsApp, 1000);
-  }
-
   res.json({
     connected: isConnected,
-    qr: isQrValid ? currentQR : null,
-    expires_in_seconds: isQrValid ? expiresIn : 0,
+    qr: currentQR,
     phone: connectedNumber
   });
-});
-
-// Endpoint: Generate 8-digit Pairing Code for phone number (No camera / QR scan needed)
-app.post('/pairing-code', async (req, res) => {
-  try {
-    const { phone } = req.body;
-    if (!phone) {
-      return res.status(400).json({ success: false, error: 'Falta el número de teléfono' });
-    }
-    const cleanNumber = phone.replace(/[^0-9]/g, '');
-    if (!cleanNumber || cleanNumber.length < 8) {
-      return res.status(400).json({ success: false, error: 'Número de teléfono inválido. Incluye prefijo de país (ej. 34 para España, 971 para UAE).' });
-    }
-    if (isConnected) {
-      return res.json({ success: false, error: `Ya está conectado como +${connectedNumber}` });
-    }
-    if (!sock || typeof sock.requestPairingCode !== 'function') {
-      await startWhatsApp();
-      await new Promise(r => setTimeout(r, 2000));
-    }
-    const rawCode = await sock.requestPairingCode(cleanNumber);
-    const formattedCode = rawCode?.match(/.{1,4}/g)?.join('-') || rawCode;
-    console.log(`[WhatsApp] Pairing code generated for +${cleanNumber}: ${formattedCode}`);
-    return res.json({
-      success: true,
-      code: formattedCode,
-      raw_code: rawCode,
-      phone: cleanNumber,
-      expires_in_seconds: 60
-    });
-  } catch (err) {
-    console.error('[WhatsApp] Pairing code error:', err.message);
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// Endpoint: Force restart socket and clear auth for clean QR
-app.post('/restart', async (req, res) => {
-  try {
-    console.log('[WhatsApp] Manual restart requested');
-    if (sock) {
-      try { sock.end(undefined); } catch (e) {}
-    }
-    if (fs.existsSync(AUTH_DIR)) {
-      fs.rmSync(AUTH_DIR, { recursive: true, force: true });
-      fs.mkdirSync(AUTH_DIR, { recursive: true });
-    }
-    isConnected = false;
-    currentQR = null;
-    qrGeneratedAt = null;
-    connectedNumber = null;
-    startWhatsApp();
-    return res.json({ success: true, message: 'Socket reiniciado. Generando nuevo QR limpio.' });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
 });
 
 app.post('/send', async (req, res) => {
@@ -455,13 +390,13 @@ app.post('/logout', async (req, res) => {
     if (sock) {
       try { await sock.logout(); } catch (e) { try { sock.end(undefined); } catch (_) {} }
     }
+    await clearAuthFromSupabase();
     if (fs.existsSync(AUTH_DIR)) {
       fs.rmSync(AUTH_DIR, { recursive: true, force: true });
       fs.mkdirSync(AUTH_DIR, { recursive: true });
     }
     isConnected = false;
     currentQR = null;
-    qrGeneratedAt = null;
     connectedNumber = null;
     setTimeout(startWhatsApp, 1500);
     return res.json({ success: true, message: 'Logged out and restarted' });
