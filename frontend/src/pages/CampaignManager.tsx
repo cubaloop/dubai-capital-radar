@@ -54,6 +54,7 @@ export const CampaignManager: React.FC = () => {
   const [campaignAiPrompt, setCampaignAiPrompt] = useState<string>('');
   const [isUpdatingPrompt, setIsUpdatingPrompt] = useState<boolean>(false);
   const [isPromptPanelOpen, setIsPromptPanelOpen] = useState<boolean>(true);
+  const [isAiConnected, setIsAiConnected] = useState<boolean>(true);
 
   // Individual Lead Message Inline Editing
   const [isEditingLeadMsg, setIsEditingLeadMsg] = useState<boolean>(false);
@@ -102,6 +103,9 @@ export const CampaignManager: React.FC = () => {
       const res = await apiService.getCampaignLeads(cid);
       if (res?.leads) {
         setLeads(res.leads);
+        if (res.gemini_ai_connected !== undefined) {
+          setIsAiConnected(res.gemini_ai_connected);
+        }
         if (res.leads.length > 0) {
           setSelectedLeadPreview(res.leads[0]);
         } else {
@@ -163,10 +167,10 @@ export const CampaignManager: React.FC = () => {
   const PROMPT_PRESETS = [
     {
       label: '🏨 Evento Novotel Madrid',
-      text: 'Presentar las novedades exclusivas y proyectos en el Dubai Property Expo en el Novotel Madrid Center los días 9 y 10 de Septiembre. Beneficios: Golden Visa 10 años gratis, descuentos hasta el 20%, gestión de alquiler gratis y cuotas desde 1% mensual. Confirmar asistencia para lista VIP.'
+      text: 'Recordar su interés previo y anunciar que tenemos el evento presencial exclusivo en Novotel Madrid Center los días 9 y 10 de Septiembre. Pedir confirmación para lista VIP.'
     },
     {
-      label: '💻 Ofertas desde 50K (Zoom)',
+      label: '📱 Ofertas desde 50K (Zoom)',
       text: 'Informar que tenemos nuevas ofertas para entrar al mercado inmobiliario de Dubai a partir de 50K. Pedir que me escriba qué día y hora le viene bien esta semana para hacerle una breve presentación online.'
     },
     {
@@ -186,6 +190,9 @@ export const CampaignManager: React.FC = () => {
       setIsUpdatingPrompt(true);
       const res = await apiService.updateCampaignAiPrompt(selectedCampaignId, campaignAiPrompt, true);
       if (res?.success) {
+        if (res.gemini_ai_connected !== undefined) {
+          setIsAiConnected(res.gemini_ai_connected);
+        }
         if (res.leads) {
           setLeads(res.leads);
           if (selectedLeadPreview) {
@@ -199,13 +206,17 @@ export const CampaignManager: React.FC = () => {
         if (res.campaign) {
           setCampaigns((prev) => prev.map((c) => (c.id === res.campaign.id ? { ...c, ...res.campaign } : c)));
         }
-        setStatusMsg(`⚡ ¡Instrucciones aplicadas! Se regeneraron ${res.updated_count} mensajes de leads con la nueva directiva.`);
+        if (res.ai_used) {
+          setStatusMsg(`✨ ¡IA Gemini 3.6 Flash activada! Se redactaron ${res.updated_count} mensajes hiper-personalizados para cada cliente.`);
+        } else {
+          setStatusMsg(`⚡ ¡Instrucciones aplicadas! Se regeneraron ${res.updated_count} mensajes de leads.`);
+        }
       }
     } catch (err: any) {
       setStatusMsg(`❌ Error actualizando prompt: ${err.message}`);
     } finally {
       setIsUpdatingPrompt(false);
-      setTimeout(() => setStatusMsg(null), 5000);
+      setTimeout(() => setStatusMsg(null), 6000);
     }
   };
 
@@ -623,6 +634,17 @@ export const CampaignManager: React.FC = () => {
                   <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-900 border border-sky-300 font-mono font-bold">
                     {selectedCampaign?.name || 'Campaña Activa'}
                   </span>
+                  {isAiConnected ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-300 font-mono text-[10px] font-bold shadow-sm">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      Gemini 3.6 Flash Conectado
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 font-mono text-[10px] font-bold shadow-sm" title="Falta GEMINI_API_KEY en variables de entorno">
+                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                      Modo Plantilla Local (Sin API Key)
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-slate-600 mt-0.5">
                   Escribe en lenguaje natural qué quieres que diga el bot (ofertas, eventos, fechas, importes mínimos o llamadas a la acción). La IA combinará estas directivas con los datos individuales del Excel.

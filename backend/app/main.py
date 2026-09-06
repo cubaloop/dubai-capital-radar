@@ -5,6 +5,9 @@ from typing import List, Dict, Any, Optional
 import uvicorn
 import os
 import uuid
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from .models.schemas import (
     ProspectProfile,
@@ -557,7 +560,12 @@ async def api_upload_excel_campaign(
 def api_get_campaign_leads(campaign_id: str):
     """Returns all leads for a given campaign with their persistent WhatsApp status."""
     leads = get_leads_by_campaign(campaign_id)
-    return {"campaign_id": campaign_id, "total": len(leads), "leads": leads}
+    return {
+        "campaign_id": campaign_id,
+        "total": len(leads),
+        "leads": leads,
+        "gemini_ai_connected": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+    }
 
 @app.post("/api/crm/campaigns/{campaign_id}/update-ai-prompt")
 async def api_update_campaign_ai_prompt(campaign_id: str, payload: Dict[str, Any]):
@@ -568,7 +576,7 @@ async def api_update_campaign_ai_prompt(campaign_id: str, payload: Dict[str, Any
     prompt = payload.get("prompt_instructions", "").strip()
     only_pending = payload.get("regenerate_pending_only", True)
     
-    result = regenerate_campaign_lead_messages(
+    result = await regenerate_campaign_lead_messages(
         campaign_id=campaign_id,
         new_prompt=prompt,
         only_pending=only_pending
@@ -582,7 +590,9 @@ async def api_update_campaign_ai_prompt(campaign_id: str, payload: Dict[str, Any
         "success": True,
         "campaign": camp,
         "leads": leads,
-        "updated_count": result.get("updated_count", 0)
+        "updated_count": result.get("updated_count", 0),
+        "ai_used": result.get("ai_used", False),
+        "gemini_ai_connected": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
     }
 
 @app.patch("/api/crm/leads/{lead_id}/message")

@@ -10,7 +10,10 @@ import re
 import httpx
 from typing import Dict, Any, Optional
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+def get_gemini_api_key() -> str:
+    return (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
+
+GEMINI_API_KEY = get_gemini_api_key()
 
 def format_lead_first_name(raw_name: str) -> str:
     if not raw_name:
@@ -28,9 +31,11 @@ def clean_user_instruction_meta(instruction: str) -> str:
     """Removes meta directives like 'Quiero que les digas que' and trailing 'que me escriba...' so text is natural."""
     s = instruction.strip()
     patterns = [
+        r"^(?:por favor\s+)?(?:quiero\s+que\s+(?:le\s+|les\s+)?(?:mandes|envíes|envies|hagas|digas|comentes|avises|expliques|recuerdes|menciones)[^\:]*?(?:vincula(?:s)?|con|la siguiente idea)?:?\s*)",
         r"^(?:por favor\s+)?(?:quiero\s+que\s+(?:además\s+de[^\.]*\s+|ademas\s+de[^\.]*\s+)?(?:les\s+)?(?:menciones|digas|comentes|avises|expliques|recuerdes)\s+(?:que\s+)?)+",
         r"^(?:diles\s+que\s+|recuérdales\s+que\s+|recuerdales\s+que\s+|menciónales\s+que\s+|mencionales\s+que\s+|avísales\s+que\s+)",
-        r"^(?:quiero\s+que\s+)"
+        r"^(?:quiero\s+que\s+)",
+        r"^.*?(?:vincula\s+la\s+siguiente\s+idea:?\s*)"
     ]
     for p in patterns:
         s = re.sub(p, "", s, flags=re.IGNORECASE).strip()
@@ -130,9 +135,10 @@ Un saludo cordial."""
 
 async def compose_lead_message_ai(lead: Dict[str, Any], prompt_instructions: str, campaign_name: str = "") -> str:
     """
-    Calls Gemini if GEMINI_API_KEY is configured, else seamlessly falls back to compose_lead_message_local.
+    Calls Google Gemini (v3.6 Flash / v3.5 Flash) with full broker instructions and lead CRM profile.
+    Falls back gracefully to local synthesizer if API key is not present or on network error.
     """
-    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    api_key = get_gemini_api_key()
     if not api_key:
         return compose_lead_message_local(lead, prompt_instructions, campaign_name)
 
@@ -143,44 +149,55 @@ async def compose_lead_message_ai(lead: Dict[str, Any], prompt_instructions: str
     timeline = lead.get("timeline", "")
     budget = lead.get("budget_eur") or lead.get("budget_aed") or ""
 
-    system_prompt = f"""Eres un asesor senior de inversiones inmobiliarias en Dubai.
+    system_prompt = f"""Eres David, asesor experto en inversiones y Bienes Raíces en Dubai con trato ejecutivo, cercano y de alto valor.
 Tu objetivo es redactar un mensaje de WhatsApp individual, ultra personalizado, directo y persuasivo para un lead específico.
 
-INSTRUCCIONES CLAVE DE LA CAMPAÑA DADAS POR EL BROKER:
+INSTRUCCIONES CLAVE DE LA CAMPAÑA DADAS POR TI (EL BROKER):
 "{prompt_instructions}"
 
-DATOS ESPECÍFICOS DEL LEAD:
-- Nombre: {name} (Llámalo por su nombre: {first_name})
-- Notas o conversación previa: {notes or 'Sin notas previas'}
+DATOS ESPECÍFICOS DEL LEAD (DEL EXCEL / CRM):
+- Nombre completo: {name} (Llámalo por su nombre de pila: {first_name})
+- Notas históricas o conversación previa: {notes or 'Sin notas previas'}
 - Objetivo de inversión: {objective or 'Inversión'}
 - Plazo: {timeline or 'No especificado'}
-- Presupuesto: {budget}
+- Presupuesto: {budget or 'Flexible'}
 
 REGLAS OBLIGATORIAS:
-1. Saluda cordialmente por su nombre: "Hola {first_name},"
-2. Conecta de forma sutil con su interés o notas previas si existen.
-3. Incorpora FIELMENTE y con naturalidad las instrucciones de la campaña que dio el broker (fechas, lugares, eventos, ofertas, requisitos o llamadas a la acción).
-4. Termina con una llamada a la acción clara y sencilla para que responda por WhatsApp.
-5. Usa formato de WhatsApp (*negrita* en puntos clave, párrafos cortos y limpios).
-6. Tono: profesional, cercano, directo, sin rodeos ni saludos robóticos.
-7. Devuelve ÚNICAMENTE el texto exacto del mensaje de WhatsApp, nada más."""
+1. Saluda cordialmente por su nombre de pila: "Hola {first_name}," o "¿Cómo estás, {first_name}?".
+2. Preséntate con naturalidad en primera persona como David.
+3. Conecta de forma sutil, empática y creíble con su interés previo o notas registradas en el CRM ("{notes}") para que sienta atención 1 a 1 genuina.
+4. Desarrolla las ofertas, ideas y beneficios señalados en las instrucciones (importes de depósito, cuotas mensuales, tipos de propiedades, evento reciente en Miami o ventajas fiscales) con lenguaje seductor y profesional.
+5. NUNCA copies las órdenes de desarrollo textuales del usuario. NUNCA digas "Quiero que le mandes un mensaje", ni "vincula la siguiente idea", ni repitas directivas técnicas. Habla directamente al cliente.
+6. Termina con una llamada a la acción clara para agendar día y hora por Zoom o responder por WhatsApp.
+7. Usa formato nativo de WhatsApp (*negrita* en importes y puntos clave, párrafos cortos y limpios).
+8. Devuelve ÚNICAMENTE el texto exacto del mensaje de WhatsApp, sin introducciones ni notas adicionales."""
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.post(url, json={
-                "contents": [{"parts": [{"text": system_prompt}]}],
-                "generationConfig": {
-                    "temperature": 0.4,
-                    "maxOutputTokens": 600
-                }
-            })
-            if res.status_code == 200:
-                data = res.json()
-                text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                if text:
-                    return text
-    except Exception as e:
-        print(f"[AI Composer] Gemini call error: {e}, falling back to local synthesizer.")
+    models_to_try = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash-lite"]
+    
+    for model_name in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+        try:
+            async with httpx.AsyncClient(timeout=35.0) as client:
+                res = await client.post(url, json={
+                    "contents": [{"parts": [{"text": system_prompt}]}],
+                    "generationConfig": {
+                        "temperature": 0.4,
+                        "maxOutputTokens": 2048
+                    }
+                })
+                if res.status_code == 200:
+                    data = res.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        if parts and parts[0].get("text"):
+                            text = parts[0]["text"].strip()
+                            if text:
+                                return text
+                elif res.status_code == 404:
+                    continue  # Try next model
+        except Exception as e:
+            print(f"[AI Composer] Gemini call error on {model_name}: {e}")
+            continue
 
     return compose_lead_message_local(lead, prompt_instructions, campaign_name)

@@ -451,8 +451,10 @@ def update_single_lead_message(lead_id: str, new_message: str) -> bool:
     conn.close()
     return True
 
-def regenerate_campaign_lead_messages(campaign_id: str, new_prompt: Optional[str] = None, only_pending: bool = True) -> Dict[str, Any]:
-    from ..crm.ai_composer import compose_lead_message_local
+async def regenerate_campaign_lead_messages(campaign_id: str, new_prompt: Optional[str] = None, only_pending: bool = True) -> Dict[str, Any]:
+    import asyncio
+    import os
+    from ..crm.ai_composer import compose_lead_message_ai, compose_lead_message_local
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -475,22 +477,36 @@ def regenerate_campaign_lead_messages(campaign_id: str, new_prompt: Optional[str
         query += " AND (whatsapp_status IS NULL OR whatsapp_status != 'sent')"
     
     cursor.execute(query, (campaign_id,))
-    leads_to_update = cursor.fetchall()
+    leads_to_update = [dict(r) for r in cursor.fetchall()]
+    conn.close()
 
-    updated_count = 0
-    for l_row in leads_to_update:
-        lead_dict = dict(l_row)
-        new_msg = compose_lead_message_local(lead_dict, active_prompt, camp_name)
-        cursor.execute("UPDATE leads SET personalized_message = ? WHERE id = ?", (new_msg, lead_dict["id"]))
-        updated_count += 1
+    # Process in parallel with concurrency semaphore (4 concurrent requests to stay within rate limits)
+    sem = asyncio.Semaphore(4)
 
+    async def generate_for_lead(lead_dict):
+        async with sem:
+            try:
+                msg = await compose_lead_message_ai(lead_dict, active_prompt, camp_name)
+            except Exception as e:
+                print(f"[Lead AI Gen Error {lead_dict.get('id')}]: {e}")
+                msg = compose_lead_message_local(lead_dict, active_prompt, camp_name)
+            return lead_dict["id"], msg
+
+    results = await asyncio.gather(*[generate_for_lead(l) for l in leads_to_update])
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    for lead_id, msg in results:
+        cursor.execute("UPDATE leads SET personalized_message = ? WHERE id = ?", (msg, lead_id))
     conn.commit()
     conn.close()
+
     return {
         "success": True,
         "campaign_id": campaign_id,
         "prompt_instructions": active_prompt,
-        "updated_count": updated_count
+        "updated_count": len(results),
+        "ai_used": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
     }
 
 # Initialize on import
