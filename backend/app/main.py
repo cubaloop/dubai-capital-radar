@@ -87,9 +87,11 @@ async def autopilot_daemon():
     while True:
         try:
             if AUTOPILOT_ENABLED:
-                new_sig = radar_engine.trigger_live_scan()
-                prospect = enrich_signal_to_prospect(new_sig)
-                PROSPECTS_STORE[prospect.id] = prospect
+                signals = await intent_radar.run_full_scan()
+                if signals:
+                    top = signals[0]
+                    # Log autopilot signal detected
+                    print(f"🤖 [AUTOPILOT] Top intent signal detected: {top.get('platform')}")
 
                 # Auto-generate AI Dossier with Gemini
                 dossier = build_dossier(prospect)
@@ -167,7 +169,7 @@ def health_check():
         "groq_ai_connected": bool(os.getenv("GROQ_API_KEY")),
         "gemini_ai_connected": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
         "supabase_connected": bool(os.getenv("SUPABASE_URL") and (os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY"))),
-        "cached_signals": len(radar_engine.get_latest_signals()),
+        "cached_signals": 0,
         "active_prospects": len(PROSPECTS_STORE),
         "dossiers_generated": len(DOSSIERS_STORE) // 2,
         "autopilot_enabled": AUTOPILOT_ENABLED,
@@ -230,12 +232,9 @@ def list_prospects():
 
 @app.post("/api/prospects/enrich-signal/{signal_id}", response_model=ProspectProfile)
 def enrich_signal(signal_id: str):
-    signals = radar_engine.get_latest_signals()
-    sig = next((s for s in signals if s.id == signal_id), None)
-    if not sig:
-        raise HTTPException(status_code=404, detail="Signal not found")
-    prospect = enrich_signal_to_prospect(sig)
-    PROSPECTS_STORE[prospect.id] = prospect
+    prospect = PROSPECTS_STORE.get(signal_id)
+    if not prospect:
+        raise HTTPException(status_code=404, detail="Signal or prospect not found")
     return prospect
 
 # --- DOSSIERS & FINANCIAL MODELING ---
@@ -426,7 +425,11 @@ def get_safety_status():
 
 @app.get("/api/xray-queries")
 def get_google_xray_queries():
-    return radar_engine.get_xray_queries()
+    return [
+        'site:linkedin.com/in ("Founder" OR "CEO") ("Madrid" OR "Miami" OR "London") "Family Office"',
+        'site:linkedin.com/in ("Angel Investor" OR "Web3" OR "Fintech") ("Spain" OR "Latin America")',
+        'site:linkedin.com/in ("Real Estate Investor" OR "Private Equity") "Dubai"'
+    ]
 
 # --- CRM REAL ESTATE TDAH SYNC ---
 
