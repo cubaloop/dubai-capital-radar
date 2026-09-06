@@ -26,7 +26,8 @@ import {
   Layers,
   Image as ImageIcon,
   Edit3,
-  Save
+  Save,
+  Smartphone
 } from 'lucide-react';
 
 export const CampaignManager: React.FC = () => {
@@ -60,6 +61,13 @@ export const CampaignManager: React.FC = () => {
   const [isEditingLeadMsg, setIsEditingLeadMsg] = useState<boolean>(false);
   const [editedLeadMsgText, setEditedLeadMsgText] = useState<string>('');
   const [isSavingLeadMsg, setIsSavingLeadMsg] = useState<boolean>(false);
+
+  // Send Test Message to My Personal WhatsApp
+  const [testPhoneNumber, setTestPhoneNumber] = useState<string>(
+    () => localStorage.getItem('dcr_test_phone') || '+971508379080'
+  );
+  const [isEditingTestPhone, setIsEditingTestPhone] = useState<boolean>(false);
+  const [isSendingTestMsg, setIsSendingTestMsg] = useState<boolean>(false);
 
   // New Campaign Modal State
   const [isNewCampaignOpen, setIsNewCampaignOpen] = useState<boolean>(false);
@@ -275,6 +283,34 @@ export const CampaignManager: React.FC = () => {
     } finally {
       setSendingLeadId(null);
       setTimeout(() => setStatusMsg(null), 4000);
+    }
+  };
+
+  // Send Test Message to My Personal WhatsApp Handler
+  const handleSendTestToMyPhone = async () => {
+    if (!selectedLeadPreview) return;
+    try {
+      setIsSendingTestMsg(true);
+      const msgToSend = `🧪 *[PRUEBA DE CAMPAÑA - Lead: ${selectedLeadPreview.name}]*\n\n${selectedLeadPreview.personalized_message || ''}`;
+      const res = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: testPhoneNumber,
+          message: msgToSend
+        })
+      });
+      const data = await res.json();
+      if (data?.success) {
+        setStatusMsg(`✅ ¡Mensaje de prueba de "${selectedLeadPreview.name}" enviado con éxito a tu WhatsApp (${testPhoneNumber})!`);
+      } else {
+        setStatusMsg(`⚠️ Error al enviar prueba: ${data?.error || 'Fallo de entrega'}`);
+      }
+    } catch (err: any) {
+      setStatusMsg(`❌ Error: ${err.message}`);
+    } finally {
+      setIsSendingTestMsg(false);
+      setTimeout(() => setStatusMsg(null), 6000);
     }
   };
 
@@ -922,24 +958,86 @@ export const CampaignManager: React.FC = () => {
                   )}
                 </div>
 
-                {/* 1-Click Send Button */}
-                <button
-                  onClick={() => handleSendSingleLead(selectedLeadPreview)}
-                  disabled={sendingLeadId === selectedLeadPreview.id}
-                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3.5 rounded-2xl text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all disabled:opacity-50"
-                >
-                  {sendingLeadId === selectedLeadPreview.id ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Despachando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4" />
-                      <span>Enviar a {selectedLeadPreview.name.split(' ')[0]}</span>
-                    </>
-                  )}
-                </button>
+                {/* Action Buttons: Real Send + Test to My WhatsApp */}
+                <div className="space-y-2.5 pt-1">
+                  {/* 1-Click Send Button to Client */}
+                  <button
+                    onClick={() => handleSendSingleLead(selectedLeadPreview)}
+                    disabled={sendingLeadId === selectedLeadPreview.id}
+                    className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3.5 rounded-2xl text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    {sendingLeadId === selectedLeadPreview.id ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Despachando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>Enviar a {selectedLeadPreview.name.split(' ')[0]} ({selectedLeadPreview.phone})</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Send Test to My Personal WhatsApp */}
+                  <div className="p-3 bg-sky-100/70 border border-sky-200/90 rounded-2xl space-y-2">
+                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-700">
+                      <span className="font-bold flex items-center gap-1">
+                        <Smartphone className="w-3.5 h-3.5 text-sky-800" />
+                        Probar en mi WhatsApp:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingTestPhone(!isEditingTestPhone)}
+                        className="text-sky-800 hover:underline flex items-center gap-1 font-bold"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                        {testPhoneNumber}
+                      </button>
+                    </div>
+
+                    {isEditingTestPhone && (
+                      <div className="flex gap-2 animate-fade-in">
+                        <input
+                          type="text"
+                          value={testPhoneNumber}
+                          onChange={(e) => {
+                            setTestPhoneNumber(e.target.value);
+                            localStorage.setItem('dcr_test_phone', e.target.value);
+                          }}
+                          placeholder="+971508379080"
+                          className="flex-1 bg-white border border-sky-300 rounded-xl px-3 py-1.5 text-xs text-slate-900 font-mono shadow-inner focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingTestPhone(false)}
+                          className="px-3 py-1.5 rounded-xl bg-sky-700 text-white font-mono text-xs font-bold shadow-sm"
+                        >
+                          Listo
+                        </button>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleSendTestToMyPhone}
+                      disabled={isSendingTestMsg}
+                      className="w-full bg-white hover:bg-sky-50 text-sky-900 border border-sky-300 font-bold py-2.5 rounded-xl text-xs font-mono flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50 shadow-sm"
+                    >
+                      {isSendingTestMsg ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-700" />
+                          <span>Enviando prueba a tu WhatsApp...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>🧪 Enviar prueba de este mensaje a mi móvil</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="card-3d rounded-3xl p-8 text-center text-slate-400 text-xs font-mono bg-white">
