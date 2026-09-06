@@ -251,6 +251,10 @@ async function startWhatsApp() {
                           msg.message.documentMessage?.caption ||
                           msg.message.documentMessage?.fileName || '';
 
+      // Extract document info if present
+      const hasDocument = !!msg.message.documentMessage;
+      const documentFileName = msg.message.documentMessage?.fileName || null;
+
       let documentBase64 = null;
       if (hasDocument) {
         try {
@@ -269,7 +273,9 @@ async function startWhatsApp() {
         }
       }
 
-      console.log(`[WhatsApp Inbound] Message received from ${senderNumber} (${isGroup ? 'Group' : 'Direct'})`);
+      if (!textContent && !hasDocument) continue;
+
+      console.log(`[WhatsApp Inbound] Message received from ${senderNumber} (${isGroup ? 'Group' : 'Direct'}): ${textContent ? textContent.substring(0, 40) : 'Doc'}`);
 
       // Forward asynchronously to Python backend webhook
       try {
