@@ -145,16 +145,17 @@ function resetDailyCounterIfNeeded() {
 }
 
 // ─── Self Keep-Alive Pulse ────────────────────────────────────────────────────
-const SELF_URL = process.env.SELF_URL || null;
+const SELF_URL = process.env.SELF_URL || "https://dubai-miami-radar.onrender.com";
 if (SELF_URL) {
   setInterval(async () => {
     try {
-      await fetch(`${SELF_URL}/healthz`);
-      console.log('[Keep-Alive] Pulse sent to keep container awake');
+      const pingUrl = `${SELF_URL}/api/whatsapp/qr`;
+      await fetch(pingUrl, { headers: { 'User-Agent': 'WhatsApp-Gateway-Pulse/1.0' } });
+      console.log(`[Keep-Alive] Gateway pulse delivered to ${pingUrl} (Preventing Sleep)`);
     } catch (e) {
-      // Silent fail - external ping
+      // Non-blocking log
     }
-  }, 4 * 60 * 1000); // Every 4 minutes
+  }, 3 * 60 * 1000); // Every 3 minutes
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
