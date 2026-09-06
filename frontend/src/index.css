@@ -13,19 +13,19 @@
   }
 }
 
-/* Marble Background Pattern */
+/* Marble Background Pattern with Rich Blue & Purple Mineral Veins */
 .marble-bg {
-  background-color: #f8fafc;
+  background-color: #e5ebf5;
   background-image: 
-    radial-gradient(at 10% 15%, rgba(226, 232, 240, 0.6) 0px, transparent 45%),
-    radial-gradient(at 85% 20%, rgba(212, 175, 55, 0.08) 0px, transparent 40%),
-    radial-gradient(at 45% 55%, rgba(241, 245, 249, 0.8) 0px, transparent 55%),
-    radial-gradient(at 80% 80%, rgba(203, 213, 225, 0.5) 0px, transparent 45%),
-    radial-gradient(at 15% 85%, rgba(212, 175, 55, 0.07) 0px, transparent 40%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600' viewBox='0 0 600 600'%3E%3Cfilter id='marble-veins'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.007' numOctaves='5' seed='37' result='noise'/%3E%3CfeColorMatrix type='matrix' values='1 0 0 0 0.95  0 1 0 0 0.96  0 0 1 0 0.97  0 0 0 0.16 0'/%3E%3C/filter%3E%3Crect width='600' height='600' filter='url(%23marble-veins)' opacity='0.75'/%3E%3Cpath d='M-60,140 Q130,50 300,210 T600,260 T720,470' stroke='rgba(165,178,198,0.25)' stroke-width='3' fill='none' filter='blur(1.5px)'/%3E%3Cpath d='M70,-40 Q230,150 370,100 T630,370' stroke='rgba(200,165,55,0.14)' stroke-width='2' fill='none' filter='blur(1px)'/%3E%3Cpath d='M-30,470 Q170,330 420,490 T670,530' stroke='rgba(150,165,185,0.22)' stroke-width='2.5' fill='none' filter='blur(2px)'/%3E%3Cpath d='M250,50 Q450,220 520,180 T750,420' stroke='rgba(175,188,205,0.18)' stroke-width='2' fill='none' filter='blur(1.5px)'/%3E%3C/svg%3E");
+    radial-gradient(at 12% 18%, rgba(99, 102, 241, 0.18) 0px, transparent 48%),
+    radial-gradient(at 88% 16%, rgba(168, 85, 247, 0.16) 0px, transparent 45%),
+    radial-gradient(at 48% 52%, rgba(59, 130, 246, 0.14) 0px, transparent 52%),
+    radial-gradient(at 82% 82%, rgba(139, 92, 246, 0.17) 0px, transparent 48%),
+    radial-gradient(at 15% 85%, rgba(212, 175, 55, 0.12) 0px, transparent 42%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='700' height='700' viewBox='0 0 700 700'%3E%3Cfilter id='marble-veins'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.006' numOctaves='5' seed='42' result='noise'/%3E%3CfeColorMatrix type='matrix' values='0.9 0 0 0 0.88  0 0.92 0 0 0.90  0 0 1 0 0.95  0 0 0 0.22 0'/%3E%3C/filter%3E%3Crect width='700' height='700' filter='url(%23marble-veins)' opacity='0.85'/%3E%3Cpath d='M-60,130 Q130,40 310,190 T610,240 T760,450' stroke='rgba(37,99,235,0.36)' stroke-width='3.5' fill='none' filter='blur(1.5px)'/%3E%3Cpath d='M80,-40 Q250,150 410,90 T670,360' stroke='rgba(139,92,246,0.38)' stroke-width='3.2' fill='none' filter='blur(1.5px)'/%3E%3Cpath d='M-40,490 Q170,340 430,510 T690,560' stroke='rgba(126,34,206,0.32)' stroke-width='2.8' fill='none' filter='blur(1.8px)'/%3E%3Cpath d='M260,40 Q470,230 550,170 T780,410' stroke='rgba(30,64,175,0.3)' stroke-width='2.5' fill='none' filter='blur(1.5px)'/%3E%3Cpath d='M20,380 Q190,250 420,390 T680,440' stroke='rgba(59,130,246,0.32)' stroke-width='2.6' fill='none' filter='blur(1.2px)'/%3E%3Cpath d='M100,580 Q320,440 520,590' stroke='rgba(168,85,247,0.28)' stroke-width='2.2' fill='none' filter='blur(1.5px)'/%3E%3Cpath d='M60,110 Q220,135 370,115 T620,320' stroke='rgba(217,119,6,0.22)' stroke-width='1.8' fill='none' filter='blur(1px)'/%3E%3C/svg%3E");
   background-attachment: fixed;
   background-repeat: repeat;
-  background-size: 600px 600px;
+  background-size: 700px 700px;
 }
 
 /* 3D Elevated White Cards with Soft Luxury Shadows */
