@@ -462,6 +462,7 @@ async def launch_miami_event_campaign(background_tasks: BackgroundTasks):
 # --- UNIFIED CRM & DYNAMIC CAMPAIGNS API (DATABASE BACKED) ---
 from .database.crm_db import (
     get_campaigns_list,
+    get_campaign_by_id,
     create_campaign_with_leads,
     get_leads_by_campaign,
     get_lead_by_id,
@@ -469,7 +470,10 @@ from .database.crm_db import (
     update_lead_crm_fields,
     add_lead_note_db,
     get_lead_notes_db,
-    get_all_crm_leads
+    get_all_crm_leads,
+    update_campaign_ai_prompt,
+    update_single_lead_message,
+    regenerate_campaign_lead_messages
 )
 from .crm.batch_dispatcher import batch_manager
 from .crm.excel_parser import parse_spreadsheet_bytes, map_and_structure_leads
@@ -517,7 +521,8 @@ async def api_upload_excel_campaign(
             "name": campaign_name,
             "category": category,
             "description": campaign_context or f"Campaña importada ({len(structured_leads)} leads)",
-            "attached_flyer": flyer_path
+            "attached_flyer": flyer_path,
+            "ai_prompt_instructions": campaign_context
         },
         leads_data=structured_leads
     )
@@ -533,6 +538,39 @@ def api_get_campaign_leads(campaign_id: str):
     """Returns all leads for a given campaign with their persistent WhatsApp status."""
     leads = get_leads_by_campaign(campaign_id)
     return {"campaign_id": campaign_id, "total": len(leads), "leads": leads}
+
+@app.post("/api/crm/campaigns/{campaign_id}/update-ai-prompt")
+async def api_update_campaign_ai_prompt(campaign_id: str, payload: Dict[str, Any]):
+    """
+    Updates the natural-language prompt instructions for the campaign AI bot
+    and regenerates personalized messages for pending leads.
+    """
+    prompt = payload.get("prompt_instructions", "").strip()
+    only_pending = payload.get("regenerate_pending_only", True)
+    
+    result = regenerate_campaign_lead_messages(
+        campaign_id=campaign_id,
+        new_prompt=prompt,
+        only_pending=only_pending
+    )
+    if not result.get("success"):
+        raise HTTPException(status_code=404, detail=result.get("error", "Error actualizando prompt"))
+
+    camp = get_campaign_by_id(campaign_id)
+    leads = get_leads_by_campaign(campaign_id)
+    return {
+        "success": True,
+        "campaign": camp,
+        "leads": leads,
+        "updated_count": result.get("updated_count", 0)
+    }
+
+@app.patch("/api/crm/leads/{lead_id}/message")
+def api_update_lead_message(lead_id: str, payload: Dict[str, Any]):
+    """Allows manual editing of an individual lead's personalized message."""
+    new_message = payload.get("message", "")
+    success = update_single_lead_message(lead_id, new_message)
+    return {"success": success, "lead_id": lead_id, "message": new_message}
 
 @app.post("/api/crm/leads/{lead_id}/send-whatsapp")
 async def api_send_lead_whatsapp(lead_id: str, payload: Optional[Dict[str, Any]] = None):

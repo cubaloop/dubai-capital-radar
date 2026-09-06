@@ -144,6 +144,7 @@ export interface CrmCampaign {
   category: string;
   description: string;
   attached_flyer?: string;
+  ai_prompt_instructions?: string;
   created_at: string;
   total_leads: number;
   sent_leads: number;

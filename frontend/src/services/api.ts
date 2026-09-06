@@ -211,6 +211,29 @@ export const apiService = {
   async getLeadNotes(leadId: string) {
     const res = await fetch(`${API_BASE_URL}/crm/leads/${leadId}/notes`);
     return res.json();
+  },
+
+  async updateCampaignAiPrompt(campaignId: string, promptInstructions: string, regeneratePendingOnly: boolean = true) {
+    const res = await fetch(`${API_BASE_URL}/crm/campaigns/${campaignId}/update-ai-prompt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt_instructions: promptInstructions,
+        regenerate_pending_only: regeneratePendingOnly
+      })
+    });
+    if (!res.ok) throw new Error('Error al actualizar el prompt del bot');
+    return res.json();
+  },
+
+  async updateLeadCustomMessage(leadId: string, message: string) {
+    const res = await fetch(`${API_BASE_URL}/crm/leads/${leadId}/message`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
+    });
+    if (!res.ok) throw new Error('Error al actualizar el mensaje del lead');
+    return res.json();
   }
 };
 

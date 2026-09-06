@@ -211,39 +211,15 @@ def build_lead_message(
     campaign_context: str
 ) -> str:
     """Creates a high-converting, personalized WhatsApp invitation or proposal."""
-    custom_ref = ""
-    notes_lower = notes.lower()
-    
+    from .ai_composer import compose_lead_message_local
+    lead_dict = {
+        "name": first_name,
+        "objective": objective,
+        "notes": notes,
+        "timeline": timeline
+    }
     if budget:
-        custom_ref = f"Sé que estás evaluando opciones en torno a un presupuesto de {budget}."
-    elif "flipping" in notes_lower or "plusvalia" in notes_lower:
-        custom_ref = "Recuerdo que tu objetivo principal es la revalorización de capital y maximizar retorno de inversión."
-    elif "estudio" in notes_lower or "studio" in notes_lower:
-        custom_ref = "Sé que tu interés está en unidades de entrada accesibles con alta rentabilidad neta por alquiler."
-    elif "familia" in notes_lower or "chalet" in notes_lower or "casa" in notes_lower:
-        custom_ref = "Sé que buscas una opción residencial amplia y cómoda para disfrute familiar."
-    elif objective:
-        custom_ref = f"Sé que tu objetivo está enfocado en {objective.lower()}."
-    else:
-        custom_ref = "Te escribo recordando tu interés en oportunidades de inversión en Dubai."
-
-    if campaign_context and len(campaign_context.strip()) > 10:
-        offer_block = campaign_context.strip()
-    else:
-        offer_block = """Te contacto porque tenemos una oportunidad única: estaremos presentando novedades exclusivas y proyectos con condiciones especiales:
-• 🛂 <b>Golden Visa de 10 Años GRATIS</b>
-• 🏷️ <b>Descuentos del 15% al 20%</b> exclusivos en fases de lanzamiento
-• 🏠 <b>Gestión de alquiler (Property Management) 100% GRATIS</b>
-• Planes de pago directos desde 1% mensual sin intereses"""
-
-    msg = f"""Hola {first_name},
-
-Te escribo directamente desde nuestro equipo asesor de Dubai. {custom_ref}
-
-{offer_block}
-
-¿Te gustaría que te comparta los detalles y el dossier informativo? Solo respóndeme por aquí y te lo envío sin ningún compromiso.
-
-Un saludo cordial."""
-
-    return msg.strip()
+        digits = "".join([c for c in str(budget) if c.isdigit()])
+        if digits:
+            lead_dict["budget_eur"] = float(digits)
+    return compose_lead_message_local(lead_dict, prompt_instructions=campaign_context)

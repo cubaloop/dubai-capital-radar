@@ -24,7 +24,9 @@ import {
   AlertCircle,
   RefreshCw,
   Layers,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Edit3,
+  Save
 } from 'lucide-react';
 
 export const CampaignManager: React.FC = () => {
@@ -47,6 +49,16 @@ export const CampaignManager: React.FC = () => {
   const [isStartingBatch, setIsStartingBatch] = useState<boolean>(false);
   const [batchDelay, setBatchDelay] = useState<number>(8);
   const batchPollTimer = useRef<any>(null);
+
+  // AI Prompt Customization State
+  const [campaignAiPrompt, setCampaignAiPrompt] = useState<string>('');
+  const [isUpdatingPrompt, setIsUpdatingPrompt] = useState<boolean>(false);
+  const [isPromptPanelOpen, setIsPromptPanelOpen] = useState<boolean>(true);
+
+  // Individual Lead Message Inline Editing
+  const [isEditingLeadMsg, setIsEditingLeadMsg] = useState<boolean>(false);
+  const [editedLeadMsgText, setEditedLeadMsgText] = useState<string>('');
+  const [isSavingLeadMsg, setIsSavingLeadMsg] = useState<boolean>(false);
 
   // New Campaign Modal State
   const [isNewCampaignOpen, setIsNewCampaignOpen] = useState<boolean>(false);
@@ -131,6 +143,93 @@ export const CampaignManager: React.FC = () => {
       if (batchPollTimer.current) clearInterval(batchPollTimer.current);
     };
   }, [batchStatus?.status, selectedCampaignId]);
+
+  // Sync AI prompt when selected campaign changes
+  useEffect(() => {
+    const cur = campaigns.find((c) => c.id === selectedCampaignId);
+    if (cur) {
+      setCampaignAiPrompt(cur.ai_prompt_instructions || '');
+    }
+  }, [selectedCampaignId, campaigns]);
+
+  // Sync edited message text when selected lead changes
+  useEffect(() => {
+    if (selectedLeadPreview) {
+      setEditedLeadMsgText(selectedLeadPreview.personalized_message || '');
+      setIsEditingLeadMsg(false);
+    }
+  }, [selectedLeadPreview?.id]);
+
+  const PROMPT_PRESETS = [
+    {
+      label: '🏨 Evento Novotel Madrid',
+      text: 'Presentar las novedades exclusivas y proyectos en el Dubai Property Expo en el Novotel Madrid Center los días 9 y 10 de Septiembre. Beneficios: Golden Visa 10 años gratis, descuentos hasta el 20%, gestión de alquiler gratis y cuotas desde 1% mensual. Confirmar asistencia para lista VIP.'
+    },
+    {
+      label: '💻 Ofertas desde 50K (Zoom)',
+      text: 'Informar que tenemos nuevas ofertas para entrar al mercado inmobiliario de Dubai a partir de 50K. Pedir que me escriba qué día y hora le viene bien esta semana para hacerle una breve presentación online.'
+    },
+    {
+      label: '📈 Revalorización / Flipping',
+      text: 'Destacar lanzamientos en preventa (off-plan) con alta plusvalía estimada a 24 meses, planes de pago directos desde 1% mensual sin intereses bancarios y asesoría 1 a 1 sin coste.'
+    },
+    {
+      label: '🛂 Golden Visa & 0% Impuestos',
+      text: 'Mencionar la ventaja del 0% de impuestos sobre rentas y plusvalías en Dubai, y tramitación gratuita de la Golden Visa de 10 años para él y su familia.'
+    }
+  ];
+
+  // Handler: Update Campaign AI Prompt & Regenerate pending leads
+  const handleUpdateAiPrompt = async () => {
+    if (!selectedCampaignId) return;
+    try {
+      setIsUpdatingPrompt(true);
+      const res = await apiService.updateCampaignAiPrompt(selectedCampaignId, campaignAiPrompt, true);
+      if (res?.success) {
+        if (res.leads) {
+          setLeads(res.leads);
+          if (selectedLeadPreview) {
+            const updatedCurLead = res.leads.find((l: CrmLead) => l.id === selectedLeadPreview.id);
+            if (updatedCurLead) {
+              setSelectedLeadPreview(updatedCurLead);
+              setEditedLeadMsgText(updatedCurLead.personalized_message || '');
+            }
+          }
+        }
+        if (res.campaign) {
+          setCampaigns((prev) => prev.map((c) => (c.id === res.campaign.id ? { ...c, ...res.campaign } : c)));
+        }
+        setStatusMsg(`⚡ ¡Instrucciones aplicadas! Se regeneraron ${res.updated_count} mensajes de leads con la nueva directiva.`);
+      }
+    } catch (err: any) {
+      setStatusMsg(`❌ Error actualizando prompt: ${err.message}`);
+    } finally {
+      setIsUpdatingPrompt(false);
+      setTimeout(() => setStatusMsg(null), 5000);
+    }
+  };
+
+  // Handler: Save Individual Lead Custom Message
+  const handleSaveIndividualMessage = async () => {
+    if (!selectedLeadPreview) return;
+    try {
+      setIsSavingLeadMsg(true);
+      const res = await apiService.updateLeadCustomMessage(selectedLeadPreview.id, editedLeadMsgText);
+      if (res?.success) {
+        setLeads((prev) =>
+          prev.map((l) => (l.id === selectedLeadPreview.id ? { ...l, personalized_message: editedLeadMsgText } : l))
+        );
+        setSelectedLeadPreview((prev) => (prev ? { ...prev, personalized_message: editedLeadMsgText } : null));
+        setIsEditingLeadMsg(false);
+        setStatusMsg(`✏️ Mensaje personalizado guardado para ${selectedLeadPreview.name}`);
+      }
+    } catch (err: any) {
+      setStatusMsg(`❌ Error guardando mensaje: ${err.message}`);
+    } finally {
+      setIsSavingLeadMsg(false);
+      setTimeout(() => setStatusMsg(null), 4000);
+    }
+  };
 
   // Single Lead Send Handler
   const handleSendSingleLead = async (lead: CrmLead) => {
@@ -507,6 +606,97 @@ export const CampaignManager: React.FC = () => {
           </div>
         </div>
 
+        {/* AI Bot Instructions Card for this Campaign */}
+        <div className="bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 rounded-3xl p-5 sm:p-6 border border-gold-500/50 shadow-2xl space-y-4 relative overflow-hidden">
+          <div className="absolute top-0 right-0 -mt-8 -mr-8 w-40 h-40 bg-gold-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gold-500/20 text-gold-400 flex items-center justify-center font-bold text-lg shadow-inner">
+                <Sparkles className="w-5 h-5 text-gold-400 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-white font-serif-luxury">
+                    Instrucciones del Bot de IA para esta Campaña
+                  </h3>
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-gold-500/20 text-gold-300 font-mono font-bold">
+                    {selectedCampaign?.name || 'Campaña Activa'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Escribe en lenguaje natural qué quieres que diga el bot (ofertas, eventos, fechas, importes mínimos o llamadas a la acción). La IA combinará estas directivas con los datos individuales del Excel.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setIsPromptPanelOpen(!isPromptPanelOpen)}
+              className="text-xs font-mono text-gold-400 hover:text-gold-300 flex items-center gap-1 self-end sm:self-auto px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 transition"
+            >
+              {isPromptPanelOpen ? 'Ocultar Panel ▲' : 'Configurar Bot ▼'}
+            </button>
+          </div>
+
+          {isPromptPanelOpen && (
+            <div className="space-y-4 pt-2 border-t border-slate-800/80 animate-fade-in">
+              {/* Quick Preset Chips */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-mono text-slate-400 block">Plantillas Rápidas (Haz clic para insertar):</span>
+                <div className="flex flex-wrap gap-2">
+                  {PROMPT_PRESETS.map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setCampaignAiPrompt(preset.text)}
+                      className="text-[11px] font-mono px-3 py-1.5 rounded-xl bg-slate-900/90 text-slate-300 hover:text-gold-300 hover:bg-gold-500/10 border border-slate-800 hover:border-gold-500/40 transition-all flex items-center gap-1.5 active:scale-95"
+                    >
+                      <span>{preset.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Prompt Textarea */}
+              <div className="relative">
+                <textarea
+                  rows={3}
+                  value={campaignAiPrompt}
+                  onChange={(e) => setCampaignAiPrompt(e.target.value)}
+                  placeholder="Ej: Quiero que además del contexto del excel les menciones que tenemos nuevas ofertas a partir de 50K en el evento X del hotel Y los días A y B, y que me confirmen asistencia..."
+                  className="w-full bg-slate-950 border border-slate-700/80 focus:border-gold-500 rounded-2xl p-4 text-xs text-white placeholder-slate-500 focus:outline-none leading-relaxed custom-scrollbar transition font-sans"
+                />
+              </div>
+
+              {/* Action Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                <span className="text-[11px] text-slate-400 font-mono">
+                  ℹ️ Los primeros 14 leads enviados de España quedan protegidos intactos; se regeneran los {leads.filter((l) => l.whatsapp_status !== 'sent').length} leads pendientes.
+                </span>
+
+                <button
+                  type="button"
+                  onClick={handleUpdateAiPrompt}
+                  disabled={isUpdatingPrompt}
+                  className="flex items-center justify-center gap-2 bg-gradient-to-r from-gold-500 to-amber-400 hover:from-gold-400 text-slate-950 font-black px-6 py-3 rounded-2xl shadow-lg shadow-gold-500/20 active:scale-95 transition-all text-xs font-mono uppercase tracking-wider disabled:opacity-50 shrink-0"
+                >
+                  {isUpdatingPrompt ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Regenerando Mensajes...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      <span>⚡ Aplicar y Regenerar Mensajes</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* 2-Column Workstation: Leads Cards List + Real-time Phone Bubble Preview */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Left Column: Leads Cards (7 cols) */}
@@ -632,22 +822,74 @@ export const CampaignManager: React.FC = () => {
 
             {selectedLeadPreview ? (
               <div className="bg-slate-950 rounded-3xl p-5 border border-slate-800 space-y-4 shadow-2xl relative">
-                {/* Contact Header */}
-                <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
-                  <div className="w-10 h-10 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center font-mono text-base">
-                    {selectedLeadPreview.name.charAt(0)}
+                {/* Contact Header with Edit Action */}
+                <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center font-mono text-base">
+                      {selectedLeadPreview.name.charAt(0)}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-white text-sm">{selectedLeadPreview.name}</h4>
+                      <p className="text-[11px] text-emerald-400 font-mono">{selectedLeadPreview.phone}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-bold text-white text-sm">{selectedLeadPreview.name}</h4>
-                    <p className="text-[11px] text-emerald-400 font-mono">{selectedLeadPreview.phone}</p>
-                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isEditingLeadMsg) {
+                        setEditedLeadMsgText(selectedLeadPreview.personalized_message || '');
+                      }
+                      setIsEditingLeadMsg(!isEditingLeadMsg);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-gold-500/40 text-slate-300 hover:text-gold-300 text-[11px] font-mono transition"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>{isEditingLeadMsg ? 'Cancelar' : 'Editar Texto'}</span>
+                  </button>
                 </div>
 
-                {/* WhatsApp Chat Bubble */}
+                {/* WhatsApp Chat Bubble or Inline Editor */}
                 <div className="space-y-3">
-                  <div className="bg-emerald-950/70 border border-emerald-800/70 rounded-2xl rounded-tl-none p-4 text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-line shadow-inner max-h-72 overflow-y-auto custom-scrollbar">
-                    {selectedLeadPreview.personalized_message}
-                  </div>
+                  {isEditingLeadMsg ? (
+                    <div className="space-y-2.5 animate-fade-in">
+                      <div className="text-[11px] font-mono text-gold-400 flex items-center gap-1">
+                        <span>✏️ Editando mensaje para {selectedLeadPreview.name.split(' ')[0]}:</span>
+                      </div>
+                      <textarea
+                        rows={8}
+                        value={editedLeadMsgText}
+                        onChange={(e) => setEditedLeadMsgText(e.target.value)}
+                        className="w-full bg-slate-900 border border-gold-500/60 rounded-2xl p-3.5 text-xs text-white leading-relaxed font-sans focus:outline-none focus:ring-1 focus:ring-gold-500 custom-scrollbar"
+                      />
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingLeadMsg(false)}
+                          className="px-3.5 py-1.5 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs font-mono"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveIndividualMessage}
+                          disabled={isSavingLeadMsg}
+                          className="px-4 py-1.5 rounded-xl bg-gold-500 hover:bg-gold-400 text-slate-950 font-bold text-xs font-mono flex items-center gap-1.5 shadow active:scale-95 disabled:opacity-50"
+                        >
+                          {isSavingLeadMsg ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Save className="w-3.5 h-3.5" />
+                          )}
+                          <span>Guardar Mensaje</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-emerald-950/70 border border-emerald-800/70 rounded-2xl rounded-tl-none p-4 text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-line shadow-inner max-h-72 overflow-y-auto custom-scrollbar">
+                      {selectedLeadPreview.personalized_message}
+                    </div>
+                  )}
 
                   {selectedLeadPreview.last_contact_date && (
                     <div className="text-right text-[10px] text-emerald-400 font-mono">
