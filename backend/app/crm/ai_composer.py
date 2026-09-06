@@ -189,7 +189,7 @@ REGLAS OBLIGATORIAS:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         for attempt in range(3):
             try:
-                async with httpx.AsyncClient(timeout=35.0) as client:
+                async with httpx.AsyncClient(timeout=12.0) as client:
                     res = await client.post(url, json={
                         "contents": [{"parts": [{"text": system_prompt}]}],
                         "generationConfig": {
