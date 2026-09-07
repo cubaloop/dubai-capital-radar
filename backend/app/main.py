@@ -841,9 +841,34 @@ async def handle_admin_copilot(command_text: str, sender_jid: str):
     # Check intent categories
     is_leads_inquiry = any(k in lower for k in ["respondieron", "respondio", "respuestas", "leads hoy", "ultimas 24", "últimas 24", "cuantos leads", "cuántos leads", "quienes", "quiénes"])
     is_summary_inquiry = any(k in lower for k in ["campaña", "campana", "estado", "resumen", "total leads", "reporte", "informe", "metricas", "métricas", "como vamos", "cómo vamos", "status"])
+    is_credentials_inquiry = any(k in lower for k in ["credencial", "credenciales", "acceso", "accesos", "clave", "claves", "login", "password", "mi empresa", "contraseña", "usuario", "mi cuenta"])
+
+    # Query 0: Credentials for his agency & admin portal
+    if is_credentials_inquiry:
+        reply_msg = (
+            "🏢 *DUBAI CAPITAL RADAR — CREDENCIALES DE ACCESO*\n\n"
+            "Hola David, aquí tienes a mano los accesos oficiales para tu empresa:\n\n"
+            "🌐 *Portal Web:*\nhttps://dubai-miami-radar.onrender.com\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🔑 *Acceso Empresa (H.O.M.E Properties):*\n"
+            "• *Email:* home@homeproperties.ae\n"
+            "• *Contraseña:* Dubai2026!\n"
+            "• *Agencia:* H.O.M.E Properties\n"
+            "• *Persona:* David, Asesor Senior en Inversiones Inmobiliarias Dubai\n"
+            "• *Mercado:* Dubai (Downtown, Palm Jumeirah, Dubai Hills)\n"
+            "• *Moneda:* USD ($)\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "👑 *Acceso Master Admin (Control Total):*\n"
+            "• *Email:* admin@dubaicapitalradar.com\n"
+            "• *Contraseña:* Dubai2026!\n"
+            "• *Rol:* Super-Admin\n"
+            "• *Instancia RLS:* Supabase Cloud Multi-Tenant\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🤖 *Línea del Bot WhatsApp:* +971 50 137 8020 (Conectado)"
+        )
 
     # Query 1: Specific drill-down into leads that replied / were contacted in last 24h
-    if is_leads_inquiry and not ("resumen de campañ" in lower or "resumen de campana" in lower):
+    elif is_leads_inquiry and not ("resumen de campañ" in lower or "resumen de campana" in lower):
         cursor.execute("""
         SELECT l.name, l.phone, l.crm_status, l.notes, l.last_contact_date, c.name as campaign_name
         FROM leads l
