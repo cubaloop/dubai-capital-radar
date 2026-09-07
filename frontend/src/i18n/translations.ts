@@ -61,7 +61,14 @@ export const translations = {
       crmSub: "CRM (Focus & Kanban)",
       excelSub: "Excel Manager (Campaigns & Leads)",
       offPlanSub: "Dubai Off-Plan Projects",
-      agencyConfigSub: "B2B Agency Settings"
+      agencyConfigSub: "B2B Agency Settings",
+      menuTitle: "Workspace & System",
+      menuSubtitle: "Agency Preferences & Platform Tools",
+      userProfile: "Active Broker Session",
+      currencyLabel: "System Currency",
+      languageLabel: "System Language",
+      toolsSection: "Platform Integrations",
+      categoriesSection: "Modules Navigation"
     },
 
     // Auth Landing Page
@@ -427,7 +434,14 @@ export const translations = {
       crmSub: "CRM TDAH (Focus y Kanban)",
       excelSub: "Gestor Excels (Campañas y Leads)",
       offPlanSub: "Proyectos Dubai Off-Plan",
-      agencyConfigSub: "Configuración Agencia B2B"
+      agencyConfigSub: "Configuración Agencia B2B",
+      menuTitle: "Workspace y Sistema",
+      menuSubtitle: "Preferencias de Agencia y Herramientas",
+      userProfile: "Sesión de Asesor Activa",
+      currencyLabel: "Moneda del Sistema",
+      languageLabel: "Idioma del Sistema",
+      toolsSection: "Herramientas e Integraciones",
+      categoriesSection: "Navegación de Módulos"
     },
 
     // Auth Landing Page
