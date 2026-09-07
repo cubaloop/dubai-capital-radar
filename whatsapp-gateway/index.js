@@ -538,8 +538,41 @@ app.post('/logout', async (req, res) => {
   }
 });
 
-app.listen(GATEWAY_PORT, '0.0.0.0', () => {
-  console.log(`[WhatsApp Gateway] Running on 0.0.0.0:${GATEWAY_PORT}`);
+// Transparent Fallback: If any request (e.g. GET / or UI assets) hits this gateway directly, forward to Python FastAPI
+app.use(async (req, res) => {
+  try {
+    const backendUrl = `http://127.0.0.1:${BACKEND_PORT}${req.originalUrl || req.url}`;
+    const fHeaders = { ...req.headers };
+    delete fHeaders['host'];
+    delete fHeaders['content-length'];
+
+    const fetchOptions = {
+      method: req.method,
+      headers: fHeaders
+    };
+
+    if (!['GET', 'HEAD'].includes(req.method) && req.body && Object.keys(req.body).length > 0) {
+      fetchOptions.body = JSON.stringify(req.body);
+      fetchOptions.headers['content-type'] = 'application/json';
+    }
+
+    const bRes = await fetch(backendUrl, fetchOptions);
+    res.status(bRes.status);
+    bRes.headers.forEach((v, k) => {
+      if (k.toLowerCase() !== 'transfer-encoding') {
+        res.setHeader(k, v);
+      }
+    });
+    const buf = await bRes.arrayBuffer();
+    return res.send(Buffer.from(buf));
+  } catch (err) {
+    console.error(`[Gateway Proxy Fallback] Error forwarding to backend:`, err.message);
+    return res.status(502).json({ error: 'Backend unreachable', details: err.message });
+  }
+});
+
+app.listen(GATEWAY_PORT, '127.0.0.1', () => {
+  console.log(`[WhatsApp Gateway] Running on 127.0.0.1:${GATEWAY_PORT}`);
   console.log(`[Session Backup] Supabase: ${AUTH_BACKUP_ENABLED ? 'ENABLED' : 'DISABLED (set SUPABASE_URL + SUPABASE_SERVICE_KEY)'}`);
   console.log(`[Keep-Alive] Self-ping: ${SELF_URL ? 'ENABLED' : 'DISABLED (set SELF_URL)'}`);
 });
