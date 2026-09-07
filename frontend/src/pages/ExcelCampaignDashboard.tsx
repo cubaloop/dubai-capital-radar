@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CrmCampaign, CrmLead } from '../types';
 import { apiService } from '../services/api';
+import { useLanguage } from '../i18n/LanguageContext';
 import {
   FileSpreadsheet,
   Upload,
@@ -28,6 +29,7 @@ interface ExcelDashboardProps {
 }
 
 export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentUser }) => {
+  const { t } = useLanguage();
   const [campaigns, setCampaigns] = useState<CrmCampaign[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState<CrmCampaign | null>(null);
   const [leads, setLeads] = useState<CrmLead[]>([]);
@@ -259,10 +261,10 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
             </div>
             <div>
               <h1 className="font-serif-luxury font-black text-xl sm:text-2xl tracking-wide text-white flex items-center gap-2">
-                ADMINISTRADOR DE CAMPAÑAS & EXCELS
+                {t('excels.bannerTitle', 'CAMPAIGNS & LEADS EXCEL MANAGER')}
               </h1>
               <p className="text-xs text-slate-400 font-mono">
-                Carga, actualiza, renombra y gestiona archivos de leads con persistencia Supabase
+                {t('excels.bannerSubtitle', 'Upload, update, rename and manage lead databases with Supabase persistence')}
               </p>
             </div>
           </div>
@@ -274,13 +276,13 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-400 hover:to-amber-400 text-slate-950 font-bold text-xs font-mono shadow-md shadow-gold-500/20 active:scale-95 transition-all"
           >
             <Upload className="w-4 h-4" />
-            <span>Cargar Nuevo Excel / Leads</span>
+            <span>{t('excels.uploadNewBtn', 'Upload New Excel / Leads')}</span>
           </button>
 
           <button
             onClick={fetchCampaigns}
             className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-all"
-            title="Recargar"
+            title={t('common.refresh', 'Refresh')}
           >
             <RefreshCw className={isLoading ? "w-4 h-4 animate-spin" : "w-4 h-4"} />
           </button>
@@ -303,7 +305,7 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-serif-luxury font-bold text-base text-slate-900 flex items-center gap-2">
                 <Layers className="w-4 h-4 text-gold-600" />
-                <span>Campañas Registradas ({campaigns.length})</span>
+                <span>{t('excels.registeredCampaigns', 'Registered Campaigns')} ({campaigns.length})</span>
               </h3>
             </div>
 
@@ -327,14 +329,14 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
                           type="text"
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
-                          placeholder="Nombre de campaña"
+                          placeholder={t('excels.campaignNameLabel', 'Campaign Name')}
                           className="w-full px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-300 text-slate-900 outline-none focus:border-gold-500"
                         />
                         <input
                           type="text"
                           value={editCategory}
                           onChange={(e) => setEditCategory(e.target.value)}
-                          placeholder="Etiqueta / País (Ej: España, USA, México)"
+                          placeholder={t('excels.categoryTagLabel', 'Tag / Category')}
                           className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 text-slate-900 outline-none focus:border-gold-500"
                         />
                         <div className="flex justify-end gap-1.5 pt-1">
@@ -365,7 +367,7 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
                                 handleStartEditCampaign(camp);
                               }}
                               className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
-                              title="Editar nombre y etiqueta"
+                              title={t('common.edit', 'Edit')}
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
@@ -375,7 +377,7 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
                                 handleDeleteCampaign(camp.id);
                               }}
                               className="p-1 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50"
-                              title="Eliminar campaña"
+                              title={t('common.delete', 'Delete')}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -387,10 +389,10 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
                             🏷️ {camp.category || 'General'}
                           </span>
                           <span className="text-[11px] font-mono text-slate-500">
-                            {camp.total_leads || 0} Leads
+                            {camp.total_leads || 0} {t('campaigns.statsTotal', 'Leads')}
                           </span>
                           <span className="text-[11px] font-mono text-emerald-600 font-bold ml-auto">
-                            {camp.sent_leads || 0} Enviados
+                            {camp.sent_leads || 0} {t('common.sent', 'Sent')}
                           </span>
                         </div>
                       </div>
@@ -413,7 +415,7 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
                       {selectedCampaign.name}
                     </h2>
                     <p className="text-xs text-slate-500 font-mono mt-0.5">
-                      {filteredLeads.length} leads listados • Etiqueta: <span className="font-bold text-slate-700">{selectedCampaign.category || 'General'}</span>
+                      {filteredLeads.length} {t('campaigns.statsTotal', 'leads')} • {t('excels.categoryTagLabel', 'Tag')}: <span className="font-bold text-slate-700">{selectedCampaign.category || 'General'}</span>
                     </p>
                   </div>
 
@@ -424,7 +426,7 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
                         type="text"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Buscar por nombre o teléfono..."
+                        placeholder={t('excels.searchPlaceholderLeads', 'Search by name or phone...')}
                         className="pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-300 text-slate-900 outline-none focus:border-gold-500 w-48 sm:w-64"
                       />
                     </div>
@@ -437,11 +439,11 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
                     <thead>
                       <tr className="bg-slate-50/90 text-slate-600 font-mono text-[11px] border-b border-slate-200 sticky top-0 z-10 backdrop-blur-sm">
                         <th className="py-3 px-3.5 font-bold">#</th>
-                        <th className="py-3 px-3.5 font-bold">Nombre</th>
-                        <th className="py-3 px-3.5 font-bold">Teléfono</th>
-                        <th className="py-3 px-3.5 font-bold">Objetivo</th>
-                        <th className="py-3 px-3.5 font-bold">Estado WhatsApp</th>
-                        <th className="py-3 px-3.5 font-bold text-right">Acciones</th>
+                        <th className="py-3 px-3.5 font-bold">{t('common.name', 'Name')}</th>
+                        <th className="py-3 px-3.5 font-bold">{t('common.phone', 'Phone')}</th>
+                        <th className="py-3 px-3.5 font-bold">{t('crm.objective', 'Objective')}</th>
+                        <th className="py-3 px-3.5 font-bold">{t('excels.thWaStatus', 'WhatsApp Status')}</th>
+                        <th className="py-3 px-3.5 font-bold text-right">{t('common.actions', 'Actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-800">
@@ -457,13 +459,13 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
                             {lead.phone}
                           </td>
                           <td className="py-2.5 px-3.5 text-slate-600">
-                            {lead.objective || 'Inversión'}
+                            {lead.objective || t('crm.objective', 'Investment')}
                           </td>
                           <td className="py-2.5 px-3.5">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                               lead.whatsapp_status === 'sent' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                             }`}>
-                              {lead.whatsapp_status === 'sent' ? '✓ Enviado' : 'Pendiente'}
+                              {lead.whatsapp_status === 'sent' ? `✓ ${t('common.sent', 'Sent')}` : t('common.pending', 'Pending')}
                             </span>
                           </td>
                           <td className="py-2.5 px-3.5 text-right">
@@ -471,14 +473,14 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
                               <button
                                 onClick={() => handleStartEditLead(lead)}
                                 className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
-                                title="Editar lead"
+                                title={t('common.edit', 'Edit')}
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleDeleteLead(lead.id)}
                                 className="p-1 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50"
-                                title="Eliminar lead"
+                                title={t('common.delete', 'Delete')}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -492,7 +494,7 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
               </>
             ) : (
               <div className="py-16 text-center text-slate-400 font-mono text-xs">
-                Selecciona una campaña a la izquierda o carga un archivo Excel nuevo.
+                {t('excels.emptySelectCampaign', 'Select a campaign on the left or upload a new Excel file.')}
               </div>
             )}
           </div>
@@ -505,7 +507,7 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
           <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col">
             <div className="px-6 py-4 bg-gradient-to-r from-slate-900 to-slate-800 text-white flex items-center justify-between">
               <h3 className="font-serif-luxury font-bold text-sm sm:text-base text-gold-300">
-                Editar Datos del Lead: {editingLead.name}
+                {t('excels.editLeadTitle', 'Edit Lead Data:')} {editingLead.name}
               </h3>
               <button onClick={() => setEditingLead(null)} className="text-slate-400 hover:text-white">
                 <X className="w-4 h-4" />
@@ -515,7 +517,7 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
             <form onSubmit={handleSaveLead} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Nombre</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">{t('common.name', 'Name')}</label>
                   <input
                     type="text"
                     value={leadForm.name}
@@ -524,7 +526,7 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Email</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">{t('common.email', 'Email')}</label>
                   <input
                     type="email"
                     value={leadForm.email}
@@ -536,7 +538,7 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Objetivo</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">{t('crm.objective', 'Objective')}</label>
                   <input
                     type="text"
                     value={leadForm.objective}
@@ -545,26 +547,26 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Estado CRM</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">{t('crm.crmStageLabel', 'Stage in CRM')}</label>
                   <select
                     value={leadForm.crm_status}
                     onChange={(e) => setLeadForm({ ...leadForm, crm_status: e.target.value as import('../types').CrmLeadStatus })}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 text-slate-900 outline-none focus:border-gold-500 bg-white"
                   >
-                    <option value="CREATED">Nuevo (Created)</option>
-                    <option value="CONTACTED">Contactado</option>
-                    <option value="FOLLOW_UP">Seguimiento (Follow-up)</option>
-                    <option value="APPOINTMENT">Cita Agendada (Appointment)</option>
-                    <option value="RESERVATION">Reserva / EOI (Reservation)</option>
-                    <option value="CLOSED">Cerrado / Ganado</option>
-                    <option value="LOST">Perdido / Descartado</option>
+                    <option value="CREATED">{t('crm.stageCreated', 'New')}</option>
+                    <option value="CONTACTED">{t('crm.stageContacted', 'Contacted')}</option>
+                    <option value="FOLLOW_UP">{t('crm.stageFollowUp', 'Follow-up')}</option>
+                    <option value="APPOINTMENT">{t('crm.stageAppointment', 'Appointment / Zoom')}</option>
+                    <option value="RESERVATION">{t('crm.stageReservation', 'Reservation EOI')}</option>
+                    <option value="CLOSED">{t('crm.stageClosed', 'Closed / Won')}</option>
+                    <option value="LOST">{t('crm.stageLost', 'Archived / Lost')}</option>
                   </select>
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Mensaje Personalizado de WhatsApp (IA)
+                  {t('campaigns.thMessage', 'Personalized WhatsApp Message (AI)')}
                 </label>
                 <textarea
                   rows={4}
@@ -580,13 +582,13 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
                   onClick={() => setEditingLead(null)}
                   className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800"
                 >
-                  Cancelar
+                  {t('common.cancel', 'Cancel')}
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-600 text-slate-950 font-bold text-xs"
                 >
-                  Guardar Cambios
+                  {t('excels.saveChangesBtn', 'Save Changes')}
                 </button>
               </div>
             </form>
@@ -601,7 +603,7 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
             <div className="px-6 py-4 bg-gradient-to-r from-slate-900 to-slate-800 text-white flex items-center justify-between">
               <h3 className="font-serif-luxury font-bold text-sm sm:text-base text-gold-300 flex items-center gap-2">
                 <Upload className="w-4 h-4" />
-                <span>Cargar Nuevo Archivo Excel / CSV</span>
+                <span>{t('excels.uploadModalTitle', 'Upload New Excel / CSV File')}</span>
               </h3>
               <button onClick={() => setIsUploadOpen(false)} className="text-slate-400 hover:text-white">
                 <X className="w-4 h-4" />
@@ -611,7 +613,7 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
             <form onSubmit={handleUploadExcel} className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Archivo Excel o CSV
+                  {t('excels.fileLabel', 'Excel or CSV File')}
                 </label>
                 <input
                   type="file"
@@ -624,40 +626,40 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Nombre de la Campaña
+                  {t('excels.campNameLabel', 'Campaign Name')}
                 </label>
                 <input
                   type="text"
                   required
                   value={uploadCampaignName}
                   onChange={(e) => setUploadCampaignName(e.target.value)}
-                  placeholder="Ej: Inversionistas Madrid VIP Septiembre"
+                  placeholder={t('excels.newCampNamePlaceholder', 'e.g. Madrid Ultra-High-Net-Worth Investors Expo')}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 text-slate-900 outline-none focus:border-gold-500"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Etiqueta / Categoría
+                  {t('excels.categoryTagLabel', 'Tag / Category')}
                 </label>
                 <input
                   type="text"
                   value={uploadCategory}
                   onChange={(e) => setUploadCategory(e.target.value)}
-                  placeholder="Ej: España, Miami, México, Colombia"
+                  placeholder={t('excels.categoryPlaceholder', 'e.g. Spain, Miami, Mexico, Colombia')}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 text-slate-900 outline-none focus:border-gold-500"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Contexto / Instrucciones para la IA (Opcional)
+                  {t('excels.contextLabel', 'AI Context / Instructions (Optional)')}
                 </label>
                 <textarea
                   rows={3}
                   value={uploadContext}
                   onChange={(e) => setUploadContext(e.target.value)}
-                  placeholder="Instrucciones del evento, ofertas o mensaje clave..."
+                  placeholder={t('excels.contextPlaceholderText', 'Event notes, offers, or key talking points...')}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 text-slate-900 outline-none focus:border-gold-500"
                 />
               </div>
@@ -668,7 +670,7 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
                   onClick={() => setIsUploadOpen(false)}
                   className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800"
                 >
-                  Cancelar
+                  {t('common.cancel', 'Cancel')}
                 </button>
                 <button
                   type="submit"
@@ -676,11 +678,11 @@ export const ExcelCampaignDashboard: React.FC<ExcelDashboardProps> = ({ currentU
                   className="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-600 text-slate-950 font-bold text-xs flex items-center gap-1.5"
                 >
                   {isUploading ? (
-                    <span>Procesando e Importando...</span>
+                    <span>{t('excels.processingImportBtn', 'Processing & Ingesting...')}</span>
                   ) : (
                     <>
                       <Upload className="w-3.5 h-3.5" />
-                      <span>Cargar e Importar</span>
+                      <span>{t('excels.uploadAndImportBtn', 'Upload & Ingest')}</span>
                     </>
                   )}
                 </button>

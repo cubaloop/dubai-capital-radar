@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CrmLead, CrmLeadStatus, LeadNoteItem } from '../../types';
 import { apiService } from '../../services/api';
+import { useLanguage } from '../../i18n/LanguageContext';
 import {
   X,
   Phone,
@@ -23,14 +24,14 @@ interface LeadDetailModalProps {
   sendingLeadId: string | null;
 }
 
-const STAGES: { id: CrmLeadStatus; label: string }[] = [
-  { id: 'CREATED', label: 'Nuevo' },
-  { id: 'CONTACTED', label: 'Contactado' },
-  { id: 'FOLLOW_UP', label: 'En Seguimiento' },
-  { id: 'APPOINTMENT', label: 'Cita / Zoom' },
-  { id: 'RESERVATION', label: 'Reserva EOI' },
-  { id: 'CLOSED', label: 'Cerrado / Venta' },
-  { id: 'LOST', label: 'Descartado' }
+const STAGE_IDS: CrmLeadStatus[] = [
+  'CREATED',
+  'CONTACTED',
+  'FOLLOW_UP',
+  'APPOINTMENT',
+  'RESERVATION',
+  'CLOSED',
+  'LOST'
 ];
 
 export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
@@ -40,9 +41,20 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   onSendWhatsApp,
   sendingLeadId
 }) => {
+  const { t } = useLanguage();
   const [notes, setNotes] = useState<LeadNoteItem[]>([]);
   const [newNoteContent, setNewNoteContent] = useState('');
   const [isSubmittingNote, setIsSubmittingNote] = useState(false);
+
+  const stageLabels: Record<CrmLeadStatus, string> = {
+    CREATED: t('crm.stageCreated', 'New'),
+    CONTACTED: t('crm.stageContacted', 'Contacted'),
+    FOLLOW_UP: t('crm.stageFollowUp', 'In Follow-up'),
+    APPOINTMENT: t('crm.stageAppointment', 'Appointment / Zoom'),
+    RESERVATION: t('crm.stageReservation', 'Reservation EOI'),
+    CLOSED: t('crm.stageClosed', 'Closed / Won'),
+    LOST: t('crm.stageLost', 'Archived')
+  };
 
   useEffect(() => {
     if (lead) {
@@ -96,7 +108,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
             </span>
             {lead.whatsapp_status === 'sent' && (
               <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-300 px-2.5 py-0.5 rounded-full font-mono inline-flex items-center gap-1 font-semibold">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Enviado
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> {t('common.sent', 'Sent')}
               </span>
             )}
           </div>
@@ -111,19 +123,19 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
         {/* Lifecycle Stage Buttons */}
         <div className="space-y-2">
-          <div className="text-xs font-mono text-slate-500">Etapa en el CRM:</div>
+          <div className="text-xs font-mono text-slate-500">{t('crm.crmStageLabel', 'Stage in CRM:')}</div>
           <div className="flex flex-wrap gap-2">
-            {STAGES.map((s) => (
+            {STAGE_IDS.map((sid) => (
               <button
-                key={s.id}
-                onClick={() => onUpdateLeadStatus(lead.id, s.id)}
+                key={sid}
+                onClick={() => onUpdateLeadStatus(lead.id, sid)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition font-mono ${
-                  lead.crm_status === s.id
+                  lead.crm_status === sid
                     ? 'bg-gold-500 text-slate-950 shadow-md shadow-gold-500/20 scale-105'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300'
                 }`}
               >
-                {s.label}
+                {stageLabels[sid] || sid}
               </button>
             ))}
           </div>
@@ -132,18 +144,18 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
         {/* WhatsApp Send Action */}
         <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
           <div className="flex items-center justify-between text-xs font-mono text-slate-500">
-            <span>Mensaje de WhatsApp:</span>
+            <span>{t('crm.waMessageLabel', 'WhatsApp Message:')}</span>
             <a
               href={waWebLink}
               target="_blank"
               rel="noopener noreferrer"
               className="text-emerald-700 hover:underline flex items-center gap-1 font-semibold"
             >
-              <MessageSquare className="w-3.5 h-3.5" /> Abrir WhatsApp Web
+              <MessageSquare className="w-3.5 h-3.5" /> {t('crm.openWaWeb', 'Open in WhatsApp Web')}
             </a>
           </div>
           <div className="text-xs text-slate-800 leading-relaxed font-sans whitespace-pre-line bg-white p-3 rounded-xl border border-slate-200 max-h-40 overflow-y-auto custom-scrollbar">
-            {lead.personalized_message || 'Sin mensaje generado.'}
+            {lead.personalized_message || t('crm.noMessageGen', 'No message generated.')}
           </div>
 
           <button
@@ -154,12 +166,12 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
             {sendingLeadId === lead.id ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Despachando...</span>
+                <span>{t('crm.dispatching', 'Dispatching...')}</span>
               </>
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                <span>Enviar WhatsApp Oficial con Flyer</span>
+                <span>{t('crm.sendOfficialWaFlyer', 'Send Official WhatsApp with Flyer')}</span>
               </>
             )}
           </button>
@@ -167,7 +179,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
         {/* Lead Notes & Chronological History */}
         <div className="space-y-3 pt-2 border-t border-slate-200">
-          <h4 className="text-xs font-mono text-slate-500 font-bold uppercase">Notas e Historial de Contacto</h4>
+          <h4 className="text-xs font-mono text-slate-500 font-bold uppercase">{t('crm.notesAndHistory', 'Notes & Interaction History')}</h4>
 
           <div className="flex gap-2">
             <input
@@ -175,7 +187,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               value={newNoteContent}
               onChange={(e) => setNewNoteContent(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAddNote()}
-              placeholder="Añadir nota de seguimiento o acuerdo de llamada..."
+              placeholder={t('crm.addNoteInputPlaceholder', 'Add follow-up note or call outcome...')}
               className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-gold-500"
             />
             <button
@@ -183,14 +195,14 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               disabled={isSubmittingNote}
               className="px-4 py-2.5 rounded-xl bg-gold-500 text-slate-950 font-bold text-xs font-mono hover:bg-gold-400 transition shadow-sm"
             >
-              Añadir
+              {t('crm.addBtn', 'Add')}
             </button>
           </div>
 
           <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
             {lead.notes && (
               <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
-                <span className="font-bold text-[10px] uppercase font-mono block text-amber-700">Nota Original Meta Ads:</span>
+                <span className="font-bold text-[10px] uppercase font-mono block text-amber-700">{t('crm.origNotesMeta', 'Original Meta Ads Note:')}</span>
                 {lead.notes}
               </div>
             )}

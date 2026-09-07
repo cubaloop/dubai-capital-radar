@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Building2, X, Check, Globe, Shield, Sparkles, UserCheck } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface AgencyModalProps {
   isOpen: boolean;
@@ -25,7 +26,7 @@ export const getStoredAgencyConfig = (): AgencyConfig => {
   }
   return {
     agencyName: 'Dubai Capital Advisory',
-    brokerPersona: 'David, Asesor Senior en Inversiones Inmobiliarias',
+    brokerPersona: 'David, Senior Real Estate Investment Advisor',
     targetMarket: 'Dubai (Downtown, Palm Jumeirah, Dubai Hills)',
     currency: 'USD ($)',
     phonePrefix: '+971'
@@ -33,6 +34,7 @@ export const getStoredAgencyConfig = (): AgencyConfig => {
 };
 
 export const AgencySettingsModal: React.FC<AgencyModalProps> = ({ isOpen, onClose }) => {
+  const { t } = useLanguage();
   const [config, setConfig] = useState<AgencyConfig>(getStoredAgencyConfig());
   const [saved, setSaved] = useState(false);
 
@@ -65,10 +67,10 @@ export const AgencySettingsModal: React.FC<AgencyModalProps> = ({ isOpen, onClos
             </div>
             <div>
               <h3 className="font-serif-luxury font-bold text-sm sm:text-base text-gold-200">
-                Configuración de Agencia (B2B White-Label)
+                {t('modals.agencyTitle', 'B2B Agency & White-Label Configuration')}
               </h3>
               <p className="text-[10px] text-slate-400 font-mono">
-                Adapta el sistema a cualquier inmobiliaria o bróker
+                {t('modals.agencySubtitle', 'Brand your platform, customize the AI broker persona, and adjust target market defaults.')}
               </p>
             </div>
           </div>
@@ -84,26 +86,26 @@ export const AgencySettingsModal: React.FC<AgencyModalProps> = ({ isOpen, onClos
         <div className="p-6 space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-              Nombre de la Inmobiliaria / Agencia
+              {t('modals.agencyNameLabel', 'Agency Trading Name')}
             </label>
             <input
               type="text"
               value={config.agencyName}
               onChange={(e) => setConfig({ ...config, agencyName: e.target.value })}
-              placeholder="Ej: Engel & Völkers Dubai / Prestige Real Estate"
+              placeholder={t('modals.agencyNamePlaceholder', 'e.g. H.O.M.E Properties or Dubai Capital Advisory')}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-gold-500 focus:ring-1 focus:ring-gold-500 outline-none text-slate-900"
             />
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-              Persona / Asesor Comercial (Firma de la IA)
+              {t('modals.brokerPersonaLabel', 'AI Advisor Persona & Voice')}
             </label>
             <input
               type="text"
               value={config.brokerPersona}
               onChange={(e) => setConfig({ ...config, brokerPersona: e.target.value })}
-              placeholder="Ej: David, Asesor Senior en Inversiones Inmobiliarias"
+              placeholder={t('modals.brokerPersonaPlaceholder', 'e.g. David, Senior Investment Advisor at H.O.M.E Properties Dubai...')}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-gold-500 focus:ring-1 focus:ring-gold-500 outline-none text-slate-900"
             />
           </div>
@@ -111,7 +113,7 @@ export const AgencySettingsModal: React.FC<AgencyModalProps> = ({ isOpen, onClos
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Mercado Principal
+                {t('modals.targetMarketLabel', 'Primary Target Market')}
               </label>
               <select
                 value={config.targetMarket}
@@ -119,15 +121,15 @@ export const AgencySettingsModal: React.FC<AgencyModalProps> = ({ isOpen, onClos
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-gold-500 focus:ring-1 focus:ring-gold-500 outline-none text-slate-900 bg-white"
               >
                 <option value="Dubai (Downtown, Palm, Hills)">Dubai (Downtown, Palm, Hills)</option>
-                <option value="Madrid / Barcelona (España)">Madrid / Barcelona (España)</option>
+                <option value="Madrid / Barcelona (España)">Madrid / Barcelona (Spain)</option>
                 <option value="Miami / Florida (USA)">Miami / Florida (USA)</option>
-                <option value="Internacional Global">Internacional Global</option>
+                <option value="Internacional Global">International Global</option>
               </select>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Moneda Preferida
+                {t('modals.currencyLabel', 'Display Currency')}
               </label>
               <select
                 value={config.currency}
@@ -145,7 +147,7 @@ export const AgencySettingsModal: React.FC<AgencyModalProps> = ({ isOpen, onClos
           <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-2.5">
             <Shield className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
             <div className="text-[11px] text-emerald-900">
-              <span className="font-bold">Persistencia en Supabase Cloud Activa:</span> Los leads y campañas se guardan de forma permanente e indestructible en PostgreSQL bajo el tenant de esta agencia.
+              <span className="font-bold">{t('auth.footerNote', 'Protected by 256-bit encryption. Multi-tenant Supabase persistence.')}</span>
             </div>
           </div>
         </div>
@@ -156,7 +158,7 @@ export const AgencySettingsModal: React.FC<AgencyModalProps> = ({ isOpen, onClos
             onClick={onClose}
             className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800"
           >
-            Cancelar
+            {t('common.cancel', 'Cancel')}
           </button>
           <button
             onClick={handleSave}
@@ -169,11 +171,11 @@ export const AgencySettingsModal: React.FC<AgencyModalProps> = ({ isOpen, onClos
           >
             {saved ? (
               <>
-                <Check className="w-3.5 h-3.5" /> Guardado
+                <Check className="w-3.5 h-3.5" /> {t('common.copied', 'Saved')}
               </>
             ) : (
               <>
-                <Sparkles className="w-3.5 h-3.5" /> Guardar Perfil de Agencia
+                <Sparkles className="w-3.5 h-3.5" /> {t('modals.saveAgencyBtn', 'Save Agency Settings')}
               </>
             )}
           </button>

@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { Radar, ShieldCheck, Lock, Mail, User, Building, ArrowRight, CheckCircle2, Sparkles, LogIn, UserPlus } from 'lucide-react';
+import { useTranslation } from '../i18n/LanguageContext';
+import { LanguageSwitch } from '../components/LanguageSwitch';
 
 interface AuthModalProps {
   onLoginSuccess: (userData: { email: string; name: string; role: string; agencyName: string }) => void;
 }
 
 export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) => {
+  const { t } = useTranslation();
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('admin@dubaicapitalradar.com');
   const [password, setPassword] = useState('Dubai2026!');
@@ -141,7 +144,8 @@ export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) =>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <LanguageSwitch />
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 border border-gold-500/30 text-gold-400 text-xs font-mono">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
             <span>Multi-Tenant Enterprise RLS</span>
@@ -164,7 +168,7 @@ export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) =>
             }`}
           >
             <LogIn className="w-3.5 h-3.5" />
-            <span>Iniciar Sesión</span>
+            <span>{t('auth.loginTitle', 'Sign In')}</span>
           </button>
           <button
             type="button"
@@ -176,19 +180,19 @@ export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) =>
             }`}
           >
             <UserPlus className="w-3.5 h-3.5" />
-            <span>Nueva Agencia</span>
+            <span>{t('auth.registerTitle', 'New Agency')}</span>
           </button>
         </div>
 
         {/* Title */}
         <div className="text-center mb-6">
           <h2 className="font-serif-luxury font-bold text-2xl text-white">
-            {isRegister ? 'Crear Perfil de Agencia' : 'Portal de Acceso Inmobiliario'}
+            {isRegister ? t('auth.registerTitle', 'Register Agency Workspace') : t('auth.loginTitle', 'Access Broker Portal')}
           </h2>
           <p className="text-xs text-slate-400 mt-1">
             {isRegister
-              ? 'Registra tu empresa o bróker para gestionar leads con IA propia'
-              : 'Accede a tu radar de señales, campañas de WhatsApp y leads en Supabase'}
+              ? t('auth.registerSub', 'Create an isolated agency instance in seconds')
+              : t('auth.loginSub', 'Sign in with your verified credentials')}
           </p>
         </div>
 
@@ -204,7 +208,7 @@ export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) =>
             <>
               <div>
                 <label className="block text-xs font-mono uppercase tracking-wider text-slate-300 mb-1.5">
-                  Nombre de tu Inmobiliaria / Agencia
+                  {t('auth.agencyNameLabel', 'Agency / Firm Name')}
                 </label>
                 <div className="relative">
                   <Building className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
@@ -213,7 +217,7 @@ export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) =>
                     required
                     value={agencyName}
                     onChange={(e) => setAgencyName(e.target.value)}
-                    placeholder="Ej: Highline Luxury Properties"
+                    placeholder="e.g. Highline Luxury Properties"
                     className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl bg-slate-950/90 border border-slate-700 text-white placeholder-slate-500 focus:border-gold-500 focus:ring-1 focus:ring-gold-500 outline-none"
                   />
                 </div>
@@ -221,7 +225,7 @@ export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) =>
 
               <div>
                 <label className="block text-xs font-mono uppercase tracking-wider text-slate-300 mb-1.5">
-                  Tu Nombre y Cargo (Asesor IA)
+                  {t('auth.fullNameLabel', 'Full Name and Title (AI Advisor)')}
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
@@ -230,7 +234,7 @@ export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) =>
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Ej: Carlos Silva (Managing Broker)"
+                    placeholder="e.g. Carlos Silva (Managing Broker)"
                     className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl bg-slate-950/90 border border-slate-700 text-white placeholder-slate-500 focus:border-gold-500 focus:ring-1 focus:ring-gold-500 outline-none"
                   />
                 </div>
@@ -240,7 +244,7 @@ export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) =>
 
           <div>
             <label className="block text-xs font-mono uppercase tracking-wider text-slate-300 mb-1.5">
-              Correo Electrónico
+              {t('auth.emailLabel', 'Work Email')}
             </label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
@@ -249,7 +253,7 @@ export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) =>
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="broker@empresa.com"
+                placeholder="broker@agency.com"
                 className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl bg-slate-950/90 border border-slate-700 text-white placeholder-slate-500 focus:border-gold-500 focus:ring-1 focus:ring-gold-500 outline-none"
               />
             </div>
@@ -257,7 +261,7 @@ export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) =>
 
           <div>
             <label className="block text-xs font-mono uppercase tracking-wider text-slate-300 mb-1.5">
-              Contraseña
+              {t('auth.passwordLabel', 'Password')}
             </label>
             <div className="relative">
               <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
@@ -278,10 +282,10 @@ export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) =>
             className="w-full py-3 mt-2 rounded-xl bg-gradient-to-r from-gold-500 via-amber-400 to-gold-500 hover:from-gold-400 hover:to-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-gold-500/20 active:scale-95 flex items-center justify-center gap-2"
           >
             {loading ? (
-              <span className="animate-pulse">Autenticando en Supabase...</span>
+              <span className="animate-pulse">{t('common.loading', 'Authenticating...')}</span>
             ) : (
               <>
-                <span>{isRegister ? 'Registrar y Crear Espacio' : 'Entrar al Sistema'}</span>
+                <span>{isRegister ? t('auth.registerBtn', 'Create Agency Account') : t('auth.signInBtn', 'Sign In to Dashboard')}</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
@@ -296,7 +300,7 @@ export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) =>
               className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-600/30 via-gold-500/20 to-amber-600/30 border border-gold-500/40 text-gold-300 hover:text-gold-200 text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all hover:border-gold-400"
             >
               <img src="/home_properties_logo.jpg" alt="HOME" className="w-5 h-4 object-contain rounded" />
-              <span>Acceso Rápido H.O.M.E Properties (1-Click)</span>
+              <span>{t('auth.homeDemo', 'Fast Access H.O.M.E Properties (1-Click)')}</span>
             </button>
 
             <button
@@ -304,7 +308,7 @@ export const AuthLandingView: React.FC<AuthModalProps> = ({ onLoginSuccess }) =>
               className="text-[11px] font-mono text-slate-400 hover:text-gold-300 flex items-center justify-center gap-1.5 mx-auto transition-colors"
             >
               <Sparkles className="w-3.5 h-3.5 text-gold-400" />
-              <span>Acceso Administrador Maestro</span>
+              <span>{t('auth.adminDemo', 'Master Admin Demo Access')}</span>
             </button>
             <p className="text-[10px] text-slate-500 font-mono">
               H.O.M.E: <code className="text-slate-300">home@homeproperties.ae</code> / <code className="text-slate-300">Dubai2026!</code>

@@ -12,8 +12,10 @@ import {
 } from 'lucide-react';
 import { RealEstateProject } from '../types';
 import { apiService } from '../services/api';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export const OffPlanMatcher: React.FC = () => {
+  const { t } = useLanguage();
   const [projects, setProjects] = useState<RealEstateProject[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [filterDeveloper, setFilterDeveloper] = useState<string>('all');
@@ -48,10 +50,10 @@ export const OffPlanMatcher: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-serif-luxury font-bold text-white">
-            Catálogo Off-Plan & Matcher de Dubái
+            {t('offplan.catalogTitle', 'Dubai Off-Plan Project Catalog & Matcher')}
           </h1>
           <p className="text-sm text-slate-300 mt-1 max-w-2xl">
-            Proyectos de primer nivel protegidos bajo cuenta de custodia oficial de la Dubai Land Department (DLD) con asignación de Golden Visa de 10 años y rieles de liquidación cripto (USDT/BTC/ETH).
+            {t('offplan.catalogSubtitle', 'Prime developments secured under official Dubai Land Department (DLD) escrow accounts with 10-year Golden Visa eligibility and crypto transaction rails (USDT/BTC/ETH).')}
           </p>
         </div>
 
@@ -65,7 +67,7 @@ export const OffPlanMatcher: React.FC = () => {
                 : 'bg-purple-950/60 text-purple-300 border border-purple-800/60 hover:bg-purple-900/60'
             }`}
           >
-            <span>🪙 {cryptoOnly ? 'Mostrando Solo Cripto' : 'Filtrar Cripto-Friendly'}</span>
+            <span>{cryptoOnly ? t('offplan.cryptoOnlyBtn', '🪙 Showing Crypto Only') : t('offplan.filterCryptoBtn', '🪙 Filter Crypto-Friendly')}</span>
           </button>
 
           {developers.map(dev => (
@@ -78,14 +80,14 @@ export const OffPlanMatcher: React.FC = () => {
                   : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
               }`}
             >
-              {dev === 'all' ? 'Todos' : dev}
+              {dev === 'all' ? t('offplan.allDevs', 'All') : dev}
             </button>
           ))}
         </div>
       </div>
 
       {isLoading ? (
-        <div className="text-center py-16 text-slate-400 font-serif-luxury">Cargando inventario de Dubái...</div>
+        <div className="text-center py-16 text-slate-400 font-serif-luxury">{t('offplan.loadingInventory', 'Loading Dubai inventory...')}</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {filteredProjects.map((proj) => (
@@ -120,8 +122,8 @@ export const OffPlanMatcher: React.FC = () => {
                     </p>
                   </div>
                   <div className="text-right">
-                    <span className="text-[10px] text-slate-400 uppercase font-mono block">Yield Proyectado</span>
-                    <span className="text-base font-bold text-emerald-400 font-mono">+{proj.projected_net_yield}% Neto</span>
+                    <span className="text-[10px] text-slate-400 uppercase font-mono block">{t('offplan.projectedYield', 'Projected Yield')}</span>
+                    <span className="text-base font-bold text-emerald-400 font-mono">+{proj.projected_net_yield}% Net</span>
                   </div>
                 </div>
               </div>
@@ -132,7 +134,7 @@ export const OffPlanMatcher: React.FC = () => {
                 </p>
 
                 <div className="space-y-2">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider font-mono">Características Principales:</span>
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider font-mono">{t('offplan.keyFeatures', 'Key Features:')}</span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                     {proj.key_features.map((feat, idx) => (
                       <div key={idx} className="flex items-center gap-1.5 text-slate-300">
@@ -145,22 +147,22 @@ export const OffPlanMatcher: React.FC = () => {
 
                 <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-800/80 text-xs">
                   <div>
-                    <span className="text-slate-500 block text-[11px]">Precio de Salida:</span>
+                    <span className="text-slate-500 block text-[11px]">{t('offplan.startingPrice', 'Starting Price:')}</span>
                     <span className="font-bold text-white font-mono text-sm">AED {proj.starting_price_aed.toLocaleString()}</span>
                     <span className="text-[11px] text-gold-400/90 block font-mono">(${proj.starting_price_usd.toLocaleString()} USD)</span>
                   </div>
 
                   <div>
-                    <span className="text-slate-500 block text-[11px]">Estructura de Pagos:</span>
+                    <span className="text-slate-500 block text-[11px]">{t('offplan.paymentStructure', 'Payment Structure:')}</span>
                     <span className="font-semibold text-slate-200 text-xs">{proj.payment_plan}</span>
-                    <span className="text-[11px] text-slate-400 block font-mono">Entrega: {proj.completion_date}</span>
+                    <span className="text-[11px] text-slate-400 block font-mono">{t('offplan.handover', 'Handover:')} {proj.completion_date}</span>
                   </div>
                 </div>
 
                 <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 flex items-center justify-between text-xs font-mono">
-                  <span className="text-slate-400">Cuenta Escrow: <strong className="text-slate-200">{proj.dld_escrow_number}</strong></span>
+                  <span className="text-slate-400">{t('offplan.escrowAccount', 'Escrow Account:')} <strong className="text-slate-200">{proj.dld_escrow_number}</strong></span>
                   <span className="text-emerald-400 flex items-center gap-1 font-semibold">
-                    <ShieldCheck className="w-4 h-4" /> 100% Protegido DLD
+                    <ShieldCheck className="w-4 h-4" /> {t('offplan.protectedDld', '100% DLD Escrow Protected')}
                   </span>
                 </div>
               </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CrmLead, CrmLeadStatus } from '../../types';
+import { useLanguage } from '../../i18n/LanguageContext';
 import {
   ChevronLeft,
   ChevronRight,
@@ -29,13 +30,13 @@ interface AdhdFocusViewProps {
   sendingLeadId: string | null;
 }
 
-const STAGE_BUTTONS: { id: CrmLeadStatus; label: string; color: string }[] = [
-  { id: 'CREATED', label: 'Nuevo', color: 'bg-blue-600 hover:bg-blue-500' },
-  { id: 'CONTACTED', label: 'Contactado', color: 'bg-cyan-600 hover:bg-cyan-500' },
-  { id: 'FOLLOW_UP', label: 'En Seguimiento', color: 'bg-amber-600 hover:bg-amber-500' },
-  { id: 'APPOINTMENT', label: 'Cita / Zoom', color: 'bg-indigo-600 hover:bg-indigo-500' },
-  { id: 'RESERVATION', label: 'Reserva EOI', color: 'bg-purple-600 hover:bg-purple-500' },
-  { id: 'CLOSED', label: 'Cerrado / Venta', color: 'bg-emerald-600 hover:bg-emerald-500' }
+const STAGE_KEYS: { id: CrmLeadStatus; color: string }[] = [
+  { id: 'CREATED', color: 'bg-blue-600 hover:bg-blue-500' },
+  { id: 'CONTACTED', color: 'bg-cyan-600 hover:bg-cyan-500' },
+  { id: 'FOLLOW_UP', color: 'bg-amber-600 hover:bg-amber-500' },
+  { id: 'APPOINTMENT', color: 'bg-indigo-600 hover:bg-indigo-500' },
+  { id: 'RESERVATION', color: 'bg-purple-600 hover:bg-purple-500' },
+  { id: 'CLOSED', color: 'bg-emerald-600 hover:bg-emerald-500' }
 ];
 
 export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
@@ -46,14 +47,25 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
   onSendWhatsApp,
   sendingLeadId
 }) => {
+  const { t } = useLanguage();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [newNoteText, setNewNoteText] = useState('');
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
 
+  const stageLabels: Record<CrmLeadStatus, string> = {
+    CREATED: t('crm.stageCreated', 'New'),
+    CONTACTED: t('crm.stageContacted', 'Contacted'),
+    FOLLOW_UP: t('crm.stageFollowUp', 'In Follow-up'),
+    APPOINTMENT: t('crm.stageAppointment', 'Appointment / Zoom'),
+    RESERVATION: t('crm.stageReservation', 'Reservation EOI'),
+    CLOSED: t('crm.stageClosed', 'Closed / Won'),
+    LOST: t('crm.stageLost', 'Archived')
+  };
+
   if (!leads.length) {
     return (
       <div className="py-16 text-center text-slate-400 font-mono text-sm">
-        No hay leads registrados en este filtro.
+        {t('crm.noLeadsFiltered', 'No prospects found in this filter.')}
       </div>
     );
   }
@@ -105,7 +117,7 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
       <div className="flex items-center justify-between bg-white px-5 py-3 rounded-2xl border border-slate-200 card-3d backdrop-blur-md">
         <div className="flex items-center gap-3">
           <span className="text-xs font-mono text-slate-600">
-            Lead <span className="text-slate-900 font-bold">{currentIndex + 1}</span> de{' '}
+            {t('crm.lead', 'Lead')} <span className="text-slate-900 font-bold">{currentIndex + 1}</span> {t('crm.of', 'of')}{' '}
             <span className="text-slate-900 font-bold">{leads.length}</span>
           </span>
           <span className="text-xs text-gold-700 font-mono font-bold truncate max-w-[200px]">
@@ -118,7 +130,7 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
             onClick={handlePrev}
             disabled={currentIndex === 0}
             className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition"
-            title="Anterior (Deslizar izquierda)"
+            title={t('crm.focusPrevBtn', 'Previous Lead')}
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -126,7 +138,7 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
             onClick={handleNext}
             disabled={currentIndex === leads.length - 1}
             className="p-2 rounded-xl bg-gold-500 text-slate-950 font-bold hover:bg-gold-400 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-md"
-            title="Siguiente (Deslizar derecha)"
+            title={t('crm.focusNextBtn', 'Next Lead')}
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -140,7 +152,7 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
           <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-rose-50 border border-rose-300 text-rose-800 text-xs font-mono">
             <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
             <span>
-              ⚡ <b>Alerta TDAH:</b> Este lead aún no ha sido contactado. ¡Toma acción ahora!
+              {t('crm.overdueAlert', '⚡ ADHD Alert: This prospect has not been contacted yet. Take action now!')}
             </span>
           </div>
         )}
@@ -152,7 +164,7 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
               <span>{currentLead.name}</span>
               {currentLead.whatsapp_status === 'sent' && (
                 <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-300 px-3 py-1 rounded-full font-mono font-semibold inline-flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Enviado ({currentLead.last_sent_type || 'manual'})
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> {t('common.sent', 'Sent')} ({currentLead.last_sent_type || 'manual'})
                 </span>
               )}
             </h2>
@@ -170,7 +182,7 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
 
           <div className="flex items-center gap-2">
             <span className="px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-300 text-xs font-bold text-slate-800 font-mono uppercase">
-              {currentLead.crm_status}
+              {stageLabels[currentLead.crm_status] || currentLead.crm_status}
             </span>
           </div>
         </div>
@@ -178,17 +190,17 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
         {/* Lead Context Data Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-            <div className="text-slate-500 font-mono">Objetivo</div>
-            <div className="text-slate-900 font-semibold">{currentLead.objective || 'Inversión'}</div>
+            <div className="text-slate-500 font-mono">{t('crm.objective', 'Objective')}</div>
+            <div className="text-slate-900 font-semibold">{currentLead.objective || 'Investment'}</div>
           </div>
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-            <div className="text-slate-500 font-mono">Plazo / Timeline</div>
-            <div className="text-slate-900 font-semibold">{currentLead.timeline || 'Próximos meses'}</div>
+            <div className="text-slate-500 font-mono">{t('crm.timeline', 'Timeline')}</div>
+            <div className="text-slate-900 font-semibold">{currentLead.timeline || 'Upcoming months'}</div>
           </div>
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-            <div className="text-slate-500 font-mono">Presupuesto</div>
+            <div className="text-slate-500 font-mono">{t('crm.budget', 'Budget')}</div>
             <div className="text-gold-700 font-bold font-mono">
-              {currentLead.budget_eur ? `${currentLead.budget_eur.toLocaleString()} €` : 'A consultar'}
+              {currentLead.budget_eur ? `${currentLead.budget_eur.toLocaleString()} €` : 'To discuss'}
             </div>
           </div>
         </div>
@@ -197,7 +209,7 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
         {currentLead.notes && (
           <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 leading-relaxed">
             <span className="font-bold font-mono uppercase block text-[10px] text-amber-700 mb-1">
-              Notas Previas del Cliente:
+              {t('crm.previousNotes', 'Previous Prospect Notes:')}
             </span>
             {currentLead.notes}
           </div>
@@ -206,15 +218,15 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
         {/* Personalized AI Message Preview & Send Action */}
         <div className="space-y-3 pt-2">
           <div className="flex items-center justify-between text-xs font-mono text-slate-500">
-            <span>Mensaje Personalizado WhatsApp:</span>
+            <span>{t('crm.waMessageLabel', 'Personalized WhatsApp Message:')}</span>
             {currentLead.last_contact_date && (
               <span className="text-emerald-700 font-semibold">
-                Último contacto: {currentLead.last_contact_date}
+                {t('crm.lastContact', 'Last contact:')} {currentLead.last_contact_date}
               </span>
             )}
           </div>
           <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 leading-relaxed font-sans whitespace-pre-line max-h-48 overflow-y-auto custom-scrollbar">
-            {currentLead.personalized_message || 'Sin mensaje generado.'}
+            {currentLead.personalized_message || t('crm.noMessageGen', 'No message generated.')}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
@@ -226,12 +238,12 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
               {sendingLeadId === currentLead.id ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Despachando...</span>
+                  <span>{t('crm.dispatching', 'Dispatching...')}</span>
                 </>
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  <span>Enviar WhatsApp Oficial (1 Clic)</span>
+                  <span>{t('crm.sendOfficialWa', 'Send Official WhatsApp (1 Click)')}</span>
                 </>
               )}
             </button>
@@ -243,16 +255,16 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
               className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 font-bold py-3.5 rounded-2xl text-xs font-mono flex items-center justify-center gap-2 transition"
             >
               <MessageSquare className="w-4 h-4 text-emerald-600" />
-              <span>Abrir en WhatsApp Web</span>
+              <span>{t('crm.openWaWeb', 'Open in WhatsApp Web')}</span>
             </a>
           </div>
         </div>
 
         {/* Quick Stage Transition Buttons */}
         <div className="space-y-2 pt-3 border-t border-slate-200">
-          <div className="text-[11px] font-mono text-slate-500">Cambiar Etapa con 1 Toque:</div>
+          <div className="text-[11px] font-mono text-slate-500">{t('crm.oneTapStage', 'Change Stage with 1 Tap:')}</div>
           <div className="flex flex-wrap gap-2">
-            {STAGE_BUTTONS.map((btn) => (
+            {STAGE_KEYS.map((btn) => (
               <button
                 key={btn.id}
                 onClick={() => onUpdateLeadStatus(currentLead.id, btn.id)}
@@ -260,7 +272,7 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
                   currentLead.crm_status === btn.id ? 'ring-2 ring-slate-900 scale-105' : 'opacity-80 hover:opacity-100'
                 }`}
               >
-                {btn.label}
+                {stageLabels[btn.id] || btn.id}
               </button>
             ))}
           </div>
@@ -269,26 +281,26 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
         {/* Quick Follow-up Reminders */}
         <div className="space-y-2 pt-2">
           <div className="text-[11px] font-mono text-slate-500 flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-gold-600" /> Programar Recordatorio:
+            <Clock className="w-3.5 h-3.5 text-gold-600" /> {t('crm.scheduleReminder', 'Schedule Reminder:')}
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => onSetReminder(currentLead.id, 2)}
               className="px-3 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-xs text-slate-700 font-mono"
             >
-              En 2 Horas
+              {t('crm.in2h', 'In 2 Hours')}
             </button>
             <button
               onClick={() => onSetReminder(currentLead.id, 24)}
               className="px-3 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-xs text-slate-700 font-mono"
             >
-              Mañana (24h)
+              {t('crm.tomorrow24h', 'Tomorrow (24h)')}
             </button>
             <button
               onClick={() => onSetReminder(currentLead.id, 72)}
               className="px-3 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-xs text-slate-700 font-mono"
             >
-              En 3 Días
+              {t('crm.in3d', 'In 3 Days')}
             </button>
           </div>
         </div>
@@ -301,14 +313,14 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
               value={newNoteText}
               onChange={(e) => setNewNoteText(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && submitNote()}
-              placeholder="Escribe una nota rápida de la llamada..."
+              placeholder={t('crm.quickNotePlaceholder', 'Type a quick call or follow-up note...')}
               className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-4 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-gold-500 font-sans"
             />
             <button
               onClick={submitNote}
               className="px-4 py-2 rounded-xl bg-gold-500 text-slate-950 font-bold text-xs font-mono hover:bg-gold-400 transition"
             >
-              Guardar
+              {t('common.save', 'Save')}
             </button>
           </div>
         </div>

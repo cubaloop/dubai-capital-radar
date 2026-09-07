@@ -4,6 +4,7 @@ import { apiService } from '../services/api';
 import { KanbanBoard } from '../components/crm/KanbanBoard';
 import { AdhdFocusView } from '../components/crm/AdhdFocusView';
 import { LeadDetailModal } from '../components/crm/LeadDetailModal';
+import { useTranslation } from '../i18n/LanguageContext';
 import {
   LayoutGrid,
   Sparkles,
@@ -24,6 +25,7 @@ interface CRMViewProps {
 }
 
 export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
+  const { t } = useTranslation();
   const [leads, setLeads] = useState<CrmLead[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [viewMode, setViewMode] = useState<'focus' | 'kanban'>('focus');
@@ -181,13 +183,13 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-serif-luxury font-bold text-slate-900 flex items-center gap-3">
-            <span>CRM Inteligente TDAH</span>
+            <span>{t('crm.title', 'Investor Pipeline & CRM')}</span>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-gold-500/20 text-gold-700 border border-gold-400 font-mono font-bold">
-              Enfoque Máximo
+              {t('common.active', 'Active')}
             </span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            Gestión visual sin saturación cognitiva: una tarjeta a la vez o tablero Kanban interactivo.
+            {t('crm.subtitle', 'Track qualified prospects, follow-up cadence, and deal progression in real-time.')}
           </p>
         </div>
 
@@ -202,7 +204,7 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Deck Focus TDAH</span>
+            <span>{t('crm.viewFocus', 'Focus Mode (TDAH)')}</span>
           </button>
           <button
             onClick={() => setViewMode('kanban')}
@@ -213,7 +215,7 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
             }`}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
-            <span>Tablero Kanban</span>
+            <span>{t('crm.viewKanban', 'Kanban Board')}</span>
           </button>
         </div>
       </div>
@@ -221,23 +223,23 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
       {/* Stats Counters Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="p-3.5 rounded-2xl bg-white border border-slate-200 card-3d space-y-1">
-          <div className="text-[11px] font-mono text-slate-500">Total Leads</div>
+          <div className="text-[11px] font-mono text-slate-500">{t('campaigns.statsTotal', 'Total Leads')}</div>
           <div className="text-lg font-bold text-slate-900 font-mono">{stats.total}</div>
         </div>
         <div className="p-3.5 rounded-2xl bg-white border border-slate-200 card-3d space-y-1">
-          <div className="text-[11px] font-mono text-emerald-600">Contactados</div>
+          <div className="text-[11px] font-mono text-emerald-600">{t('crm.stageContacted', 'Contacted')}</div>
           <div className="text-lg font-bold text-emerald-700 font-mono">{stats.contacted}</div>
         </div>
         <div className="p-3.5 rounded-2xl bg-white border border-slate-200 card-3d space-y-1">
-          <div className="text-[11px] font-mono text-rose-600">Sin Contacto (Alerta)</div>
+          <div className="text-[11px] font-mono text-rose-600">{t('crm.urgentOnly', 'Uncontacted')}</div>
           <div className="text-lg font-bold text-rose-700 font-mono">{stats.uncontacted}</div>
         </div>
         <div className="p-3.5 rounded-2xl bg-white border border-slate-200 card-3d space-y-1">
-          <div className="text-[11px] font-mono text-indigo-600">Citas / Zoom</div>
+          <div className="text-[11px] font-mono text-indigo-600">{t('crm.stageClosing', 'Appointments / Zoom')}</div>
           <div className="text-lg font-bold text-indigo-700 font-mono">{stats.appointments}</div>
         </div>
         <div className="p-3.5 rounded-2xl bg-white border border-slate-200 card-3d space-y-1 col-span-2 sm:col-span-1">
-          <div className="text-[11px] font-mono text-amber-700">Cerrados / Ventas</div>
+          <div className="text-[11px] font-mono text-amber-700">{t('crm.stageWon', 'Closed Deals')}</div>
           <div className="text-lg font-bold text-amber-800 font-mono">{stats.closed}</div>
         </div>
       </div>
@@ -257,7 +259,7 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar por nombre, teléfono, notas..."
+            placeholder={t('crm.searchPlaceholder', 'Search by name, phone, notes...')}
             className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 focus:outline-none focus:border-gold-500 font-mono"
           />
         </div>
@@ -268,7 +270,7 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
           onChange={(e) => setCampaignFilter(e.target.value)}
           className="bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-xl px-3 py-2 font-mono focus:outline-none focus:border-gold-500"
         >
-          <option value="all">Todas las Campañas</option>
+          <option value="all">{t('crm.allCampaigns', 'All Campaigns')}</option>
           {campaignOptions.map((c) => (
             <option key={c} value={c}>
               {c}
@@ -282,14 +284,13 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
           onChange={(e) => setStatusFilter(e.target.value)}
           className="bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-xl px-3 py-2 font-mono focus:outline-none focus:border-gold-500"
         >
-          <option value="all">Todas las Etapas</option>
-          <option value="CREATED">Nuevos</option>
-          <option value="CONTACTED">Contactados</option>
-          <option value="FOLLOW_UP">En Seguimiento</option>
-          <option value="APPOINTMENT">Cita / Zoom</option>
-          <option value="RESERVATION">Reserva EOI</option>
-          <option value="CLOSED">Cerrados</option>
-          <option value="LOST">Descartados</option>
+          <option value="all">{t('crm.allStages', 'All Stages')}</option>
+          <option value="CREATED">{t('crm.stageCreated', 'New Leads')}</option>
+          <option value="CONTACTED">{t('crm.stageContacted', 'Contacted')}</option>
+          <option value="INTERESTED">{t('crm.stageInterested', 'Interested / Replied')}</option>
+          <option value="APPOINTMENT">{t('crm.stageClosing', 'Appointment')}</option>
+          <option value="CLOSED">{t('crm.stageWon', 'Closed Deal')}</option>
+          <option value="LOST">{t('crm.stageLost', 'Archived')}</option>
         </select>
 
         {/* ADHD Alert Filter Button */}
@@ -302,7 +303,7 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
           }`}
         >
           <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
-          <span>Alerta TDAH</span>
+          <span>{t('crm.urgentOnly', 'Alert Filter')}</span>
         </button>
 
         <button

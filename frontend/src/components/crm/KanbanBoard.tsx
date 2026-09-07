@@ -1,6 +1,7 @@
 import React from 'react';
 import { CrmLead, CrmLeadStatus } from '../../types';
 import { Phone, MessageSquare, Clock, AlertCircle, CheckCircle2, ChevronRight, User } from 'lucide-react';
+import { useTranslation } from '../../i18n/LanguageContext';
 
 interface KanbanBoardProps {
   leads: CrmLead[];
@@ -10,19 +11,18 @@ interface KanbanBoardProps {
 
 interface KanbanColConfig {
   id: CrmLeadStatus;
-  title: string;
   badgeColor: string;
   borderColor: string;
 }
 
 const KANBAN_COLUMNS: KanbanColConfig[] = [
-  { id: 'CREATED', title: 'Nuevos', badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/40', borderColor: 'border-blue-500/30' },
-  { id: 'CONTACTED', title: 'Contactados', badgeColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40', borderColor: 'border-cyan-500/30' },
-  { id: 'FOLLOW_UP', title: 'En Seguimiento', badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/40', borderColor: 'border-amber-500/30' },
-  { id: 'APPOINTMENT', title: 'Cita / Zoom', badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40', borderColor: 'border-indigo-500/30' },
-  { id: 'RESERVATION', title: 'Reserva / EOI', badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/40', borderColor: 'border-purple-500/30' },
-  { id: 'CLOSED', title: 'Cerrados', badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40', borderColor: 'border-emerald-500/30' },
-  { id: 'LOST', title: 'Descartados', badgeColor: 'bg-slate-700/40 text-slate-400 border-slate-700', borderColor: 'border-slate-800' }
+  { id: 'CREATED', badgeColor: 'bg-blue-500/20 text-blue-700 border-blue-500/40', borderColor: 'border-blue-500/30' },
+  { id: 'CONTACTED', badgeColor: 'bg-cyan-500/20 text-cyan-700 border-cyan-500/40', borderColor: 'border-cyan-500/30' },
+  { id: 'FOLLOW_UP', badgeColor: 'bg-amber-500/20 text-amber-700 border-amber-500/40', borderColor: 'border-amber-500/30' },
+  { id: 'APPOINTMENT', badgeColor: 'bg-indigo-500/20 text-indigo-700 border-indigo-500/40', borderColor: 'border-indigo-500/30' },
+  { id: 'RESERVATION', badgeColor: 'bg-purple-500/20 text-purple-700 border-purple-500/40', borderColor: 'border-purple-500/30' },
+  { id: 'CLOSED', badgeColor: 'bg-emerald-500/20 text-emerald-700 border-emerald-500/40', borderColor: 'border-emerald-500/30' },
+  { id: 'LOST', badgeColor: 'bg-slate-700/20 text-slate-600 border-slate-400', borderColor: 'border-slate-800' }
 ];
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
@@ -30,7 +30,21 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onSelectLead,
   onUpdateLeadStatus
 }) => {
+  const { t } = useTranslation();
   const [draggedLeadId, setDraggedLeadId] = React.useState<string | null>(null);
+
+  const getColumnTitle = (id: CrmLeadStatus) => {
+    switch (id) {
+      case 'CREATED': return t('crm.stageCreated', 'New Leads');
+      case 'CONTACTED': return t('crm.stageContacted', 'Contacted');
+      case 'FOLLOW_UP': return t('crm.stageInterested', 'Follow-up');
+      case 'APPOINTMENT': return t('crm.stageClosing', 'Appointment / Zoom');
+      case 'RESERVATION': return t('crm.stageHot', 'Reservation / EOI');
+      case 'CLOSED': return t('crm.stageWon', 'Closed Deals');
+      case 'LOST': return t('crm.stageLost', 'Archived');
+      default: return id;
+    }
+  };
 
   const handleDragStart = (e: React.DragEvent, leadId: string) => {
     e.dataTransfer.setData('text/plain', leadId);
@@ -66,7 +80,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             <div className="flex items-center justify-between pb-2 border-b border-slate-200">
               <div className="flex items-center gap-2">
                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${col.badgeColor}`}>
-                  {col.title}
+                  {getColumnTitle(col.id)}
                 </span>
                 <span className="text-xs text-slate-500 font-mono">({colLeads.length})</span>
               </div>

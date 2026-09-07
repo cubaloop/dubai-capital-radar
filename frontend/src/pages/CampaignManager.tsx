@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CrmCampaign, CrmLead, BatchDispatchStatus } from '../types';
 import { apiService } from '../services/api';
+import { useTranslation } from '../i18n/LanguageContext';
 import {
   Send,
   MessageSquare,
@@ -35,6 +36,7 @@ interface CampaignManagerProps {
 }
 
 export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser }) => {
+  const { t, language } = useTranslation();
   const [campaigns, setCampaigns] = useState<CrmCampaign[]>([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('spain_madrid_expo');
   const [leads, setLeads] = useState<CrmLead[]>([]);
@@ -188,7 +190,24 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
     }
   }, [selectedLeadPreview?.id]);
 
-  const PROMPT_PRESETS = [
+  const PROMPT_PRESETS = language === 'en' ? [
+    {
+      label: '🏨 Novotel Madrid Event',
+      text: 'Recall their previous interest and announce our exclusive in-person event at Novotel Madrid Center on September 9-10. Request confirmation for VIP list.'
+    },
+    {
+      label: '📱 Entry Offers from $50K (Zoom)',
+      text: 'Highlight entry opportunities in the Dubai property market starting from $50K. Ask which day/time works best this week for a brief online presentation.'
+    },
+    {
+      label: '📈 Capital Appreciation / Flipping',
+      text: 'Emphasize off-plan pre-launches with high estimated 24-month capital growth, direct developer 1% monthly payment plans with 0% interest, and complimentary 1-on-1 structuring.'
+    },
+    {
+      label: '🛂 Golden Visa & 0% Tax',
+      text: 'Highlight the 0% personal income & capital gains tax in Dubai, plus 10-year Golden Visa qualification for investor and family.'
+    }
+  ] : [
     {
       label: '🏨 Evento Novotel Madrid',
       text: 'Recordar su interés previo y anunciar que tenemos el evento presencial exclusivo en Novotel Madrid Center los días 9 y 10 de Septiembre. Pedir confirmación para lista VIP.'
@@ -427,13 +446,13 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-3xl font-serif-luxury font-bold text-slate-900 flex items-center gap-2.5 flex-wrap">
-            <span>WhatsApp & Campañas</span>
+            <span>{t('campaigns.title', 'WhatsApp & Campaigns')}</span>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-mono font-bold">
-              Gateway Conectado
+              {t('common.connected', 'Gateway Connected')}
             </span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-2xl">
-            Gestión de grupos de captación, importación directa de Excel, envíos manuales a 1 clic o secuencias automáticas garantizadas.
+            {t('campaigns.subtitle', 'Execute high-touch conversational sequences with AI personalization and anti-ban safeguards.')}
           </p>
         </div>
 
@@ -443,7 +462,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
           className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-gold-500 hover:from-amber-400 hover:to-gold-400 text-slate-950 font-black px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl shadow-lg shadow-gold-500/25 active:scale-95 transition-all text-xs font-mono uppercase tracking-wider self-start md:self-auto shrink-0"
         >
           <Plus className="w-4 h-4" />
-          <span>Nueva Campaña (Excel / CSV)</span>
+          <span>{t('campaigns.newCampaignBtn', 'New Campaign (Excel / CSV)')}</span>
         </button>
       </div>
 
@@ -464,7 +483,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
               <div className="text-left">
                 <div className="font-bold">{camp.name}</div>
                 <div className={`text-[10px] ${isSelected ? 'text-slate-800' : 'text-slate-500'}`}>
-                  {camp.sent_leads} / {camp.total_leads} enviados ({camp.pending_leads} pendientes)
+                  {camp.sent_leads} / {camp.total_leads} {t('common.sent', 'sent').toLowerCase()} ({camp.pending_leads} {t('common.pending', 'pending').toLowerCase()})
                 </div>
               </div>
             </button>
@@ -484,37 +503,37 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-mono uppercase font-bold text-sky-800">Control de Envío Automático</span>
+              <span className="text-xs font-mono uppercase font-bold text-sky-800">{t('campaigns.batchSenderTitle', 'Automated Sequential Batch Sender')}</span>
               {batchStatus?.status === 'running' && (
                 <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-mono animate-pulse">
-                  ● Enviando en Segundo Plano
+                  ● {t('campaigns.sending', 'Sending in Background')}
                 </span>
               )}
               {batchStatus?.status === 'paused' && (
                 <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-mono">
-                  ❚❚ En Pausa
+                  ❚❚ {t('campaigns.pauseBatchBtn', 'Paused')}
                 </span>
               )}
             </div>
             <p className="text-xs text-slate-600">
-              Despacha a todos los leads pendientes de forma secuencial con pausas de seguridad anti-baneo.
+              {t('campaigns.batchSenderSubtitle', 'Human cadence delivery with random jitter to ensure 100% account safety.')}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
             {/* Delay selector */}
             <div className="flex items-center gap-2 text-xs font-mono text-slate-600 bg-slate-50 px-3 py-2 rounded-xl border border-slate-300 shadow-inner">
-              <span>Pausa:</span>
+              <span>{t('campaigns.delayLabel', 'Delay:')}</span>
               <select
                 value={batchDelay}
                 onChange={(e) => setBatchDelay(Number(e.target.value))}
                 disabled={batchStatus?.status === 'running'}
                 className="bg-transparent text-slate-900 font-bold focus:outline-none cursor-pointer"
               >
-                <option value={5}>5s (Rápido / Test)</option>
-                <option value={8}>8s (Estándar)</option>
-                <option value={20}>20s (Seguro)</option>
-                <option value={45}>45s (Anti-Ban)</option>
+                <option value={5}>5s ({t('common.fast', 'Fast / Test')})</option>
+                <option value={8}>8s ({t('common.standard', 'Standard')})</option>
+                <option value={20}>20s ({t('common.safe', 'Safe')})</option>
+                <option value={45}>45s ({t('common.antiBan', 'Anti-Ban Shield')})</option>
               </select>
             </div>
 
@@ -526,14 +545,14 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                   className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs font-mono"
                 >
                   <Pause className="w-3.5 h-3.5" />
-                  <span>Pausar</span>
+                  <span>{t('campaigns.pauseBatchBtn', 'Pause')}</span>
                 </button>
                 <button
                   onClick={() => handleControlBatch('stop')}
                   className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs font-mono"
                 >
                   <Square className="w-3.5 h-3.5" />
-                  <span>Detener</span>
+                  <span>{t('campaigns.stopBatchBtn', 'Stop')}</span>
                 </button>
               </div>
             ) : batchStatus?.status === 'paused' ? (
@@ -543,14 +562,14 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                   className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs font-mono"
                 >
                   <Play className="w-3.5 h-3.5" />
-                  <span>Reanudar</span>
+                  <span>{t('campaigns.resumeBatchBtn', 'Resume')}</span>
                 </button>
                 <button
                   onClick={() => handleControlBatch('stop')}
                   className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs font-mono"
                 >
                   <Square className="w-3.5 h-3.5" />
-                  <span>Detener</span>
+                  <span>{t('campaigns.stopBatchBtn', 'Stop')}</span>
                 </button>
               </div>
             ) : (
@@ -562,12 +581,12 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                 {isStartingBatch ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Iniciando...</span>
+                    <span>{t('campaigns.starting', 'Starting...')}</span>
                   </>
                 ) : (
                   <>
                     <Send className="w-4 h-4" />
-                    <span>Iniciar Envío Automático</span>
+                    <span>{t('campaigns.startBatchBtn', 'Start Batch')}</span>
                   </>
                 )}
               </button>
@@ -626,7 +645,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar en campaña..."
+                placeholder={t('campaigns.searchPlaceholder', 'Search by name, phone, or tags...')}
                 className="bg-white border border-sky-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-500 font-mono w-full sm:w-52 shadow-inner"
               />
             </div>
@@ -639,7 +658,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                   statusFilter === 'all' ? 'bg-gold-500 text-slate-950 font-bold shadow-sm' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                Todos ({leads.length})
+                {t('common.all', 'All')} ({leads.length})
               </button>
               <button
                 onClick={() => setStatusFilter('pending')}
@@ -647,7 +666,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                   statusFilter === 'pending' ? 'bg-gold-500 text-slate-950 font-bold shadow-sm' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                Pendientes ({leads.filter((l) => l.whatsapp_status !== 'sent').length})
+                {t('common.pending', 'Pending')} ({leads.filter((l) => l.whatsapp_status !== 'sent').length})
               </button>
               <button
                 onClick={() => setStatusFilter('sent')}
@@ -655,14 +674,14 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                   statusFilter === 'sent' ? 'bg-gold-500 text-slate-950 font-bold shadow-sm' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                Enviados ({leads.filter((l) => l.whatsapp_status === 'sent').length})
+                {t('common.sent', 'Sent')} ({leads.filter((l) => l.whatsapp_status === 'sent').length})
               </button>
             </div>
 
             <button
               onClick={() => selectedCampaignId && fetchLeads(selectedCampaignId)}
               className="p-2 rounded-xl bg-white border border-sky-200 text-slate-600 hover:text-slate-900 shadow-sm"
-              title="Recargar leads"
+              title={t('common.refresh', 'Refresh')}
             >
               <RefreshCw className={`w-4 h-4 ${isLoadingLeads ? 'animate-spin' : ''}`} />
             </button>
@@ -681,25 +700,25 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-base font-bold text-slate-900 font-serif-luxury">
-                    Instrucciones del Bot de IA para esta Campaña
+                    {t('campaigns.aiPromptTitle', 'AI Message Prompt & Voice Persona')}
                   </h3>
                   <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-900 border border-sky-300 font-mono font-bold">
-                    {selectedCampaign?.name || 'Campaña Activa'}
+                    {selectedCampaign?.name || 'Active Campaign'}
                   </span>
                   {isAiConnected ? (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300 font-mono text-[10px] font-bold shadow-sm">
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                      ⚡ Groq LPU (Principal) + Gemini (Respaldo)
+                      ⚡ Groq LPU (Primary) + Gemini (Fallback)
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 font-mono text-[10px] font-bold shadow-sm" title="Faltan API keys">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 font-mono text-[10px] font-bold shadow-sm" title="Missing API keys">
                       <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                      Modo Plantilla Local
+                      Local Template Mode
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Escribe en lenguaje natural qué quieres que diga el bot (ofertas, eventos, fechas, importes mínimos o llamadas a la acción). La IA combinará estas directivas con los datos individuales del Excel.
+                  {t('campaigns.aiPromptSubtitle', 'Customizes the tone, investment pitch, and value proposition for this audience.')}
                 </p>
               </div>
             </div>
@@ -708,7 +727,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
               onClick={() => setIsPromptPanelOpen(!isPromptPanelOpen)}
               className="text-xs font-mono text-sky-800 hover:text-sky-900 flex items-center gap-1 self-end sm:self-auto px-3 py-1.5 rounded-xl bg-white border border-sky-300 shadow-sm transition"
             >
-              {isPromptPanelOpen ? 'Ocultar Panel ▲' : 'Configurar Bot ▼'}
+              {isPromptPanelOpen ? t('campaigns.hidePromptPanel', 'Hide ▲') : t('campaigns.configurePromptPanel', 'Configure ▼')}
             </button>
           </div>
 
@@ -716,7 +735,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
             <div className="space-y-4 pt-2 border-t border-sky-200 animate-fade-in">
               {/* Quick Preset Chips */}
               <div className="space-y-1.5">
-                <span className="text-[11px] font-mono text-slate-500 block">Plantillas Rápidas (Haz clic para insertar):</span>
+                <span className="text-[11px] font-mono text-slate-500 block">{t('campaigns.quickPresets', 'Quick Presets (Click to insert):')}</span>
                 <div className="flex flex-wrap gap-2">
                   {PROMPT_PRESETS.map((preset, idx) => (
                     <button
@@ -737,7 +756,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                   rows={3}
                   value={campaignAiPrompt}
                   onChange={(e) => setCampaignAiPrompt(e.target.value)}
-                  placeholder="Ej: Quiero que además del contexto del excel les menciones que tenemos nuevas ofertas a partir de 50K en el evento X del hotel Y los días A y B, y que me confirmen asistencia..."
+                  placeholder={t('campaigns.aiPromptPlaceholder', 'Example: Focus on high rental yields in Palm Jumeirah, mention 5-year post-handover payment plan, maintain an exclusive private banking tone...')}
                   className="w-full bg-white border border-sky-300 focus:border-sky-500 rounded-2xl p-4 text-xs text-slate-900 placeholder-slate-400 focus:outline-none leading-relaxed custom-scrollbar transition font-sans shadow-inner"
                 />
               </div>
@@ -745,7 +764,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
               {/* Action Bar */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
                 <span className="text-[11px] text-slate-500 font-mono">
-                  ℹ️ Los primeros 14 leads enviados de España quedan protegidos intactos; se regeneran los {leads.filter((l) => l.whatsapp_status !== 'sent').length} leads pendientes.
+                  ℹ️ {t('campaigns.aiPromptPreserveNote', 'Sent leads remain protected and intact; only pending leads will be regenerated.')} ({leads.filter((l) => l.whatsapp_status !== 'sent').length} {t('crm.stagePending', 'pending')})
                 </span>
 
                 <button
@@ -757,12 +776,12 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                   {isUpdatingPrompt ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Regenerando Mensajes...</span>
+                      <span>{t('campaigns.regeneratingMessages', 'Regenerating Messages...')}</span>
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4" />
-                      <span>⚡ Aplicar y Regenerar Mensajes</span>
+                      <span>{t('campaigns.applyAndRegenerate', '⚡ Apply & Regenerate Messages')}</span>
                     </>
                   )}
                 </button>
@@ -860,17 +879,17 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                         {isSendingThis ? (
                           <>
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>Enviando...</span>
+                            <span>{t('campaigns.sending', 'Sending...')}</span>
                           </>
                         ) : isSent ? (
                           <>
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Reenviar</span>
+                            <span>{t('campaigns.sendNow', 'Resend')}</span>
                           </>
                         ) : (
                           <>
                             <Send className="w-3.5 h-3.5" />
-                            <span>Enviar</span>
+                            <span>{t('campaigns.sendNow', 'Send')}</span>
                           </>
                         )}
                       </button>
@@ -881,7 +900,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
 
               {filteredLeads.length === 0 && (
                 <div className="py-16 text-center text-slate-400 text-xs font-mono">
-                  No hay leads que coincidan con los filtros.
+                  {t('common.noResults', 'No leads match the filters.')}
                 </div>
               )}
             </div>
@@ -890,8 +909,8 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
           {/* Right Column: Live Message Preview in WhatsApp Phone Bubble (5 cols) */}
           <div className="lg:col-span-5 space-y-3">
             <div className="flex justify-between items-center text-xs font-mono text-slate-500">
-              <span>Vista Previa del Mensaje</span>
-              <span className="text-gold-700 font-bold truncate max-w-[180px]">{selectedLeadPreview?.name || 'Selecciona un lead'}</span>
+              <span>{t('common.preview', 'Message Preview')}</span>
+              <span className="text-gold-700 font-bold truncate max-w-[180px]">{selectedLeadPreview?.name || t('campaigns.selectLead', 'Select a lead')}</span>
             </div>
 
             {selectedLeadPreview ? (
@@ -985,12 +1004,12 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                     {sendingLeadId === selectedLeadPreview.id ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Despachando...</span>
+                        <span>{t('campaigns.sending', 'Dispatching...')}</span>
                       </>
                     ) : (
                       <>
                         <Send className="w-4 h-4" />
-                        <span>Enviar a {selectedLeadPreview.name.split(' ')[0]} ({selectedLeadPreview.phone})</span>
+                        <span>{t('campaigns.sendNow', 'Send to')} {selectedLeadPreview.name.split(' ')[0]} ({selectedLeadPreview.phone})</span>
                       </>
                     )}
                   </button>
@@ -1000,7 +1019,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                     <div className="flex items-center justify-between text-[11px] font-mono text-slate-700">
                       <span className="font-bold flex items-center gap-1">
                         <Smartphone className="w-3.5 h-3.5 text-sky-800" />
-                        Probar en mi WhatsApp:
+                        {t('campaigns.testSendTitle', 'Test on personal WhatsApp')}:
                       </span>
                       <button
                         type="button"
@@ -1029,7 +1048,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                           onClick={() => setIsEditingTestPhone(false)}
                           className="px-3 py-1.5 rounded-xl bg-sky-700 text-white font-mono text-xs font-bold shadow-sm"
                         >
-                          Listo
+                          {t('common.save', 'Done')}
                         </button>
                       </div>
                     )}
@@ -1043,12 +1062,12 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                       {isSendingTestMsg ? (
                         <>
                           <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-700" />
-                          <span>Enviando prueba a tu WhatsApp...</span>
+                          <span>{t('campaigns.sending', 'Sending test preview...')}</span>
                         </>
                       ) : (
                         <>
-                          <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>🧪 Enviar prueba de este mensaje a mi móvil</span>
+                          <Send className="w-3.5 h-3.5 text-sky-800" />
+                          <span>{t('campaigns.testSendBtn', 'Send Test Preview')}</span>
                         </>
                       )}
                     </button>

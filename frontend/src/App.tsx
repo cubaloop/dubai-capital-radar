@@ -11,8 +11,11 @@ import { AgencySettingsModal } from './components/AgencySettingsModal';
 import { LicenseModal, getLicenseState, getRemainingTrialDays } from './components/LicenseModal';
 import { AuthLandingView } from './pages/AuthLandingView';
 import { Lock, ShieldCheck, PhoneCall } from 'lucide-react';
+import { useTranslation } from './i18n/LanguageContext';
+import { LanguageSwitch } from './components/LanguageSwitch';
 
 export function App() {
+  const { t } = useTranslation();
   const [currentUser, setCurrentUser] = useState<any>(() => {
     try {
       const saved = localStorage.getItem('dcr_user_session');
@@ -105,12 +108,13 @@ export function App() {
                   DUBAI CAPITAL <span className="text-gold-400 font-black">ADVISORY</span>
                 </span>
                 <span className="block text-[10px] text-slate-400 font-mono uppercase tracking-wider">
-                  Private Wealth & Sovereign Asset Structuring • DIFC
+                  {t('dossier.privateBankingHeader', 'Private Wealth & Sovereign Asset Structuring • DIFC')}
                 </span>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
+              <LanguageSwitch variant="compact" />
               <a
                 href="https://wa.me/971501378020?text=Hello,%20I%20am%20reviewing%20my%20Confidential%20Dubai%20Wealth%20Dossier."
                 target="_blank"
@@ -120,7 +124,7 @@ export function App() {
                 <PhoneCall className="w-3.5 h-3.5" /> +971 50 137 8020
               </a>
               <div className="inline-flex items-center gap-1.5 text-xs text-gold-400 font-mono bg-gold-950/60 border border-gold-800/60 px-3 py-1.5 rounded-xl">
-                <Lock className="w-3.5 h-3.5" /> CONFIDENTIAL
+                <Lock className="w-3.5 h-3.5" /> {t('common.status', 'CONFIDENTIAL')}
               </div>
             </div>
           </div>

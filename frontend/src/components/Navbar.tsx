@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Radar, FileText, Send, Building2, ShieldCheck, Activity, Users, Menu, X, LogOut, Key, FileSpreadsheet } from 'lucide-react';
+import { useTranslation } from '../i18n/LanguageContext';
+import { LanguageSwitch } from './LanguageSwitch';
 
 interface NavbarProps {
   activeTab: 'crm' | 'campaigns' | 'excels' | 'radar' | 'dossiers' | 'inventory';
@@ -26,6 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   currentUser
 }) => {
+  const { t } = useTranslation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleNavClick = (tab: 'crm' | 'campaigns' | 'excels' | 'radar' | 'dossiers' | 'inventory') => {
@@ -63,7 +66,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </span>
               <span className="block text-[8px] sm:text-[10px] text-slate-500 font-mono uppercase tracking-widest hidden md:block">
-                CRM & WhatsApp Outreach
+                {t('nav.brandSub', 'CRM & WhatsApp Outreach')}
               </span>
             </div>
           </div>
@@ -79,7 +82,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Users className="w-4 h-4" />
-              <span>CRM Leads</span>
+              <span>{t('nav.crmLeads', 'CRM Leads')}</span>
             </button>
 
             <button
@@ -91,7 +94,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Send className="w-4 h-4" />
-              <span>WhatsApp & Campañas</span>
+              <span>{t('nav.whatsappCampaigns', 'WhatsApp & Campaigns')}</span>
             </button>
 
             <button
@@ -103,7 +106,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <FileSpreadsheet className="w-4 h-4" />
-              <span>Gestor Excels</span>
+              <span>{t('nav.excelManager', 'Excel Manager')}</span>
             </button>
 
             <button
@@ -115,12 +118,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Building2 className="w-4 h-4" />
-              <span>Off-Plan</span>
+              <span>{t('nav.offPlan', 'Off-Plan')}</span>
             </button>
           </nav>
 
-          {/* Trial Days Countdown, Agency Settings, WhatsApp QR & Mobile Menu Toggle */}
+          {/* Language Switch, Trial Countdown, Agency Settings, WhatsApp QR & Mobile Menu Toggle */}
           <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+            {/* Interactive Language Selector Toggle */}
+            <LanguageSwitch className="hidden sm:inline-flex" />
+
             {onOpenLicenseModal && (
               <button
                 onClick={onOpenLicenseModal}
@@ -131,11 +137,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                     ? 'bg-amber-950/80 border-gold-500/50 text-gold-300 shadow-sm shadow-gold-500/10'
                     : 'bg-red-950 border-red-500 text-red-300 animate-pulse'
                 }`}
-                title={isUnlocked ? 'Licencia Comercial Verificada' : `${remainingTrialDays} días de prueba restantes`}
+                title={isUnlocked ? t('modals.licenseStatusPro', 'Commercial License Verified') : `${remainingTrialDays} ${t('nav.freeTrial', 'days free trial')}`}
               >
                 <Key className="w-3.5 h-3.5" />
                 <span>
-                  {isUnlocked ? 'Licencia Pro' : `${remainingTrialDays}d Gratis`}
+                  {isUnlocked ? t('nav.proLicense', 'Pro License') : `${remainingTrialDays}${t('nav.freeTrial', 'd Free')}`}
                 </span>
               </button>
             )}
@@ -144,10 +150,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 onClick={onOpenAgencyModal}
                 className="hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-gold-400 text-[11px] sm:text-xs font-bold border border-gold-500/30 transition-all shadow-sm active:scale-95"
-                title="Configuración de Agencia B2B"
+                title={t('nav.agencyConfigSub', 'B2B Agency Settings')}
               >
                 <Building2 className="w-3.5 h-3.5 text-gold-400" />
-                <span>Agencia B2B</span>
+                <span>{t('nav.b2bAgency', 'B2B Agency')}</span>
               </button>
             )}
 
@@ -156,24 +162,24 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] sm:text-xs font-bold transition-all shadow-md shadow-emerald-600/20 active:scale-95 shrink-0"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
-              <span>WhatsApp QR</span>
+              <span>{t('nav.qrModal', 'WhatsApp QR')}</span>
             </button>
 
             {onLogout && (
               <button
                 onClick={onLogout}
                 className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-slate-500 hover:text-red-600 hover:bg-red-50 border border-slate-200 text-xs font-mono transition-all"
-                title="Cerrar Sesión"
+                title={t('nav.logout', 'Log Out')}
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span>Salir</span>
+                <span>{t('nav.logout', 'Log Out')}</span>
               </button>
             )}
 
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="p-1.5 sm:p-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900 lg:hidden shrink-0"
-              aria-label="Abrir menú"
+              aria-label={t('nav.openMenu', 'Open Menu')}
             >
               {isMobileMenuOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5" /> : <Menu className="w-4 h-4 sm:w-5 sm:h-5" />}
             </button>
@@ -184,6 +190,12 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Mobile Menu Drawer */}
       {isMobileMenuOpen && (
         <div className="lg:hidden border-t border-slate-200 bg-white/98 backdrop-blur-xl p-4 space-y-2 shadow-2xl animate-fade-in">
+          {/* Mobile Language Switch */}
+          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <span className="text-xs font-mono text-slate-500">{t('common.filter', 'Language')}:</span>
+            <LanguageSwitch />
+          </div>
+
           <button
             onClick={() => handleNavClick('crm')}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold font-mono ${
@@ -191,7 +203,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>CRM TDAH (Focus & Kanban)</span>
+            <span>{t('nav.crmSub', 'CRM Leads (Focus & Kanban)')}</span>
           </button>
 
           <button
@@ -201,7 +213,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <Send className="w-4 h-4" />
-            <span>WhatsApp & Campañas</span>
+            <span>{t('nav.whatsappCampaigns', 'WhatsApp & Campaigns')}</span>
           </button>
 
           <button
@@ -211,7 +223,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <FileSpreadsheet className="w-4 h-4" />
-            <span>Gestor Excels (Campañas y Leads)</span>
+            <span>{t('nav.excelSub', 'Excel Manager (Campaigns & Leads)')}</span>
           </button>
 
           <button
@@ -221,7 +233,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <Building2 className="w-4 h-4" />
-            <span>Proyectos Dubai Off-Plan</span>
+            <span>{t('nav.offPlanSub', 'Dubai Off-Plan Projects')}</span>
           </button>
 
           {onOpenAgencyModal && (
@@ -233,7 +245,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold font-mono text-gold-600 bg-slate-900"
             >
               <Building2 className="w-4 h-4" />
-              <span>Configuración Agencia B2B</span>
+              <span>{t('nav.agencyConfigSub', 'B2B Agency Settings')}</span>
             </button>
           )}
 
@@ -246,7 +258,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold font-mono text-red-600 hover:bg-red-50"
             >
               <LogOut className="w-4 h-4" />
-              <span>Cerrar Sesión</span>
+              <span>{t('nav.logout', 'Log Out')}</span>
             </button>
           )}
         </div>

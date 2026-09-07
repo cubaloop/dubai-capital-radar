@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Key, ShieldAlert, CheckCircle2, Clock, Zap, ArrowRight, Lock, HelpCircle } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export interface TrialState {
   registeredAt: number; // timestamp ms
@@ -80,6 +81,7 @@ interface LicenseModalProps {
 }
 
 export const LicenseModal: React.FC<LicenseModalProps> = ({ isOpen, onClose, userEmail, onSuccess }) => {
+  const { t } = useLanguage();
   const [keyInput, setKeyInput] = useState('');
   const [license, setLicense] = useState<TrialState>(getLicenseState(userEmail));
   const [error, setError] = useState('');
@@ -137,10 +139,10 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({ isOpen, onClose, use
             </div>
             <div>
               <h3 className="font-serif-luxury font-bold text-base text-gold-300">
-                Licencia Comercial & Planes
+                {t('modals.licenseTitle', 'Commercial License & Subscription')}
               </h3>
               <p className="text-[10px] text-slate-400 font-mono">
-                Dubai Capital Radar Enterprise SaaS
+                {t('modals.licenseSubtitle', 'Dubai Capital Radar Enterprise SaaS')}
               </p>
             </div>
           </div>
@@ -149,7 +151,7 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({ isOpen, onClose, use
               onClick={onClose}
               className="text-slate-400 hover:text-white text-xs font-mono px-2 py-1 rounded-lg hover:bg-slate-800 transition-colors"
             >
-              Cerrar
+              {t('common.close', 'Close')}
             </button>
           )}
         </div>
@@ -175,17 +177,17 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({ isOpen, onClose, use
             <div>
               <div className="font-bold text-sm">
                 {license.isUnlocked
-                  ? `Plan Activo: ${license.leadLimit} Leads (Licencia Verificada)`
+                  ? `${t('modals.licenseStatusPro', 'Commercial License Active')}: ${license.leadLimit} Leads`
                   : isExpired
-                  ? 'Periodo de Prueba de 30 Días Finalizado'
-                  : `Prueba Gratuita: ${remainingDays} días restantes`}
+                  ? 'Trial Period Expired'
+                  : `${t('modals.licenseStatusTrial', 'Free Trial Period')}: ${remainingDays} ${t('modals.licenseDaysRemaining', 'days remaining')}`}
               </div>
               <div className="text-xs text-slate-300 mt-1">
                 {license.isUnlocked
-                  ? `Tu agencia cuenta con acceso total para envíos y enriquecimiento con IA hasta ${license.leadLimit} leads.`
+                  ? `Your agency has full access for automated messaging and AI enrichment up to ${license.leadLimit} leads.`
                   : isExpired
-                  ? 'Para reactivar el acceso de tu agencia, introduce la llave de acceso generada por el proveedor.'
-                  : 'Cuentas con 30 días de acceso gratuito completo y hasta 250 leads para probar el sistema.'}
+                  ? 'To restore access for your agency, enter your commercial activation key.'
+                  : 'You have 30 days of complete access and up to 250 leads to test the platform.'}
               </div>
             </div>
           </div>
@@ -195,17 +197,17 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({ isOpen, onClose, use
             <div className={`p-3 rounded-xl border text-center transition-all ${
               license.plan === 'trial_250' ? 'border-gold-500 bg-gold-950/30' : 'border-slate-800 bg-slate-950/50'
             }`}>
-              <span className="text-[10px] font-mono text-gold-400 uppercase font-bold">Plan Starter</span>
+              <span className="text-[10px] font-mono text-gold-400 uppercase font-bold">Starter Plan</span>
               <div className="font-bold text-lg text-white mt-0.5">250</div>
-              <span className="text-[10px] text-slate-400">Leads / mes</span>
+              <span className="text-[10px] text-slate-400">Leads / mo</span>
             </div>
 
             <div className={`p-3 rounded-xl border text-center transition-all ${
               license.plan === 'plan_600' ? 'border-gold-500 bg-gold-950/30' : 'border-slate-800 bg-slate-950/50'
             }`}>
-              <span className="text-[10px] font-mono text-gold-400 uppercase font-bold">Plan Pro</span>
+              <span className="text-[10px] font-mono text-gold-400 uppercase font-bold">Pro Plan</span>
               <div className="font-bold text-lg text-white mt-0.5">600</div>
-              <span className="text-[10px] text-slate-400">Leads / mes</span>
+              <span className="text-[10px] text-slate-400">Leads / mo</span>
             </div>
 
             <div className={`p-3 rounded-xl border text-center transition-all ${
@@ -213,14 +215,14 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({ isOpen, onClose, use
             }`}>
               <span className="text-[10px] font-mono text-gold-400 uppercase font-bold">Enterprise</span>
               <div className="font-bold text-lg text-white mt-0.5">1,500</div>
-              <span className="text-[10px] text-slate-400">Leads / mes</span>
+              <span className="text-[10px] text-slate-400">Leads / mo</span>
             </div>
           </div>
 
           {/* Key activation form */}
           <form onSubmit={handleApplyKey} className="space-y-3 pt-2">
             <label className="block text-xs font-mono uppercase tracking-wider text-slate-300">
-              Introducir Llave de Acceso / Activación
+              {t('modals.licenseKeyLabel', 'Enter Activation License Key')}
             </label>
             <div className="relative">
               <Key className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
@@ -229,7 +231,7 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({ isOpen, onClose, use
                 required
                 value={keyInput}
                 onChange={(e) => setKeyInput(e.target.value)}
-                placeholder="Ej: DCR-600-XXXXX o RADAR-PRO-600"
+                placeholder={t('modals.licenseKeyPlaceholder', 'DCR-PRO-XXXX-XXXX-XXXX')}
                 className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:border-gold-500 focus:ring-1 focus:ring-gold-500 outline-none uppercase font-mono"
               />
             </div>
@@ -245,7 +247,7 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({ isOpen, onClose, use
               type="submit"
               className="w-full py-2.5 rounded-xl bg-gradient-to-r from-gold-500 via-amber-400 to-gold-500 text-slate-950 font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-gold-500/20 active:scale-95 flex items-center justify-center gap-1.5"
             >
-              <span>Activar Llave de Licencia</span>
+              <span>{t('modals.activateBtn', 'Activate License')}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </form>
@@ -253,7 +255,7 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({ isOpen, onClose, use
           {/* Help note */}
           <div className="text-[11px] text-slate-400 flex items-center gap-1.5 pt-1">
             <HelpCircle className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-            <span>¿Necesitas una llave o ampliar a 600 / 1500 leads? Contacta a tu asesor comercial en Dubai.</span>
+            <span>Need a key or looking to upgrade to 600 / 1,500 leads? Contact your account executive.</span>
           </div>
         </div>
       </div>

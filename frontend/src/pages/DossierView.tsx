@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { DossierResponse, RealEstateProject } from '../types';
 import { apiService } from '../services/api';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface DossierViewProps {
   slugOrId: string;
@@ -408,8 +409,15 @@ export const DossierView: React.FC<DossierViewProps> = ({ slugOrId, onBack, isCl
     return 'USD';
   };
 
+  const { language: globalLang } = useLanguage();
   const [currency, setCurrency] = useState<CurrencyCode>(() => detectCurrency(dossier.prospect.country));
-  const [language, setLanguage] = useState<LanguageCode>('en');
+  const [language, setLanguage] = useState<LanguageCode>((globalLang === 'es' ? 'es' : 'en') as LanguageCode);
+
+  useEffect(() => {
+    if (globalLang === 'es' || globalLang === 'en') {
+      setLanguage(globalLang as LanguageCode);
+    }
+  }, [globalLang]);
 
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
 
