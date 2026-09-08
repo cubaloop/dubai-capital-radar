@@ -82,6 +82,16 @@ def init_crm_db():
     )
     """)
 
+    # 4. Super-Admin Copilot Conversation History table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS copilot_chat (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    )
+    """)
+
     conn.commit()
     
     # Auto-seed initial campaigns if empty
@@ -671,6 +681,22 @@ def delete_lead_db(lead_id: str) -> bool:
     conn.commit()
     conn.close()
     return True
+
+def save_copilot_message_db(role: str, content: str):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("INSERT INTO copilot_chat (role, content, created_at) VALUES (?, ?, ?)", (role, content, now_str))
+    conn.commit()
+    conn.close()
+
+def get_recent_copilot_history_db(limit: int = 14) -> List[Dict[str, str]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT role, content FROM copilot_chat ORDER BY id DESC LIMIT ?", (limit,))
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"role": r["role"], "content": r["content"]} for r in reversed(rows)]
 
 # Initialize on import
 init_crm_db()

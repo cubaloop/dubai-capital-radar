@@ -839,209 +839,182 @@ from .inventory.project_parser import parse_project_from_text, is_developer_or_l
 from .outreach.ai_agent import classify_message_intent, generate_ai_response
 from .content.social_generator import generate_daily_social_pack
 from .outreach.telegram_notifier import notify_hot_prospect_reply, notify_developer_launch
-from .database.crm_db import get_db_connection, add_lead_note_db
+from .database.crm_db import (
+    get_db_connection, 
+    add_lead_note_db, 
+    save_copilot_message_db, 
+    get_recent_copilot_history_db
+)
 from .database.supabase_sync import sync_lead_background
 from datetime import datetime
 
 INGESTED_PROJECTS_FEED: List[Dict[str, Any]] = []
 ADMIN_PHONE_DIGITS = "971508379080"
 
-async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_phone: str = ""):
-    """
-    Handles inquiries directly from the Super-Admin / Broker (+971508379080).
-    Uses 'Jota' as the wake word / bot identity, with instant fallback for direct operational queries.
-    """
-    lower = command_text.lower().strip()
-    
-    # Check for wake word 'Jota' or standard operational intents
-    has_jota = "jota" in lower
-    is_leads_inquiry = any(k in lower for k in ["respondieron", "respondio", "respuestas", "leads hoy", "ultimas 24", "últimas 24", "cuantos leads", "cuántos leads", "quienes", "quiénes"])
-    is_summary_inquiry = any(k in lower for k in ["campaña", "campana", "estado", "resumen", "total leads", "reporte", "informe", "metricas", "métricas", "como vamos", "cómo vamos", "status"])
-    is_credentials_inquiry = any(k in lower for k in ["credencial", "credenciales", "acceso", "accesos", "clave", "claves", "login", "password", "mi empresa", "contraseña", "usuario", "mi cuenta"])
-
-    # If message is not directed to Jota and is not an operational query, ignore to keep chat quiet
-    if not (has_jota or is_leads_inquiry or is_summary_inquiry or is_credentials_inquiry):
-        return {"status": "ignored", "reason": "no_wake_word_jota"}
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    reply_msg = ""
-
-    # Query 0: Credentials for his agency & admin portal
-    if is_credentials_inquiry:
-        reply_msg = (
-            "🏢 *DUBAI CAPITAL RADAR — CREDENCIALES DE ACCESO*\n\n"
-            "Hola David, aquí tienes a mano los accesos oficiales para tu empresa:\n\n"
-            "🌐 *Portal Web:*\nhttps://dubai-miami-radar.onrender.com\n\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "🔑 *Acceso Empresa (H.O.M.E Properties):*\n"
-            "• *Email:* home@homeproperties.ae\n"
-            "• *Contraseña:* Dubai2026!\n"
-            "• *Agencia:* H.O.M.E Properties\n"
-            "• *Persona:* David, Asesor Senior en Inversiones Inmobiliarias Dubai\n"
-            "• *Mercado:* Dubai (Downtown, Palm Jumeirah, Dubai Hills)\n"
-            "• *Moneda:* USD ($)\n\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "👑 *Acceso Master Admin (Control Total):*\n"
-            "• *Email:* admin@dubaicapitalradar.com\n"
-            "• *Contraseña:* Dubai2026!\n"
-            "• *Rol:* Super-Admin\n"
-            "• *Instancia RLS:* Supabase Cloud Multi-Tenant\n\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "🤖 *Línea del Bot WhatsApp:* +971 50 137 8020 (Conectado)"
-        )
-
-    # Query 1: Specific drill-down into leads that replied / were contacted in last 24h
-    elif is_leads_inquiry and not ("resumen de campañ" in lower or "resumen de campana" in lower):
-        cursor.execute("""
-        SELECT l.name, l.phone, l.crm_status, l.notes, l.last_contact_date, c.name as campaign_name
-        FROM leads l
-        LEFT JOIN campaigns c ON l.campaign_id = c.id
-        WHERE l.crm_status IN ('INTERESTED', 'HOT', 'REPLIED')
-           OR l.whatsapp_status IN ('replied', 'interested', 'hot')
-        ORDER BY l.last_contact_date DESC NULLS LAST
-        LIMIT 10
-        """)
-        rows = cursor.fetchall()
+def get_jota_system_prompt() -> str:
+    """Generates dynamic, rich system prompt with real-time business and database state."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
-        # If no actual replies yet, show recent contacted as fallback
-        if not rows:
-            cursor.execute("""
-            SELECT l.name, l.phone, l.crm_status, l.notes, l.last_contact_date, c.name as campaign_name
-            FROM leads l
-            LEFT JOIN campaigns c ON l.campaign_id = c.id
-            WHERE l.crm_status = 'CONTACTED'
-            ORDER BY l.last_contact_date DESC NULLS LAST
-            LIMIT 5
-            """)
-            rows = cursor.fetchall()
-            is_fallback = True
-        else:
-            is_fallback = False
-        
-        if not rows:
-            reply_msg = "📊 *Reporte Copiloto Jota*\n\nActualmente no se han registrado respuestas entrantes en las últimas 24h.\nLas campañas activas continúan en seguimiento."
-        else:
-            title = "📊 *Reporte Copiloto Jota — Leads Activos*"
-            sub = f"Leads que respondieron recientemente ({len(rows)} activos):" if not is_fallback else f"Sin respuestas directas hoy. Últimos {len(rows)} contactados:"
-            lines = [f"{title}\n{sub}"]
-            for idx, r in enumerate(rows, 1):
-                clean_name = r["name"] or "Inversor"
-                phone_num = r["phone"] or ""
-                camp = r["campaign_name"] or "General"
-                status = r["crm_status"] or "CONTACTED"
-                notes = (r["notes"] or "").split("\n")[-1]
-                lines.append(f"\n{idx}. *{clean_name}* ({phone_num})\n   • Campaña: _{camp}_\n   • Estado: *{status}*\n   • Nota: {notes[:80] if notes else 'En seguimiento'}")
-            
-            lines.append("\n✅ _Todos los datos están sincronizados en tiempo real con tu CRM y Supabase._")
-            reply_msg = "\n".join(lines)
-
-    # Query 2: Standalone wake greeting (e.g. "Jota", "Hola Jota", "Hey Jota")
-    elif lower in ["jota", "hola jota", "oye jota", "hey jota", "buenas jota"]:
-        reply_msg = (
-            "👋 *¡Hola David! Aquí Jota, tu copiloto de IA en Dubai Capital Radar.*\n\n"
-            "¿En qué te puedo apoyar hoy? Puedes pedirme:\n"
-            "📊 *'Jota, resumen'* — Avance de campañas y envíos\n"
-            "👥 *'Jota, leads'* — Inversores que respondieron hoy\n"
-            "🔑 *'Jota, credenciales'* — Accesos del sistema\n"
-            "💡 O hacerme cualquier consulta libre sobre propiedades, objeciones de clientes o redacción de mensajes."
-        )
-
-    # Query 3: Executive Campaign Summary & Overall Pulse
-    elif is_summary_inquiry and not ("jota" in lower and len(lower.split()) > 3):
+        # 1. Campaigns overview
         cursor.execute("""
         SELECT c.name, COUNT(l.id) as total,
                SUM(CASE WHEN l.whatsapp_status = 'sent' THEN 1 ELSE 0 END) as sent,
-               SUM(CASE WHEN l.crm_status IN ('INTERESTED', 'HOT', 'REPLIED') THEN 1 ELSE 0 END) as replied
+               SUM(CASE WHEN l.crm_status IN ('APPOINTMENT', 'INTERESTED', 'HOT', 'REPLIED') THEN 1 ELSE 0 END) as active
         FROM campaigns c
         LEFT JOIN leads l ON c.id = l.campaign_id
         GROUP BY c.id
         """)
         camps = cursor.fetchall()
-        lines = ["📈 *Resumen Ejecutivo — Copiloto Jota*"]
+        camp_lines = []
         for c in camps:
-            lines.append(f"\n• *{c['name']}*:\n  - 🎯 Total: {c['total']} leads\n  - 📨 Enviados: {c['sent']}\n  - 💬 Respuestas: {c['replied']}")
-        
-        # Also include recent replied leads preview if any
+            camp_lines.append(f"• {c['name']}: {c['total']} leads ({c['sent']} contactados, {c['active']} activos/citas)")
+
+        # 2. Confirmed & scheduled Novotel Madrid Expo attendees
         cursor.execute("""
-        SELECT l.name, l.phone, l.crm_status, l.notes
-        FROM leads l
-        WHERE l.crm_status IN ('INTERESTED', 'HOT', 'REPLIED')
-        ORDER BY l.last_contact_date DESC NULLS LAST
-        LIMIT 3
+        SELECT name, phone, timeline, notes, crm_status
+        FROM leads
+        WHERE campaign_id = 'spain_madrid_expo' AND crm_status IN ('APPOINTMENT', 'FOLLOW_UP')
+        ORDER BY crm_status ASC, id ASC
         """)
-        recent_replies = cursor.fetchall()
-        if recent_replies:
-            lines.append("\n🔥 *Inversores Interesados Recientes:*")
-            for rr in recent_replies:
-                lines.append(f"  • *{rr['name']}* ({rr['phone']}): _{rr['crm_status']}_")
+        expo_leads = cursor.fetchall()
+        expo_lines = []
+        for el in expo_leads:
+            expo_lines.append(f"• {el['name']} ({el['phone']}) -> {el['crm_status']} | Horario: {el['timeline'] or 'Por definir'} | Detalle: {el['notes']}")
 
-        lines.append("\n🟢 *Bot WhatsApp:* Conectado y en línea (+971501378020)")
-        reply_msg = "\n".join(lines)
+        conn.close()
+    except Exception as e:
+        camp_lines = [f"• Error cargando campañas: {e}"]
+        expo_lines = []
 
-    # Query 4: Open Intelligence / Copilot Advisory via Groq (Llama 3.3 70B) or Gemini
-    else:
-        import re
-        clean_question = re.sub(r'^(oye\s+)?jota[,:\s]*', '', command_text, flags=re.IGNORECASE).strip()
-        if not clean_question:
-            clean_question = command_text
+    prompt = f"""Eres JOTA, el Asistente Inteligente de IA de David (Super-Admin y Broker Senior de H.O.M.E Properties en Dubai y Dubai Capital Radar).
+Eres su copiloto de máxima confianza: resolutivo, altamente inteligente, ejecutivo, proactivo, analítico y cercano. No eres un bot rígido ni tienes restricciones preprogramadas de palabras clave o formato. Comprendes perfectamente el contexto, la intención y el fondo de cada mensaje.
 
-        groq_key = os.getenv("GROQ_API_KEY", "").strip()
-        gemini_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
+CONOCIMIENTO OPERATIVO Y BASE DE DATOS EN TIEMPO REAL:
+1. EVENTO INMEDIATO: Dubai Property Expo en Hotel Novotel Madrid Center (9 y 10 de Septiembre 2026).
+   - Horario: 10:00 AM a 8:00 PM.
+   - Beneficios exclusivos: 15-20% descuento exclusivo, Property Management 100% gratis, Golden Visa de 10 años gratis, planes de pago directos desde 1% mensual sin hipoteca.
+   - Asistentes Confirmados y en Seguimiento registrados en tu CRM:
+{chr(10).join(expo_lines) if expo_lines else "• Sincronizando datos de asistentes..."}
 
-        sys_prompt = (
-            "Eres Jota, el copiloto de IA de David, Super-Admin de Dubai Capital Radar y broker senior de H.O.M.E Properties en Dubai. "
-            "Responde siempre en español, con tono ejecutivo, seguro y experto en inversiones inmobiliarias en Dubai "
-            "(Downtown, Palm Jumeirah, Dubai Hills, Business Bay, off-plan, Golden Visa, ROI del 8-10% neto, plusvalía, fiscalidad 0% y planes de pago flexibles). "
-            "Sé conciso, directo y usa formato de WhatsApp (negritas y viñetas cuando convenga). Máximo 3 o 4 párrafos cortos."
+2. CAMPAÑAS Y MÉTRICAS ACTUALES:
+{chr(10).join(camp_lines) if camp_lines else "• Campaña Novotel Madrid Expo activa."}
+
+3. ACCESOS Y CREDENCIALES OFICIALES:
+   - Portal Web CRM: https://dubai-miami-radar.onrender.com
+   - Empresa: H.O.M.E Properties | Email: home@homeproperties.ae | Pass: Dubai2026!
+   - Super-Admin: admin@dubaicapitalradar.com | Pass: Dubai2026!
+   - Bot WhatsApp: +971 50 137 8020
+
+4. INVERSIONES INMOBILIARIAS DUBAI:
+   - Zonas top: Downtown Dubai, Palm Jumeirah, Dubai Hills Estate, Business Bay, Dubai Marina, Creek Harbour.
+   - Desarrolladoras líderes: Emaar, Sobha, Damac, Nakheel, Binghatti, Ellington, Meraas.
+   - Atractivo clave: 0% impuestos personales y de ganancias de capital, rentabilidades netas del 8-10%, Golden Visa con inversión desde 2,000,000 AED (~$545,000 USD / ~€500,000 EUR).
+
+5. TU COMPORTAMIENTO Y FORMA DE TRABAJAR:
+   - Responde siempre en español, de forma ejecutiva, natural, profesional y directa.
+   - Si David te envía datos, listas, tablas o CSVs, léelos y analízalos con detenimiento, extrae conclusiones, confirma lo registrado y recomiéndale los siguientes pasos comerciales.
+   - Si David te pide resúmenes, estados o cifras, dale un informe ejecutivo claro con los datos reales de arriba.
+   - Si David te pide credenciales, dale sus accesos de H.O.M.E Properties y Super-Admin de forma limpia.
+   - Si David te pide redacción, tácticas de cierre, objeciones o asesoría, dale respuestas de alto nivel comercial.
+   - Mantén el hilo de la conversación recordando los mensajes anteriores que han intercambiado.
+   - Usa formato WhatsApp limpio (negritas y viñetas) para que se lea perfectamente en el móvil.
+"""
+    return prompt
+
+async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_phone: str = ""):
+    """
+    Handles inquiries from Super-Admin / Broker with full intelligence,
+    dynamic real-time CRM context, and conversation memory. Zero restrictions.
+    """
+    text = command_text.strip()
+    if not text:
+        return {"status": "ignored", "reason": "empty"}
+
+    # Save incoming user message to persistent conversation history
+    save_copilot_message_db(role="user", content=text)
+
+    # Fetch recent conversation history (last 10 messages)
+    history = get_recent_copilot_history_db(limit=10)
+    past_history = history[:-1] if history else []
+
+    system_prompt = get_jota_system_prompt()
+
+    groq_key = os.getenv("GROQ_API_KEY", "").strip()
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
+
+    reply_msg = ""
+
+    # Build messages array for LLM
+    messages = [{"role": "system", "content": system_prompt}]
+    for turn in past_history:
+        role = "assistant" if turn["role"] in ["assistant", "model", "jota"] else "user"
+        messages.append({"role": role, "content": turn["content"]})
+    messages.append({"role": "user", "content": text})
+
+    # 1. Try Groq (Llama 3.3 70B Versatile / Llama 3.1 8B Instant)
+    if groq_key:
+        for model_name in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]:
+            try:
+                async with httpx.AsyncClient(timeout=18.0) as client:
+                    payload = {
+                        "model": model_name,
+                        "messages": messages,
+                        "temperature": 0.4,
+                        "max_tokens": 1000
+                    }
+                    r = await client.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        json=payload,
+                        headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
+                    )
+                    if r.status_code == 200:
+                        ans = r.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                        if ans:
+                            reply_msg = ans
+                            break
+            except Exception as e:
+                print(f"⚠️ [Groq Copilot Warning - {model_name}]: {e}")
+
+    # 2. Try Gemini 1.5 Flash fallback if Groq failed or not set
+    if not reply_msg and gemini_key:
+        try:
+            gem_contents = []
+            for turn in past_history:
+                r_gem = "model" if turn["role"] in ["assistant", "model", "jota"] else "user"
+                gem_contents.append({"role": r_gem, "parts": [{"text": turn["content"]}]})
+            gem_contents.append({"role": "user", "parts": [{"text": f"[ROL Y CONTEXTO DEL SISTEMA:\n{system_prompt}]\n\nMensaje de David: {text}"}]})
+
+            async with httpx.AsyncClient(timeout=18.0) as client:
+                gem_payload = {"contents": gem_contents}
+                r = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}",
+                    json=gem_payload
+                )
+                if r.status_code == 200:
+                    cand = r.json().get("candidates", [])
+                    if cand:
+                        reply_msg = cand[0]["content"]["parts"][0]["text"].strip()
+        except Exception as e:
+            print(f"⚠️ [Gemini Copilot Warning]: {e}")
+
+    # 3. Intelligent local fallback if both cloud providers fail
+    if not reply_msg:
+        reply_msg = (
+            f"👋 *Hola David, recibí tu mensaje.*\n\n"
+            f"He tomado nota de tu consulta. Los datos del evento de Madrid (Novotel) y las campañas están sincronizados en tiempo real en tu CRM.\n"
+            f"Dime en qué detalle específico de la operativa o los clientes deseas que nos enfoquemos ahora."
         )
 
-        if groq_key:
-            for gm in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]:
-                try:
-                    async with httpx.AsyncClient(timeout=12.0) as client:
-                        payload = {
-                            "model": gm,
-                            "messages": [
-                                {"role": "system", "content": sys_prompt},
-                                {"role": "user", "content": clean_question}
-                            ],
-                            "temperature": 0.3,
-                            "max_tokens": 500
-                        }
-                        r = await client.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"})
-                        if r.status_code == 200:
-                            reply_msg = r.json()["choices"][0]["message"]["content"].strip()
-                            break
-                except Exception:
-                    pass
+    # Save assistant reply to persistent conversation history
+    save_copilot_message_db(role="assistant", content=reply_msg)
 
-        if not reply_msg and gemini_key:
-            try:
-                async with httpx.AsyncClient(timeout=12.0) as client:
-                    gem_payload = {
-                        "contents": [
-                            {"parts": [{"text": f"{sys_prompt}\n\nPregunta de David: {clean_question}"}]}
-                        ]
-                    }
-                    r = await client.post(f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}", json=gem_payload)
-                    if r.status_code == 200:
-                        cand = r.json().get("candidates", [])
-                        if cand:
-                            reply_msg = cand[0]["content"]["parts"][0]["text"].strip()
-            except Exception:
-                pass
-
-        if not reply_msg:
-            reply_msg = f"👋 Hola David, recibí tu consulta: \"{clean_question}\". Puedes pedirme tus reportes directos con *'Jota, resumen'* o *'Jota, leads'*."
-
-    conn.close()
-    
     # Send response back to admin via WhatsApp
     try:
-        print(f"[ADMIN COPILOT] Dispatching reply to Super-Admin ({ADMIN_PHONE_DIGITS}):\n{reply_msg}")
+        print(f"[ADMIN COPILOT] Dispatching reply to Super-Admin ({ADMIN_PHONE_DIGITS}):\n{reply_msg[:120]}...")
     except UnicodeEncodeError:
-        print(f"[ADMIN COPILOT] Dispatching reply to Super-Admin ({ADMIN_PHONE_DIGITS}):\n{reply_msg.encode('ascii', 'backslashreplace').decode('ascii')}")
+        print(f"[ADMIN COPILOT] Dispatching reply to Super-Admin ({ADMIN_PHONE_DIGITS})")
 
     target_jid = sender_jid if sender_jid else f"{ADMIN_PHONE_DIGITS}@s.whatsapp.net"
     target_phone = sender_phone if (sender_phone and len(sender_phone) >= 8 and not sender_jid.endswith('@lid')) else ADMIN_PHONE_DIGITS
@@ -1145,15 +1118,41 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     )
     matched_lead = cursor.fetchone()
 
-    # Non-lead number: immediately discard without triggering AI or alerts
+    # Unlisted number: auto-register in CRM as Inbound Lead so no prospect or inquiry is ever lost
     if not matched_lead:
-        conn.close()
-        print(f"[WhatsApp Inbound Filter] Ignored message from unlisted number +{sender}. Not in CRM leads.")
-        return {
-            "status": "ignored",
-            "reason": "not_in_crm_leads",
-            "sender": sender
-        }
+        new_lid = f"inbound_{int(datetime.now().timestamp())}"
+        contact_name = payload.get("push_name") or f"Inversor +{sender_digits}"
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+        INSERT INTO leads (
+            id, campaign_id, name, phone, clean_phone, email,
+            objective, timeline, notes, crm_status, whatsapp_status,
+            last_contact_date, last_sent_type, personalized_message,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            new_lid,
+            "spain_madrid_expo",
+            contact_name,
+            f"+{sender_digits}",
+            sender_digits,
+            "",
+            "Consulta Entrante WhatsApp",
+            "",
+            f"💬 Primer contacto recibido vía WhatsApp: \"{text[:120]}\"",
+            "CONTACTED",
+            "replied",
+            now_str,
+            "inbound",
+            "",
+            now_str
+        ))
+        conn.commit()
+        cursor.execute("SELECT * FROM leads WHERE id = ?", (new_lid,))
+        matched_lead = cursor.fetchone()
+        if matched_lead:
+            sync_lead_background(dict(matched_lead))
+        print(f"[Inbound Auto-Register] Registered new lead in CRM for +{sender}: '{contact_name}'")
 
     # SENDER IS A REGISTERED LEAD: Process intent & update CRM records
     lid = matched_lead["id"]
