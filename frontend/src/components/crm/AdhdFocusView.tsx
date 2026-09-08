@@ -18,7 +18,8 @@ import {
   AlertTriangle,
   Calendar,
   Send,
-  Loader2
+  Loader2,
+  ExternalLink
 } from 'lucide-react';
 
 interface AdhdFocusViewProps {
@@ -229,41 +230,39 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
             {currentLead.personalized_message || t('crm.noMessageGen', 'No message generated.')}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+          <div className="flex items-center justify-center gap-3 pt-2">
+            {/* WhatsApp Send 1-Click */}
             <button
               onClick={() => onSendWhatsApp(currentLead)}
               disabled={sendingLeadId === currentLead.id}
-              className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-white font-black py-3.5 rounded-2xl text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 active:scale-95 transition-all disabled:opacity-50"
+              className="flex-1 max-w-[150px] h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-md shadow-emerald-600/25 active:scale-95 transition-all disabled:opacity-50"
+              title="Enviar WhatsApp Oficial"
             >
               {sendingLeadId === currentLead.id ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>{t('crm.dispatching', 'Dispatching...')}</span>
-                </>
+                <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
-                <>
-                  <Send className="w-4 h-4" />
-                  <span>{t('crm.sendOfficialWa', 'Send WhatsApp')}</span>
-                </>
+                <MessageSquare className="w-5 h-5" />
               )}
             </button>
 
+            {/* Direct Phone Call */}
             <a
               href={`tel:${cleanDigits}`}
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-2xl text-xs font-mono flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 transition active:scale-95"
+              className="flex-1 max-w-[150px] h-12 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl flex items-center justify-center shadow-md shadow-blue-600/20 transition active:scale-95"
+              title="Llamar directamente al lead"
             >
-              <Phone className="w-4 h-4" />
-              <span>Llamar al Lead</span>
+              <Phone className="w-5 h-5" />
             </a>
 
+            {/* Open in WhatsApp Web */}
             <a
               href={waWebLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 font-bold py-3.5 rounded-2xl text-xs font-mono flex items-center justify-center gap-2 transition"
+              className="flex-1 max-w-[150px] h-12 bg-slate-100 hover:bg-slate-200 text-emerald-700 border border-slate-200 rounded-2xl flex items-center justify-center transition active:scale-95"
+              title="Abrir en WhatsApp Web"
             >
-              <MessageSquare className="w-4 h-4 text-emerald-600" />
-              <span>{t('crm.openWaWeb', 'WhatsApp Web')}</span>
+              <ExternalLink className="w-5 h-5" />
             </a>
           </div>
         </div>

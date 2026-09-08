@@ -853,15 +853,15 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0 pt-1 sm:pt-0">
+                    <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0 pt-1 sm:pt-0">
                       {lead.phone && (
                         <a
                           href={`tel:${lead.phone.replace(/[^0-9+]/g, '')}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition shadow-sm flex items-center justify-center"
+                          className="w-8 h-8 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 transition shadow-sm flex items-center justify-center active:scale-95"
                           title="Llamar directamente al lead"
                         >
-                          <Phone className="w-3.5 h-3.5" />
+                          <Phone className="w-4 h-4" />
                         </a>
                       )}
 
@@ -870,10 +870,10 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="p-2 rounded-xl bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 border border-slate-200 transition"
+                        className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-emerald-50 hover:text-emerald-600 text-slate-600 border border-slate-200 transition flex items-center justify-center active:scale-95"
                         title="Abrir en WhatsApp Web"
                       >
-                        <ExternalLink className="w-3.5 h-3.5" />
+                        <MessageSquare className="w-4 h-4" />
                       </a>
 
                       <button
@@ -882,27 +882,19 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                           handleSendSingleLead(lead);
                         }}
                         disabled={isSendingThis}
-                        className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl font-bold font-mono text-xs flex items-center gap-1.5 transition-all shadow-sm active:scale-95 disabled:opacity-50 ${
+                        className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all shadow-sm active:scale-95 disabled:opacity-50 ${
                           isSent
-                            ? 'bg-slate-100 hover:bg-slate-200 text-emerald-800 border border-slate-300'
+                            ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300'
                             : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
                         }`}
+                        title={isSent ? "Reenviar mensaje de WhatsApp" : "Enviar mensaje de WhatsApp"}
                       >
                         {isSendingThis ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>{t('campaigns.sending', 'Sending...')}</span>
-                          </>
+                          <Loader2 className="w-4 h-4 animate-spin" />
                         ) : isSent ? (
-                          <>
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>{t('campaigns.sendNow', 'Resend')}</span>
-                          </>
+                          <CheckCircle2 className="w-4 h-4" />
                         ) : (
-                          <>
-                            <Send className="w-3.5 h-3.5" />
-                            <span>{t('campaigns.sendNow', 'Send')}</span>
-                          </>
+                          <Send className="w-4 h-4" />
                         )}
                       </button>
                     </div>
@@ -1017,33 +1009,40 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
 
                 {/* Action Buttons: Real Send + Test to My WhatsApp */}
                 <div className="space-y-2.5 pt-1">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="flex items-center gap-2 pt-1">
                     {/* 1-Click Send Button to Client */}
                     <button
                       onClick={() => handleSendSingleLead(selectedLeadPreview)}
                       disabled={sendingLeadId === selectedLeadPreview.id}
-                      className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3.5 rounded-2xl text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all disabled:opacity-50"
+                      className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-white font-bold py-3 rounded-xl text-xs font-mono flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 active:scale-95 transition-all disabled:opacity-50"
+                      title="Enviar mensaje oficial por WhatsApp"
                     >
                       {sendingLeadId === selectedLeadPreview.id ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>{t('campaigns.sending', 'Dispatching...')}</span>
-                        </>
+                        <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
-                        <>
-                          <Send className="w-4 h-4" />
-                          <span>{t('campaigns.sendNow', 'Send WhatsApp')}</span>
-                        </>
+                        <MessageSquare className="w-4 h-4" />
                       )}
+                      <span>Enviar WhatsApp</span>
                     </button>
 
                     {/* Direct Phone Call Button */}
                     <a
                       href={`tel:${selectedLeadPreview.phone.replace(/[^0-9+]/g, '')}`}
-                      className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-3.5 rounded-2xl text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-95 transition-all"
+                      className="w-12 h-11 bg-blue-600 hover:bg-blue-500 text-white rounded-xl flex items-center justify-center shadow-md shadow-blue-600/20 active:scale-95 transition-all shrink-0"
+                      title="Llamar directamente al lead"
                     >
                       <Phone className="w-4 h-4" />
-                      <span>Llamar al Lead</span>
+                    </a>
+
+                    {/* WhatsApp Web link */}
+                    <a
+                      href={`https://wa.me/${(selectedLeadPreview.phone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(selectedLeadPreview.personalized_message || '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-12 h-11 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 border border-slate-200 rounded-xl flex items-center justify-center transition active:scale-95 shrink-0"
+                      title="Abrir en WhatsApp Web"
+                    >
+                      <ExternalLink className="w-4 h-4" />
                     </a>
                   </div>
 

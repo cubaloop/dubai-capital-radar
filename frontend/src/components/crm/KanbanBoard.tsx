@@ -130,12 +130,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       <span className="truncate max-w-[150px] text-gold-700 font-mono font-semibold">
                         {lead.campaign_name || lead.campaign_id}
                       </span>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         {lead.phone && (
                           <a
                             href={`tel:${lead.phone.replace(/[^0-9+]/g, '')}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 transition"
+                            className="w-7 h-7 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 transition flex items-center justify-center active:scale-95"
                             title="Llamar directamente al lead"
                           >
                             <Phone className="w-3.5 h-3.5" />
@@ -146,7 +146,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 transition"
+                          className="w-7 h-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 transition flex items-center justify-center active:scale-95"
                           title="Abrir WhatsApp Web"
                         >
                           <MessageSquare className="w-3.5 h-3.5" />
@@ -156,7 +156,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             e.stopPropagation();
                             onSelectLead(lead);
                           }}
-                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+                          className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 flex items-center justify-center active:scale-95"
+                          title="Ver detalle del lead"
                         >
                           <ChevronRight className="w-3.5 h-3.5" />
                         </button>
