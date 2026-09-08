@@ -96,6 +96,28 @@ async def send_whatsapp_endpoint(payload: Dict[str, Any]):
     target_jid = payload.get("jid")
     return await dispatch_whatsapp_direct(to_phone=to_phone, message=message, bypass_shield=True, target_jid=target_jid)
 
+@app.get("/api/debug/test-groq")
+async def debug_test_groq():
+    """Tests the Groq API key directly from Render's servers."""
+    groq_key = os.getenv("GROQ_API_KEY", "").strip()
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not groq_key:
+        return {"groq": "NO KEY SET", "gemini_key_present": bool(gemini_key)}
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                json={"model": "llama3-8b-8192", "messages": [{"role": "user", "content": "di hola"}], "max_tokens": 10},
+                headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
+            )
+            if r.status_code == 200:
+                ans = r.json()["choices"][0]["message"]["content"]
+                return {"groq": "OK", "response": ans, "key_prefix": groq_key[:12], "gemini_key_present": bool(gemini_key)}
+            else:
+                return {"groq": f"ERROR {r.status_code}", "body": r.text[:300], "key_prefix": groq_key[:12]}
+    except Exception as e:
+        return {"groq": "EXCEPTION", "error": str(e), "key_prefix": groq_key[:12]}
+
 @app.post("/api/whatsapp/reset-contact-session")
 async def api_reset_contact_session(payload: Optional[Dict[str, Any]] = None):
     """Clears stale Signal session ratchet keys for a contact to force a fresh pre-key handshake."""
