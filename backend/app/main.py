@@ -955,44 +955,17 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
 
     debug_errors = []
 
-    # 1. Try Groq (Llama 3.3 70B Versatile / Llama 3.1 8B Instant)
-    if groq_key:
-        for model_name in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "openai/gpt-oss-120b", "llama3-70b-8192"]:
-            try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    payload = {
-                        "model": model_name,
-                        "messages": messages,
-                        "temperature": 0.4,
-                        "max_tokens": 1000
-                    }
-                    r = await client.post(
-                        "https://api.groq.com/openai/v1/chat/completions",
-                        json=payload,
-                        headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json", "User-Agent": "Mozilla/5.0"}
-                    )
-                    if r.status_code == 200:
-                        ans = r.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-                        if ans:
-                            reply_msg = ans
-                            break
-                    else:
-                        debug_errors.append(f"Groq {model_name} HTTP {r.status_code}: {r.text[:200]}")
-            except Exception as e:
-                debug_errors.append(f"Groq {model_name} exception: {str(e)}")
-
-    # 2. Try Gemini fallback if Groq failed or not set
-    if not reply_msg and gemini_key:
-        # Format conversation cleanly in user message to avoid 400 role validation errors
+    # 1. PRIMARY: Try Gemini (Fastest sub-second generation with rich context)
+    if gemini_key:
         hist_text = "\n".join([f"{'Jota' if t['role'] in ['assistant', 'model', 'jota'] else 'David'}: {t['content']}" for t in past_history])
-        gem_prompt = f"{system_prompt}\n\nHISTORIAL DE CONVERSACIÓN:\n{hist_text}\n\nMENSAJE ACTUAL DE DAVID:\n{text}\n\nResponde como Jota:"
+        gem_prompt = f"{system_prompt}\n\nHISTORIAL DE CONVERSACIÓN RECIENTE:\n{hist_text}\n\nMENSAJE ACTUAL DE DAVID:\n{text}\n\nResponde como Jota (ejecutivo, experto, natural, formato WhatsApp):"
 
-        for gem_model in ["gemini-1.5-flash", "gemini-flash-latest", "gemini-2.0-flash", "gemini-2.5-flash"]:
+        for gem_model in ["gemini-1.5-flash", "gemini-flash-latest", "gemini-2.0-flash"]:
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with httpx.AsyncClient(timeout=8.0) as client:
                     gem_payload = {
                         "contents": [{"parts": [{"text": gem_prompt}]}],
-                        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 1000}
+                        "generationConfig": {"temperature": 0.35, "maxOutputTokens": 1000}
                     }
                     r = await client.post(
                         f"https://generativelanguage.googleapis.com/v1beta/models/{gem_model}:generateContent?key={gemini_key}",
@@ -1006,10 +979,32 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
                                 reply_msg = parts[0]["text"].strip()
                                 if reply_msg:
                                     break
-                    else:
-                        debug_errors.append(f"Gemini {gem_model} HTTP {r.status_code}: {r.text[:200]}")
             except Exception as e:
-                debug_errors.append(f"Gemini {gem_model} exception: {str(e)}")
+                pass
+
+    # 2. SECONDARY: Try Groq fallback
+    if not reply_msg and groq_key:
+        for model_name in ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]:
+            try:
+                async with httpx.AsyncClient(timeout=8.0) as client:
+                    payload = {
+                        "model": model_name,
+                        "messages": messages,
+                        "temperature": 0.35,
+                        "max_tokens": 1000
+                    }
+                    r = await client.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        json=payload,
+                        headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
+                    )
+                    if r.status_code == 200:
+                        ans = r.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                        if ans:
+                            reply_msg = ans
+                            break
+            except Exception as e:
+                pass
 
     # 3. Intelligent contextual local fallback if both cloud providers fail
     if not reply_msg:
