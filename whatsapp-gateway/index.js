@@ -160,20 +160,85 @@ if (SELF_URL) {
 }
 
 // Persistent message store for Baileys retry resolution (resolves "Esperando mensaje / Waiting for message")
+// This store is backed up to Supabase so it survives Render redeploys
 const messageStore = new Map();
 const MESSAGE_STORE_FILE = path.join(AUTH_DIR, 'message_store.json');
+let messageStoreDirty = false;
 
+async function restoreMessageStoreFromSupabase() {
+  if (!AUTH_BACKUP_ENABLED) return;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/leads?id=eq.whatsapp_message_store&select=*`, {
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'apikey': SUPABASE_KEY
+      },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!res.ok) return;
+    const rows = await res.json();
+    if (!rows || !rows.length || !rows[0].comments) return;
+    const stored = JSON.parse(rows[0].comments);
+    let count = 0;
+    for (const [k, v] of Object.entries(stored)) {
+      if (!messageStore.has(k)) {
+        messageStore.set(k, v);
+        count++;
+      }
+    }
+    if (count > 0) console.log(`[Message Store] ✅ Restored ${count} messages from Supabase for retry handling`);
+  } catch (e) {
+    console.warn('[Message Store] Supabase restore warning:', e.message);
+  }
+}
+
+async function flushMessageStoreToSupabase() {
+  if (!AUTH_BACKUP_ENABLED || !messageStoreDirty) return;
+  messageStoreDirty = false;
+  try {
+    // Keep only the last 500 messages in Supabase to stay within payload limits
+    const entries = [...messageStore.entries()];
+    const trimmed = Object.fromEntries(entries.slice(-500));
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'apikey': SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({
+        id: 'whatsapp_message_store',
+        full_name: 'WhatsApp Message Store',
+        phone: '971501378020',
+        lead_status: 'SYSTEM',
+        campaign_name: 'system_message_store',
+        comments: JSON.stringify(trimmed)
+      }),
+      signal: AbortSignal.timeout(8000)
+    });
+    if (res.ok) console.log(`[Message Store] ✅ Flushed ${Object.keys(trimmed).length} messages to Supabase`);
+  } catch (e) {
+    console.warn('[Message Store] Supabase flush warning:', e.message);
+    messageStoreDirty = true; // Retry next cycle
+  }
+}
+
+// Load from local disk first (fast), then hydrate from Supabase (persistent across redeploys)
 try {
   if (fs.existsSync(MESSAGE_STORE_FILE)) {
     const raw = JSON.parse(fs.readFileSync(MESSAGE_STORE_FILE, 'utf-8'));
     for (const [k, v] of Object.entries(raw)) {
       messageStore.set(k, v);
     }
-    console.log(`[Message Store] Loaded ${messageStore.size} cached messages from disk for retry handling`);
+    console.log(`[Message Store] Loaded ${messageStore.size} cached messages from disk`);
   }
 } catch (e) {
   // Non-blocking
 }
+
+// Flush message store to Supabase every 60 seconds if there are new messages
+setInterval(flushMessageStoreToSupabase, 60 * 1000);
 
 function saveToMessageStore(id, message) {
   if (!id || !message) return;
@@ -182,7 +247,9 @@ function saveToMessageStore(id, message) {
     messageStore.delete(oldestKey);
   }
   messageStore.set(id, message);
+  messageStoreDirty = true;
 
+  // Write to disk immediately (fast, non-blocking)
   try {
     const obj = Object.fromEntries(messageStore);
     fs.writeFileSync(MESSAGE_STORE_FILE, JSON.stringify(obj), 'utf-8');
@@ -221,6 +288,8 @@ setInterval(async () => {
 async function startWhatsApp() {
   // Try to restore session from Supabase on startup
   await restoreAuthFromSupabase();
+  // Restore message store from Supabase so Signal retry requests can be resolved across redeploys
+  await restoreMessageStoreFromSupabase();
 
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   const { version } = await fetchLatestBaileysVersion();
@@ -239,9 +308,22 @@ async function startWhatsApp() {
     retryRequestDelayMs: 2000,
     maxMsgRetryCount: 5,
     getMessage: async (key) => {
-      if (key && key.id && messageStore.has(key.id)) {
-        return messageStore.get(key.id);
+      if (!key?.id) return undefined;
+      // 1. Check in-memory store first (fastest)
+      if (messageStore.has(key.id)) {
+        const msg = messageStore.get(key.id);
+        console.log(`[getMessage] ✅ Resolved retry for msg ${key.id} from in-memory store`);
+        return msg;
       }
+      // 2. Fallback: re-hydrate from Supabase and try again
+      console.log(`[getMessage] ⚠️ Msg ${key.id} not in memory - fetching from Supabase...`);
+      await restoreMessageStoreFromSupabase();
+      if (messageStore.has(key.id)) {
+        const msg = messageStore.get(key.id);
+        console.log(`[getMessage] ✅ Resolved retry for msg ${key.id} from Supabase fallback`);
+        return msg;
+      }
+      console.log(`[getMessage] ❌ Msg ${key.id} not found - phone may show "Esperando mensaje"`);
       return undefined;
     }
   });
