@@ -90,10 +90,8 @@ def init_crm_db():
     if count == 0:
         seed_initial_campaigns(conn)
     else:
-        # Check if Spain campaign exists
-        cursor.execute("SELECT COUNT(*) FROM campaigns WHERE id = 'spain_madrid_expo'")
-        if cursor.fetchone()[0] == 0:
-            seed_spain_campaign(conn)
+        # Ensure Spain campaign and its leads are fully seeded
+        seed_spain_campaign(conn)
         cursor.execute("SELECT COUNT(*) FROM campaigns WHERE id = 'miami_vip_event'")
         if cursor.fetchone()[0] == 0:
             seed_initial_campaigns(conn)
@@ -125,12 +123,20 @@ def seed_spain_campaign(conn):
             raw_phone = lead.get("phone", "")
             clean_digits = "".join([c for c in raw_phone if c.isdigit()])
             
-            # The user manually sent to the first 14 leads!
-            is_already_sent = idx < 14
+            notes = lead.get("notes", "")
+            timeline = lead.get("timeline", "")
+            is_already_sent = idx < 14 or "CONFIRMADA" in notes or "PENDIENTE" in notes
             whatsapp_status = "sent" if is_already_sent else "pending"
-            last_contact = "2026-08-28 18:35:00" if is_already_sent else None
+            last_contact = "2026-09-08 12:00:00" if ("CONFIRMADA" in notes or "PENDIENTE" in notes) else ("2026-08-28 18:35:00" if idx < 14 else None)
             last_type = "manual" if is_already_sent else None
-            crm_status = "CONTACTED" if is_already_sent else "CREATED"
+            if "CONFIRMADA" in notes:
+                crm_status = "APPOINTMENT"
+            elif "PENDIENTE" in notes:
+                crm_status = "FOLLOW_UP"
+            elif is_already_sent:
+                crm_status = "CONTACTED"
+            else:
+                crm_status = "CREATED"
 
             cursor.execute("""
             INSERT OR IGNORE INTO leads (
@@ -436,6 +442,99 @@ def get_lead_notes_db(lead_id: str) -> List[Dict[str, Any]]:
     notes = [dict(r) for r in cursor.fetchall()]
     conn.close()
     return notes
+
+def create_or_upsert_lead_db(lead_data: Dict[str, Any]) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    lid = lead_data.get("id")
+    raw_phone = lead_data.get("phone", "")
+    clean_phone = "".join([c for c in raw_phone if c.isdigit()])
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # If no ID provided, try finding by clean_phone or assign new index ID
+    if not lid:
+        if clean_phone:
+            cursor.execute("SELECT id FROM leads WHERE clean_phone = ?", (clean_phone,))
+            row = cursor.fetchone()
+            if row:
+                lid = row["id"]
+        if not lid:
+            cid = lead_data.get("campaign_id", "spain_madrid_expo")
+            prefix = "spain_lead_" if cid == "spain_madrid_expo" else f"lead_{cid}_"
+            cursor.execute(f"SELECT id FROM leads WHERE id LIKE '{prefix}%'")
+            existing = [r["id"] for r in cursor.fetchall()]
+            nums = []
+            for e in existing:
+                try:
+                    nums.append(int(e.replace(prefix, "")))
+                except Exception:
+                    pass
+            next_num = max(nums) + 1 if nums else 1
+            lid = f"{prefix}{next_num}"
+
+    # Check if lead exists
+    cursor.execute("SELECT * FROM leads WHERE id = ?", (lid,))
+    existing_row = cursor.fetchone()
+    if existing_row:
+        cursor.execute("""
+        UPDATE leads SET
+            name = COALESCE(?, name),
+            phone = COALESCE(?, phone),
+            clean_phone = COALESCE(?, clean_phone),
+            email = COALESCE(?, email),
+            objective = COALESCE(?, objective),
+            timeline = COALESCE(?, timeline),
+            notes = COALESCE(?, notes),
+            crm_status = COALESCE(?, crm_status),
+            whatsapp_status = COALESCE(?, whatsapp_status),
+            last_contact_date = COALESCE(?, last_contact_date)
+        WHERE id = ?
+        """, (
+            lead_data.get("name"),
+            raw_phone or None,
+            clean_phone or None,
+            lead_data.get("email"),
+            lead_data.get("objective"),
+            lead_data.get("timeline"),
+            lead_data.get("notes"),
+            lead_data.get("crm_status"),
+            lead_data.get("whatsapp_status"),
+            lead_data.get("last_contact_date") or now_str,
+            lid
+        ))
+    else:
+        cursor.execute("""
+        INSERT INTO leads (
+            id, campaign_id, name, phone, clean_phone, email,
+            objective, timeline, notes, crm_status, whatsapp_status,
+            last_contact_date, last_sent_type, personalized_message,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            lid,
+            lead_data.get("campaign_id", "spain_madrid_expo"),
+            lead_data.get("name", "Nuevo Lead"),
+            raw_phone,
+            clean_phone,
+            lead_data.get("email", ""),
+            lead_data.get("objective", "Inversión"),
+            lead_data.get("timeline", ""),
+            lead_data.get("notes", ""),
+            lead_data.get("crm_status", "CREATED"),
+            lead_data.get("whatsapp_status", "pending"),
+            lead_data.get("last_contact_date") or now_str,
+            lead_data.get("last_sent_type", "manual"),
+            lead_data.get("personalized_message", ""),
+            now_str
+        ))
+
+    conn.commit()
+    cursor.execute("SELECT * FROM leads WHERE id = ?", (lid,))
+    result = dict(cursor.fetchone())
+    conn.close()
+
+    sync_lead_background(result)
+    return result
 
 def get_all_crm_leads() -> List[Dict[str, Any]]:
     conn = get_db_connection()

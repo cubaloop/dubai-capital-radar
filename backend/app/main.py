@@ -520,7 +520,8 @@ from .database.crm_db import (
     regenerate_campaign_lead_messages,
     update_campaign_meta,
     delete_campaign_db,
-    delete_lead_db
+    delete_lead_db,
+    create_or_upsert_lead_db
 )
 from .crm.batch_dispatcher import batch_manager
 from .crm.excel_parser import parse_spreadsheet_bytes, map_and_structure_leads
@@ -758,6 +759,12 @@ def api_get_campaign_batch_status(campaign_id: str):
 def api_get_all_crm_leads():
     """Returns all leads for the ADHD CRM Kanban and Focus view."""
     return {"leads": get_all_crm_leads()}
+
+@app.post("/api/crm/leads")
+def api_create_or_upsert_lead(payload: Dict[str, Any]):
+    """Creates or updates a lead, logging notes and syncing to Supabase."""
+    lead = create_or_upsert_lead_db(payload)
+    return {"success": True, "lead": lead}
 
 @app.patch("/api/crm/leads/{lead_id}")
 def api_patch_lead(lead_id: str, payload: Dict[str, Any]):
