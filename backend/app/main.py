@@ -1118,41 +1118,15 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     )
     matched_lead = cursor.fetchone()
 
-    # Unlisted number: auto-register in CRM as Inbound Lead so no prospect or inquiry is ever lost
+    # Unlisted number: do NOT add to CRM unless explicitly requested by the user
     if not matched_lead:
-        new_lid = f"inbound_{int(datetime.now().timestamp())}"
-        contact_name = payload.get("push_name") or f"Inversor +{sender_digits}"
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        cursor.execute("""
-        INSERT INTO leads (
-            id, campaign_id, name, phone, clean_phone, email,
-            objective, timeline, notes, crm_status, whatsapp_status,
-            last_contact_date, last_sent_type, personalized_message,
-            created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            new_lid,
-            "spain_madrid_expo",
-            contact_name,
-            f"+{sender_digits}",
-            sender_digits,
-            "",
-            "Consulta Entrante WhatsApp",
-            "",
-            f"💬 Primer contacto recibido vía WhatsApp: \"{text[:120]}\"",
-            "CONTACTED",
-            "replied",
-            now_str,
-            "inbound",
-            "",
-            now_str
-        ))
-        conn.commit()
-        cursor.execute("SELECT * FROM leads WHERE id = ?", (new_lid,))
-        matched_lead = cursor.fetchone()
-        if matched_lead:
-            sync_lead_background(dict(matched_lead))
-        print(f"[Inbound Auto-Register] Registered new lead in CRM for +{sender}: '{contact_name}'")
+        conn.close()
+        print(f"[Inbound Filter] Ignored message from unlisted number +{sender}. Not in CRM leads (auto-add disabled per user policy).")
+        return {
+            "status": "ignored",
+            "reason": "unlisted_number_not_in_crm",
+            "sender": sender
+        }
 
     # SENDER IS A REGISTERED LEAD: Process intent & update CRM records
     lid = matched_lead["id"]
