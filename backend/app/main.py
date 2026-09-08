@@ -107,8 +107,12 @@ async def debug_test_groq():
         async with httpx.AsyncClient(timeout=15.0) as client:
             r = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
-                json={"model": "llama3-8b-8192", "messages": [{"role": "user", "content": "di hola"}], "max_tokens": 10},
-                headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
+                json={"model": "openai/gpt-oss-120b", "messages": [{"role": "user", "content": "di hola"}], "max_tokens": 10},
+                headers={
+                    "Authorization": f"Bearer {groq_key}",
+                    "Content-Type": "application/json",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                }
             )
             if r.status_code == 200:
                 ans = r.json()["choices"][0]["message"]["content"]
@@ -994,34 +998,43 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
 
         debug_errors = []
 
-        # 1. PRIMARY: Groq (único proveedor activo — Gemini en modo espera para evitar respuestas dobles)
+        # 1. PRIMARY: Groq (con los modelos activos actuales en la plataforma)
         if groq_key:
-            for attempt in range(2):  # 2 attempts with delay on rate limit
+            import re
+            active_groq_models = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b", "groq/compound"]
+            for attempt in range(2):
                 if attempt > 0:
                     await asyncio.sleep(2)
-                for model_name in ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]:
+                for model_name in active_groq_models:
                     try:
-                        async with httpx.AsyncClient(timeout=18.0) as client:
+                        async with httpx.AsyncClient(timeout=20.0) as client:
                             payload = {
                                 "model": model_name,
                                 "messages": messages,
                                 "temperature": 0.35,
-                                "max_tokens": 450  # Conciso para WhatsApp — no más de ~300 palabras
+                                "max_tokens": 850
+                            }
+                            headers = {
+                                "Authorization": f"Bearer {groq_key}",
+                                "Content-Type": "application/json",
+                                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                             }
                             r = await client.post(
                                 "https://api.groq.com/openai/v1/chat/completions",
                                 json=payload,
-                                headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
+                                headers=headers
                             )
                             if r.status_code == 200:
-                                ans = r.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-                                if ans:
-                                    reply_msg = ans
+                                raw_ans = r.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                                # Clean internal thinking tags if model outputs chain-of-thought
+                                clean_ans = re.sub(r"<think>.*?</think>", "", raw_ans, flags=re.DOTALL).strip()
+                                if clean_ans:
+                                    reply_msg = clean_ans
                                     print(f"[JOTA] Groq ({model_name}) replied OK (attempt {attempt+1})")
                                     break
                             elif r.status_code == 429:
-                                print(f"[JOTA] Groq rate limited (attempt {attempt+1}), will retry...")
-                                break  # Break model loop, outer loop will retry after sleep
+                                print(f"[JOTA] Groq rate limited on {model_name} (attempt {attempt+1}), will retry...")
+                                break
                             else:
                                 err_text = r.text[:200]
                                 debug_errors.append(f"Groq/{model_name} HTTP {r.status_code}: {err_text}")
