@@ -971,9 +971,9 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
         hist_text = "\n".join([f"{'Jota' if t['role'] in ['assistant', 'model', 'jota'] else 'David'}: {t['content']}" for t in past_history])
         gem_prompt = f"{system_prompt}\n\nHISTORIAL DE CONVERSACIÓN RECIENTE:\n{hist_text}\n\nMENSAJE ACTUAL DE DAVID:\n{text}\n\nResponde como Jota (ejecutivo, experto, natural, formato WhatsApp):"
 
-        for gem_model in ["gemini-1.5-flash", "gemini-flash-latest", "gemini-2.0-flash"]:
+        for gem_model in ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]:
             try:
-                async with httpx.AsyncClient(timeout=8.0) as client:
+                async with httpx.AsyncClient(timeout=12.0) as client:
                     gem_payload = {
                         "contents": [{"parts": [{"text": gem_prompt}]}],
                         "generationConfig": {"temperature": 0.35, "maxOutputTokens": 1000}
@@ -989,15 +989,21 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
                             if parts and parts[0].get("text"):
                                 reply_msg = parts[0]["text"].strip()
                                 if reply_msg:
+                                    print(f"[JOTA] Gemini ({gem_model}) replied OK")
                                     break
+                    else:
+                        err_text = r.text[:200]
+                        debug_errors.append(f"Gemini/{gem_model} HTTP {r.status_code}: {err_text}")
+                        print(f"[JOTA] Gemini {gem_model} failed: HTTP {r.status_code} {err_text}")
             except Exception as e:
-                pass
+                debug_errors.append(f"Gemini/{gem_model} exception: {str(e)}")
+                print(f"[JOTA] Gemini {gem_model} exception: {e}")
 
     # 2. SECONDARY: Try Groq fallback
     if not reply_msg and groq_key:
         for model_name in ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]:
             try:
-                async with httpx.AsyncClient(timeout=8.0) as client:
+                async with httpx.AsyncClient(timeout=12.0) as client:
                     payload = {
                         "model": model_name,
                         "messages": messages,
@@ -1013,42 +1019,26 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
                         ans = r.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
                         if ans:
                             reply_msg = ans
+                            print(f"[JOTA] Groq ({model_name}) replied OK")
                             break
+                    else:
+                        err_text = r.text[:200]
+                        debug_errors.append(f"Groq/{model_name} HTTP {r.status_code}: {err_text}")
+                        print(f"[JOTA] Groq {model_name} failed: HTTP {r.status_code} {err_text}")
             except Exception as e:
-                pass
+                debug_errors.append(f"Groq/{model_name} exception: {str(e)}")
+                print(f"[JOTA] Groq {model_name} exception: {e}")
 
-    # 3. Intelligent contextual local fallback if both cloud providers fail
+    # 3. LAST RESORT: Both providers failed — send honest error with debug info
     if not reply_msg:
-        # Check if asking about attendees or confirmation
-        lower_q = text.lower()
-        if any(w in lower_q for w in ["confirmar", "confirmad", "asistenc", "quien", "quién", "novotel", "expo"]):
-            reply_msg = (
-                "📋 *Asistentes Confirmados para la Expo Novotel Madrid (9 y 10 Septiembre):*\n\n"
-                "• *Javier Araya* (+34 665 917 032) -> 9 Sept, 12:00 PM - 1:00 PM\n"
-                "• *Sergio* (+34 629 512 099) -> 9 Sept, 11:00 AM\n"
-                "• *Marcela* (+34 641 139 736) -> 10 Sept, 7:00 PM\n"
-                "• *Yuan* (+34 654 083 551) -> 9 Sept, Después de las 5:00 PM (+2 acompañantes)\n"
-                "• *Keila Martínez* (+34 627 184 236) -> 9 Sept, 6:00 PM - 8:00 PM\n"
-                "• *Patricia* (+34 613 004 173) -> 9 Sept, Tarde\n\n"
-                "⏳ *Pendientes de Confirmar:* Carlos Orellana y Francisco Javier Rallo.\n\n"
-                "¿Deseas que preparemos algún detalle o mensaje específico para alguno de ellos?"
-            )
-        elif any(w in lower_q for w in ["resumen", "campaña", "campana", "como vamos", "cómo vamos", "estado"]):
-            reply_msg = (
-                "📈 *Estado General de tus Campañas:*\n\n"
-                "• *Reactivación España (Novotel Madrid Expo):* 117 leads registrados.\n"
-                "  - 6 confirmados en agenda para el evento.\n"
-                "  - 2 pendientes de confirmación en seguimiento.\n"
-                "  - Todos los datos y notas sincronizados en tiempo real en tu CRM.\n\n"
-                "¿Qué acción te gustaría coordinar ahora?"
-            )
-        else:
-            reply_msg = (
-                f"👋 *Hola David!*\n\n"
-                f"He procesado tu consulta: \"{text[:100]}\".\n"
-                f"Los datos de la expo Novotel Madrid y las campañas están sincronizados en tiempo real en tu CRM.\n"
-                f"Dime si deseas revisar la lista de asistentes confirmados o redactar un mensaje para los inversores."
-            )
+        errors_summary = " | ".join(debug_errors) if debug_errors else "No error details captured"
+        print(f"[JOTA FALLBACK] Both Gemini and Groq failed. gemini_key={bool(gemini_key)} groq_key={bool(groq_key)} errors: {errors_summary}")
+        reply_msg = (
+            f"⚠️ Jota no pudo conectarse con el motor de IA en este momento.\n"
+            f"Gemini: {'✅ key OK' if gemini_key else '❌ sin key'} | "
+            f"Groq: {'✅ key OK' if groq_key else '❌ sin key'}\n"
+            f"Intenta de nuevo en unos segundos."
+        )
 
     # Save assistant reply to persistent conversation history
     save_copilot_message_db(role="assistant", content=reply_msg)
