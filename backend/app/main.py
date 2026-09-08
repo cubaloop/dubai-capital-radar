@@ -966,8 +966,38 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
 
     debug_errors = []
 
-    # 1. PRIMARY: Try Gemini (Fastest sub-second generation with rich context)
-    if gemini_key:
+    # 1. PRIMARY: Try Groq (main provider - more credits available)
+    if groq_key:
+        for model_name in ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]:
+            try:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    payload = {
+                        "model": model_name,
+                        "messages": messages,
+                        "temperature": 0.35,
+                        "max_tokens": 1000
+                    }
+                    r = await client.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        json=payload,
+                        headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
+                    )
+                    if r.status_code == 200:
+                        ans = r.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                        if ans:
+                            reply_msg = ans
+                            print(f"[JOTA] Groq ({model_name}) replied OK")
+                            break
+                    else:
+                        err_text = r.text[:200]
+                        debug_errors.append(f"Groq/{model_name} HTTP {r.status_code}: {err_text}")
+                        print(f"[JOTA] Groq {model_name} failed: HTTP {r.status_code} {err_text}")
+            except Exception as e:
+                debug_errors.append(f"Groq/{model_name} exception: {str(e)}")
+                print(f"[JOTA] Groq {model_name} exception: {e}")
+
+    # 2. FALLBACK: Try Gemini if Groq failed
+    if not reply_msg and gemini_key:
         hist_text = "\n".join([f"{'Jota' if t['role'] in ['assistant', 'model', 'jota'] else 'David'}: {t['content']}" for t in past_history])
         gem_prompt = f"{system_prompt}\n\nHISTORIAL DE CONVERSACIÓN RECIENTE:\n{hist_text}\n\nMENSAJE ACTUAL DE DAVID:\n{text}\n\nResponde como Jota (ejecutivo, experto, natural, formato WhatsApp):"
 
@@ -998,36 +1028,6 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
             except Exception as e:
                 debug_errors.append(f"Gemini/{gem_model} exception: {str(e)}")
                 print(f"[JOTA] Gemini {gem_model} exception: {e}")
-
-    # 2. SECONDARY: Try Groq fallback
-    if not reply_msg and groq_key:
-        for model_name in ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]:
-            try:
-                async with httpx.AsyncClient(timeout=12.0) as client:
-                    payload = {
-                        "model": model_name,
-                        "messages": messages,
-                        "temperature": 0.35,
-                        "max_tokens": 1000
-                    }
-                    r = await client.post(
-                        "https://api.groq.com/openai/v1/chat/completions",
-                        json=payload,
-                        headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
-                    )
-                    if r.status_code == 200:
-                        ans = r.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-                        if ans:
-                            reply_msg = ans
-                            print(f"[JOTA] Groq ({model_name}) replied OK")
-                            break
-                    else:
-                        err_text = r.text[:200]
-                        debug_errors.append(f"Groq/{model_name} HTTP {r.status_code}: {err_text}")
-                        print(f"[JOTA] Groq {model_name} failed: HTTP {r.status_code} {err_text}")
-            except Exception as e:
-                debug_errors.append(f"Groq/{model_name} exception: {str(e)}")
-                print(f"[JOTA] Groq {model_name} exception: {e}")
 
     # 3. LAST RESORT: Both providers failed — send honest error with debug info
     if not reply_msg:
