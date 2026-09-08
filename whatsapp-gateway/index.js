@@ -803,8 +803,8 @@ app.use(async (req, res) => {
   }
 });
 
-app.listen(GATEWAY_PORT, '127.0.0.1', () => {
-  console.log(`[WhatsApp Gateway] Running on 127.0.0.1:${GATEWAY_PORT}`);
+app.listen(GATEWAY_PORT, '0.0.0.0', () => {
+  console.log(`[WhatsApp Gateway] Running on port ${GATEWAY_PORT}`);
   console.log(`[Session Backup] Supabase: ${AUTH_BACKUP_ENABLED ? 'ENABLED' : 'DISABLED (set SUPABASE_URL + SUPABASE_SERVICE_KEY)'}`);
   console.log(`[Keep-Alive] Self-ping: ${SELF_URL ? 'ENABLED' : 'DISABLED (set SELF_URL)'}`);
 });

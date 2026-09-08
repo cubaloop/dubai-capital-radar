@@ -369,12 +369,12 @@ def get_inventory():
 # --- WHATSAPP QR GATEWAY INTEGRATION ---
 import httpx
 
-WHATSAPP_GATEWAY_URL = os.getenv("WHATSAPP_GATEWAY_URL", "http://localhost:3001")
+WHATSAPP_GATEWAY_URL = os.getenv("WHATSAPP_GATEWAY_URL", "http://127.0.0.1:3001")
 
 @app.get("/api/whatsapp/status")
 async def get_whatsapp_gateway_status():
     try:
-        async with httpx.AsyncClient(timeout=2.0) as client:
+        async with httpx.AsyncClient(timeout=5.0) as client:
             res = await client.get(f"{WHATSAPP_GATEWAY_URL}/status")
             return res.json()
     except Exception:
