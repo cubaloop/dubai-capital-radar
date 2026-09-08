@@ -13,72 +13,50 @@
   }
 }
 
-/* Marble Background Pattern with Rich Blue & Purple Mineral Veins */
+/* Marble Background Pattern - GPU Accelerated for 60fps Mobile Performance */
 .marble-bg {
-  background-color: #e5ebf5;
+  background-color: #f1f5f9;
   background-image: 
-    radial-gradient(at 12% 18%, rgba(99, 102, 241, 0.18) 0px, transparent 48%),
-    radial-gradient(at 88% 16%, rgba(168, 85, 247, 0.16) 0px, transparent 45%),
-    radial-gradient(at 48% 52%, rgba(59, 130, 246, 0.14) 0px, transparent 52%),
-    radial-gradient(at 82% 82%, rgba(139, 92, 246, 0.17) 0px, transparent 48%),
-    radial-gradient(at 15% 85%, rgba(212, 175, 55, 0.12) 0px, transparent 42%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='700' height='700' viewBox='0 0 700 700'%3E%3Cfilter id='marble-veins'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.006' numOctaves='5' seed='42' result='noise'/%3E%3CfeColorMatrix type='matrix' values='0.9 0 0 0 0.88  0 0.92 0 0 0.90  0 0 1 0 0.95  0 0 0 0.22 0'/%3E%3C/filter%3E%3Crect width='700' height='700' filter='url(%23marble-veins)' opacity='0.85'/%3E%3Cpath d='M-60,130 Q130,40 310,190 T610,240 T760,450' stroke='rgba(37,99,235,0.36)' stroke-width='3.5' fill='none' filter='blur(1.5px)'/%3E%3Cpath d='M80,-40 Q250,150 410,90 T670,360' stroke='rgba(139,92,246,0.38)' stroke-width='3.2' fill='none' filter='blur(1.5px)'/%3E%3Cpath d='M-40,490 Q170,340 430,510 T690,560' stroke='rgba(126,34,206,0.32)' stroke-width='2.8' fill='none' filter='blur(1.8px)'/%3E%3Cpath d='M260,40 Q470,230 550,170 T780,410' stroke='rgba(30,64,175,0.3)' stroke-width='2.5' fill='none' filter='blur(1.5px)'/%3E%3Cpath d='M20,380 Q190,250 420,390 T680,440' stroke='rgba(59,130,246,0.32)' stroke-width='2.6' fill='none' filter='blur(1.2px)'/%3E%3Cpath d='M100,580 Q320,440 520,590' stroke='rgba(168,85,247,0.28)' stroke-width='2.2' fill='none' filter='blur(1.5px)'/%3E%3Cpath d='M60,110 Q220,135 370,115 T620,320' stroke='rgba(217,119,6,0.22)' stroke-width='1.8' fill='none' filter='blur(1px)'/%3E%3C/svg%3E");
-  background-attachment: fixed;
-  background-repeat: repeat;
-  background-size: 700px 700px;
+    radial-gradient(at 12% 18%, rgba(99, 102, 241, 0.10) 0px, transparent 50%),
+    radial-gradient(at 88% 16%, rgba(168, 85, 247, 0.08) 0px, transparent 50%),
+    radial-gradient(at 48% 52%, rgba(59, 130, 246, 0.08) 0px, transparent 50%),
+    radial-gradient(at 82% 82%, rgba(139, 92, 246, 0.09) 0px, transparent 50%),
+    radial-gradient(at 15% 85%, rgba(212, 175, 55, 0.08) 0px, transparent 45%);
 }
 
-/* 3D Elevated White Cards with Soft Luxury Shadows */
+/* 3D Elevated White Cards - Clean GPU Accelerated Shadows */
 .card-3d {
   background-color: #ffffff;
   border: 1px solid rgba(226, 232, 240, 0.9);
-  box-shadow: 
-    0 4px 6px -1px rgba(15, 23, 42, 0.05),
-    0 10px 20px -3px rgba(15, 23, 42, 0.08),
-    0 20px 25px -5px rgba(15, 23, 42, 0.04),
-    0 1px 2px 0 rgba(0, 0, 0, 0.04);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 6px -1px rgba(15, 23, 42, 0.06);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .card-3d:hover {
-  box-shadow: 
-    0 12px 24px -2px rgba(15, 23, 42, 0.12),
-    0 24px 38px -4px rgba(15, 23, 42, 0.08),
-    0 2px 4px 0 rgba(0, 0, 0, 0.04);
+  box-shadow: 0 6px 14px -2px rgba(15, 23, 42, 0.10);
 }
 
 .card-3d-gold {
   background-color: #ffffff;
   border: 1px solid rgba(212, 175, 55, 0.35);
-  box-shadow: 
-    0 6px 12px -2px rgba(197, 159, 39, 0.12),
-    0 14px 28px -4px rgba(15, 23, 42, 0.08),
-    0 20px 30px -5px rgba(197, 159, 39, 0.06);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px -1px rgba(197, 159, 39, 0.12);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .card-3d-gold:hover {
   border-color: rgba(212, 175, 55, 0.6);
-  box-shadow: 
-    0 12px 24px -2px rgba(197, 159, 39, 0.18),
-    0 24px 40px -4px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 6px 16px -2px rgba(197, 159, 39, 0.18);
 }
 
 .card-3d-blue {
   background-color: #f0f6ff;
   border: 1px solid rgba(186, 230, 253, 0.95);
-  box-shadow: 
-    0 4px 6px -1px rgba(15, 23, 42, 0.05),
-    0 10px 25px -3px rgba(37, 99, 235, 0.08),
-    0 20px 30px -5px rgba(37, 99, 235, 0.04),
-    0 1px 3px 0 rgba(0, 0, 0, 0.04);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px -1px rgba(37, 99, 235, 0.08);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .card-3d-blue:hover {
-  box-shadow: 
-    0 12px 24px -2px rgba(37, 99, 235, 0.12),
-    0 24px 40px -4px rgba(37, 99, 235, 0.08);
+  box-shadow: 0 6px 16px -2px rgba(37, 99, 235, 0.14);
 }
 
 /* Light Luxury glow and scrollbars */
