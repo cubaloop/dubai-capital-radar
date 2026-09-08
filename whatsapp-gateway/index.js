@@ -159,8 +159,22 @@ if (SELF_URL) {
   }, 3 * 60 * 1000); // Every 3 minutes
 }
 
-// In-memory message store for Baileys retry resolution (resolves "Esperando mensaje / Waiting for message")
+// Persistent message store for Baileys retry resolution (resolves "Esperando mensaje / Waiting for message")
 const messageStore = new Map();
+const MESSAGE_STORE_FILE = path.join(AUTH_DIR, 'message_store.json');
+
+try {
+  if (fs.existsSync(MESSAGE_STORE_FILE)) {
+    const raw = JSON.parse(fs.readFileSync(MESSAGE_STORE_FILE, 'utf-8'));
+    for (const [k, v] of Object.entries(raw)) {
+      messageStore.set(k, v);
+    }
+    console.log(`[Message Store] Loaded ${messageStore.size} cached messages from disk for retry handling`);
+  }
+} catch (e) {
+  // Non-blocking
+}
+
 function saveToMessageStore(id, message) {
   if (!id || !message) return;
   if (messageStore.size > 2000) {
@@ -168,6 +182,13 @@ function saveToMessageStore(id, message) {
     messageStore.delete(oldestKey);
   }
   messageStore.set(id, message);
+
+  try {
+    const obj = Object.fromEntries(messageStore);
+    fs.writeFileSync(MESSAGE_STORE_FILE, JSON.stringify(obj), 'utf-8');
+  } catch (e) {
+    // Non-blocking
+  }
 }
 
 // Debounced auth backup to avoid hammering Supabase while continuously persisting session keys
