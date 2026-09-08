@@ -934,6 +934,9 @@ CONOCIMIENTO OPERATIVO Y BASE DE DATOS EN TIEMPO REAL:
 """
     return prompt
 
+# Mutex: process one Jota message at a time to avoid Groq rate limiting from concurrent requests
+_jota_lock = asyncio.Lock()
+
 async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_phone: str = ""):
     """
     Handles inquiries from Super-Admin / Broker with full intelligence,
@@ -943,125 +946,135 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
     if not text:
         return {"status": "ignored", "reason": "empty"}
 
-    # Save incoming user message to persistent conversation history
-    save_copilot_message_db(role="user", content=text)
+    # Queue: wait for any previous Jota call to finish before starting a new one
+    async with _jota_lock:
+        # Save incoming user message to persistent conversation history
+        save_copilot_message_db(role="user", content=text)
 
-    # Fetch recent conversation history (last 10 messages)
-    history = get_recent_copilot_history_db(limit=10)
-    past_history = history[:-1] if history else []
+        # Fetch recent conversation history (last 10 messages)
+        history = get_recent_copilot_history_db(limit=10)
+        past_history = history[:-1] if history else []
 
-    system_prompt = get_jota_system_prompt()
+        system_prompt = get_jota_system_prompt()
 
-    groq_key = os.getenv("GROQ_API_KEY", "").strip()
-    gemini_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
+        groq_key = os.getenv("GROQ_API_KEY", "").strip()
+        gemini_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
 
-    reply_msg = ""
+        reply_msg = ""
 
-    # Build messages array for LLM
-    messages = [{"role": "system", "content": system_prompt}]
-    for turn in past_history:
-        role = "assistant" if turn["role"] in ["assistant", "model", "jota"] else "user"
-        messages.append({"role": role, "content": turn["content"]})
-    messages.append({"role": "user", "content": text})
+        # Build messages array for LLM
+        messages = [{"role": "system", "content": system_prompt}]
+        for turn in past_history:
+            role = "assistant" if turn["role"] in ["assistant", "model", "jota"] else "user"
+            messages.append({"role": role, "content": turn["content"]})
+        messages.append({"role": "user", "content": text})
 
-    debug_errors = []
+        debug_errors = []
 
-    # 1. PRIMARY: Try Groq (main provider - more credits available)
-    if groq_key:
-        for model_name in ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]:
-            try:
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    payload = {
-                        "model": model_name,
-                        "messages": messages,
-                        "temperature": 0.35,
-                        "max_tokens": 1000
-                    }
-                    r = await client.post(
-                        "https://api.groq.com/openai/v1/chat/completions",
-                        json=payload,
-                        headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
-                    )
-                    if r.status_code == 200:
-                        ans = r.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-                        if ans:
-                            reply_msg = ans
-                            print(f"[JOTA] Groq ({model_name}) replied OK")
-                            break
-                    else:
-                        err_text = r.text[:200]
-                        debug_errors.append(f"Groq/{model_name} HTTP {r.status_code}: {err_text}")
-                        print(f"[JOTA] Groq {model_name} failed: HTTP {r.status_code} {err_text}")
-            except Exception as e:
-                debug_errors.append(f"Groq/{model_name} exception: {str(e)}")
-                print(f"[JOTA] Groq {model_name} exception: {e}")
-
-    # 2. FALLBACK: Try Gemini if Groq failed
-    if not reply_msg and gemini_key:
-        hist_text = "\n".join([f"{'Jota' if t['role'] in ['assistant', 'model', 'jota'] else 'David'}: {t['content']}" for t in past_history])
-        gem_prompt = f"{system_prompt}\n\nHISTORIAL DE CONVERSACIÓN RECIENTE:\n{hist_text}\n\nMENSAJE ACTUAL DE DAVID:\n{text}\n\nResponde como Jota (ejecutivo, experto, natural, formato WhatsApp):"
-
-        for gem_model in ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest", "gemini-3.5-flash"]:
-            try:
-                async with httpx.AsyncClient(timeout=12.0) as client:
-                    gem_payload = {
-                        "contents": [{"parts": [{"text": gem_prompt}]}],
-                        "generationConfig": {"temperature": 0.35, "maxOutputTokens": 1000}
-                    }
-                    r = await client.post(
-                        f"https://generativelanguage.googleapis.com/v1beta/models/{gem_model}:generateContent?key={gemini_key}",
-                        json=gem_payload
-                    )
-                    if r.status_code == 200:
-                        cand = r.json().get("candidates", [])
-                        if cand:
-                            parts = cand[0].get("content", {}).get("parts", [])
-                            if parts and parts[0].get("text"):
-                                reply_msg = parts[0]["text"].strip()
-                                if reply_msg:
-                                    print(f"[JOTA] Gemini ({gem_model}) replied OK")
+        # 1. PRIMARY: Try Groq (main provider - more credits available)
+        if groq_key:
+            for attempt in range(2):  # 2 attempts with delay on rate limit
+                if attempt > 0:
+                    await asyncio.sleep(2)
+                for model_name in ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]:
+                    try:
+                        async with httpx.AsyncClient(timeout=18.0) as client:
+                            payload = {
+                                "model": model_name,
+                                "messages": messages,
+                                "temperature": 0.35,
+                                "max_tokens": 1000
+                            }
+                            r = await client.post(
+                                "https://api.groq.com/openai/v1/chat/completions",
+                                json=payload,
+                                headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
+                            )
+                            if r.status_code == 200:
+                                ans = r.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                                if ans:
+                                    reply_msg = ans
+                                    print(f"[JOTA] Groq ({model_name}) replied OK (attempt {attempt+1})")
                                     break
-                    else:
-                        err_text = r.text[:200]
-                        debug_errors.append(f"Gemini/{gem_model} HTTP {r.status_code}: {err_text}")
-                        print(f"[JOTA] Gemini {gem_model} failed: HTTP {r.status_code} {err_text}")
-            except Exception as e:
-                debug_errors.append(f"Gemini/{gem_model} exception: {str(e)}")
-                print(f"[JOTA] Gemini {gem_model} exception: {e}")
+                            elif r.status_code == 429:
+                                print(f"[JOTA] Groq rate limited (attempt {attempt+1}), will retry...")
+                                break  # Break model loop, outer loop will retry after sleep
+                            else:
+                                err_text = r.text[:200]
+                                debug_errors.append(f"Groq/{model_name} HTTP {r.status_code}: {err_text}")
+                                print(f"[JOTA] Groq {model_name} failed: HTTP {r.status_code} {err_text}")
+                    except Exception as e:
+                        debug_errors.append(f"Groq/{model_name} exception: {str(e)}")
+                        print(f"[JOTA] Groq {model_name} exception: {e}")
+                if reply_msg:
+                    break
 
-    # 3. LAST RESORT: Both providers failed — send honest error with debug info
-    if not reply_msg:
-        errors_summary = " | ".join(debug_errors) if debug_errors else "No error details captured"
-        print(f"[JOTA FALLBACK] Both Gemini and Groq failed. gemini_key={bool(gemini_key)} groq_key={bool(groq_key)} errors: {errors_summary}")
-        reply_msg = (
-            f"⚠️ Jota no pudo conectarse con el motor de IA en este momento.\n"
-            f"Gemini: {'✅ key OK' if gemini_key else '❌ sin key'} | "
-            f"Groq: {'✅ key OK' if groq_key else '❌ sin key'}\n"
-            f"Intenta de nuevo en unos segundos."
-        )
+        # 2. FALLBACK: Try Gemini if Groq failed
+        if not reply_msg and gemini_key:
+            hist_text = "\n".join([f"{'Jota' if t['role'] in ['assistant', 'model', 'jota'] else 'David'}: {t['content']}" for t in past_history])
+            gem_prompt = f"{system_prompt}\n\nHISTORIAL DE CONVERSACIÓN RECIENTE:\n{hist_text}\n\nMENSAJE ACTUAL DE DAVID:\n{text}\n\nResponde como Jota (ejecutivo, experto, natural, formato WhatsApp):"
 
-    # Save assistant reply to persistent conversation history
-    save_copilot_message_db(role="assistant", content=reply_msg)
+            for gem_model in ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest", "gemini-3.5-flash"]:
+                try:
+                    async with httpx.AsyncClient(timeout=15.0) as client:
+                        gem_payload = {
+                            "contents": [{"parts": [{"text": gem_prompt}]}],
+                            "generationConfig": {"temperature": 0.35, "maxOutputTokens": 1000}
+                        }
+                        r = await client.post(
+                            f"https://generativelanguage.googleapis.com/v1beta/models/{gem_model}:generateContent?key={gemini_key}",
+                            json=gem_payload
+                        )
+                        if r.status_code == 200:
+                            cand = r.json().get("candidates", [])
+                            if cand:
+                                parts = cand[0].get("content", {}).get("parts", [])
+                                if parts and parts[0].get("text"):
+                                    reply_msg = parts[0]["text"].strip()
+                                    if reply_msg:
+                                        print(f"[JOTA] Gemini ({gem_model}) replied OK")
+                                        break
+                        else:
+                            err_text = r.text[:200]
+                            debug_errors.append(f"Gemini/{gem_model} HTTP {r.status_code}: {err_text}")
+                            print(f"[JOTA] Gemini {gem_model} failed: HTTP {r.status_code} {err_text}")
+                except Exception as e:
+                    debug_errors.append(f"Gemini/{gem_model} exception: {str(e)}")
+                    print(f"[JOTA] Gemini {gem_model} exception: {e}")
 
-    # Send response back to admin via WhatsApp
-    try:
-        print(f"[ADMIN COPILOT] Dispatching reply to Super-Admin ({ADMIN_PHONE_DIGITS}):\n{reply_msg[:120]}...")
-    except UnicodeEncodeError:
-        print(f"[ADMIN COPILOT] Dispatching reply to Super-Admin ({ADMIN_PHONE_DIGITS})")
+        # 3. LAST RESORT: Both providers failed — send honest error with debug info
+        if not reply_msg:
+            errors_summary = " | ".join(debug_errors) if debug_errors else "No error details captured"
+            print(f"[JOTA FALLBACK] Both Gemini and Groq failed. gemini_key={bool(gemini_key)} groq_key={bool(groq_key)} errors: {errors_summary}")
+            reply_msg = (
+                f"⚠️ Jota no pudo conectarse con el motor de IA en este momento.\n"
+                f"Gemini: {'✅ key OK' if gemini_key else '❌ sin key'} | "
+                f"Groq: {'✅ key OK' if groq_key else '❌ sin key'}\n"
+                f"Intenta de nuevo en unos segundos."
+            )
 
-    target_jid = sender_jid if sender_jid else f"{ADMIN_PHONE_DIGITS}@s.whatsapp.net"
-    target_phone = sender_phone if (sender_phone and len(sender_phone) >= 8 and not sender_jid.endswith('@lid')) else ADMIN_PHONE_DIGITS
+        # Save assistant reply to persistent conversation history
+        save_copilot_message_db(role="assistant", content=reply_msg)
 
-    dispatch_res = await dispatch_whatsapp_direct(to_phone=target_phone, message=reply_msg, bypass_shield=True, target_jid=target_jid)
-    return {
-        "status": "admin_copilot_replied", 
-        "message": reply_msg, 
-        "target_jid": target_jid, 
-        "dispatch_res": dispatch_res,
-        "debug_errors": debug_errors,
-        "groq_key_len": len(groq_key),
-        "gemini_key_len": len(gemini_key)
-    }
+        # Send response back to admin via WhatsApp
+        try:
+            print(f"[ADMIN COPILOT] Dispatching reply to Super-Admin ({ADMIN_PHONE_DIGITS}):\n{reply_msg[:120]}...")
+        except UnicodeEncodeError:
+            print(f"[ADMIN COPILOT] Dispatching reply to Super-Admin ({ADMIN_PHONE_DIGITS})")
+
+        target_jid = sender_jid if sender_jid else f"{ADMIN_PHONE_DIGITS}@s.whatsapp.net"
+        target_phone = sender_phone if (sender_phone and len(sender_phone) >= 8 and not sender_jid.endswith('@lid')) else ADMIN_PHONE_DIGITS
+
+        dispatch_res = await dispatch_whatsapp_direct(to_phone=target_phone, message=reply_msg, bypass_shield=True, target_jid=target_jid)
+        return {
+            "status": "admin_copilot_replied",
+            "message": reply_msg,
+            "target_jid": target_jid,
+            "dispatch_res": dispatch_res,
+            "debug_errors": debug_errors,
+            "groq_key_len": len(groq_key),
+            "gemini_key_len": len(gemini_key)
+        }
 
 @app.post("/api/whatsapp/inbound-webhook")
 async def handle_whatsapp_inbound(payload: Dict[str, Any]):
