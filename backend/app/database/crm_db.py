@@ -698,5 +698,96 @@ def get_recent_copilot_history_db(limit: int = 14) -> List[Dict[str, str]]:
     conn.close()
     return [{"role": r["role"], "content": r["content"]} for r in reversed(rows)]
 
+def mount_novotel_madrid_reminder_campaign() -> Dict[str, Any]:
+    """
+    Mounts the Novotel Madrid Center (9 y 10 de septiembre) reminder message 
+    for all unconfirmed leads in spain_madrid_expo.
+    Protects confirmed leads (Patricia, Javier, Sergio, Marcela, Yuan, Keila Martinez, etc.).
+    Sets whatsapp_status = 'pending' so David can send them manually one by one.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM leads WHERE campaign_id = 'spain_madrid_expo' ORDER BY rowid ASC")
+    rows = cursor.fetchall()
+    all_leads = [dict(r) for r in rows]
+
+    confirmed_phones = {
+        '+34613004173', # Patricia
+        '+34665917032', # Javier Araya
+        '+34629291549', # Javier
+        '+34629512099', # Sergio
+        '+34641139736', # Marcela
+        '+34654083551', # Yuan
+        '+34627184236', # Keila Martínez
+    }
+
+    updated_leads = []
+    protected_leads = []
+
+    for lead in all_leads:
+        phone = (lead.get("phone") or "").strip()
+        notes = (lead.get("notes") or "").lower()
+        status = lead.get("crm_status") or ""
+        name = (lead.get("name") or "").strip()
+
+        is_confirmed = (
+            phone in confirmed_phones or
+            'asistencia conf' in notes or
+            'asistencia confirmada' in notes or
+            status in ['APPOINTMENT', 'WON']
+        )
+
+        if is_confirmed:
+            protected_leads.append({
+                "id": lead["id"],
+                "name": name,
+                "phone": phone,
+                "status": status
+            })
+            continue
+
+        # Clean first name
+        first_name = name.split()[0].title() if name else ""
+        if first_name.lower() in ["lead", "inversor", "cliente", "prospecto"]:
+            first_name = ""
+        salutation = f"Hola {first_name}," if first_name else "Hola,"
+
+        reminder_msg = (
+            f"{salutation}\n\n"
+            f"Te saluda David de H.O.M.E Properties / Dubai Capital Radar.\n\n"
+            f"Te escribo para recordarte que mañana 9 de septiembre y pasado mañana 10 de septiembre "
+            f"estaremos en Madrid en el Novotel Madrid Center (Calle O'Donnell, 53) presentando oportunidades exclusivas "
+            f"de inversión en Dubái.\n\n"
+            f"Tendremos ofertas especiales de hasta un 20% de descuento en proyectos seleccionados y opciones de inversión "
+            f"desde los 60K€, válidas únicamente durante los días que estemos presencialmente en España.\n\n"
+            f"¿Te gustaría que te reserve un espacio privado de 15 minutos para revisar las opciones y rentabilidades en persona? "
+            f"Respóndeme a este mensaje y te asigno tu horario antes de cerrar agenda."
+        )
+
+        cursor.execute("""
+            UPDATE leads 
+            SET personalized_message = ?, 
+                whatsapp_status = 'pending'
+            WHERE id = ?
+        """, (reminder_msg, lead["id"]))
+
+        lead_copy = dict(lead)
+        lead_copy["personalized_message"] = reminder_msg
+        lead_copy["whatsapp_status"] = "pending"
+        sync_lead_background(lead_copy)
+        updated_leads.append(lead["id"])
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True,
+        "total_leads": len(all_leads),
+        "updated_count": len(updated_leads),
+        "protected_count": len(protected_leads),
+        "protected_leads": protected_leads
+    }
+
 # Initialize on import
 init_crm_db()

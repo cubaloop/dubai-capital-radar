@@ -576,7 +576,8 @@ from .database.crm_db import (
     update_campaign_meta,
     delete_campaign_db,
     delete_lead_db,
-    create_or_upsert_lead_db
+    create_or_upsert_lead_db,
+    mount_novotel_madrid_reminder_campaign
 )
 from .crm.batch_dispatcher import batch_manager
 from .crm.excel_parser import parse_spreadsheet_bytes, map_and_structure_leads
@@ -699,6 +700,11 @@ def api_update_campaign(campaign_id: str, payload: Dict[str, Any]):
     if not success:
         raise HTTPException(status_code=400, detail="No se pudo actualizar la campaña")
     return {"success": True, "campaign": get_campaign_by_id(campaign_id)}
+
+@app.post("/api/crm/campaigns/spain_madrid_expo/mount-novotel-reminder")
+def api_mount_novotel_reminder():
+    """Mounts Novotel Madrid Center (Sep 9-10) reminder copy for all unconfirmed leads."""
+    return mount_novotel_madrid_reminder_campaign()
 
 @app.delete("/api/crm/campaigns/{campaign_id}")
 def api_delete_campaign(campaign_id: str):
