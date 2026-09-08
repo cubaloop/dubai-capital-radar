@@ -931,6 +931,7 @@ CONOCIMIENTO OPERATIVO Y BASE DE DATOS EN TIEMPO REAL:
    - Si David te pide redacción, tácticas de cierre, objeciones o asesoría, dale respuestas de alto nivel comercial.
    - Mantén el hilo de la conversación recordando los mensajes anteriores que han intercambiado.
    - Usa formato WhatsApp limpio (negritas y viñetas) para que se lea perfectamente en el móvil.
+   - IMPORTANTE: Responde SIEMPRE en un único mensaje. Máximo 300 palabras. Sé directo y conciso — estás en WhatsApp, no en un email. Si la respuesta requiere más detalle, da primero lo esencial y ofrece ampliar si David lo pide.
 """
     return prompt
 
@@ -971,7 +972,7 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
 
         debug_errors = []
 
-        # 1. PRIMARY: Try Groq (main provider - more credits available)
+        # 1. PRIMARY: Groq (único proveedor activo — Gemini en modo espera para evitar respuestas dobles)
         if groq_key:
             for attempt in range(2):  # 2 attempts with delay on rate limit
                 if attempt > 0:
@@ -983,7 +984,7 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
                                 "model": model_name,
                                 "messages": messages,
                                 "temperature": 0.35,
-                                "max_tokens": 1000
+                                "max_tokens": 450  # Conciso para WhatsApp — no más de ~300 palabras
                             }
                             r = await client.post(
                                 "https://api.groq.com/openai/v1/chat/completions",
@@ -1009,8 +1010,9 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
                 if reply_msg:
                     break
 
-        # 2. FALLBACK: Try Gemini if Groq failed
-        if not reply_msg and gemini_key:
+        # 2. GEMINI — EN MODO ESPERA (dormido para evitar respuestas dobles mientras Groq funciona bien)
+        # Para reactivar: cambiar False por: not reply_msg and gemini_key
+        if False and not reply_msg and gemini_key:
             hist_text = "\n".join([f"{'Jota' if t['role'] in ['assistant', 'model', 'jota'] else 'David'}: {t['content']}" for t in past_history])
             gem_prompt = f"{system_prompt}\n\nHISTORIAL DE CONVERSACIÓN RECIENTE:\n{hist_text}\n\nMENSAJE ACTUAL DE DAVID:\n{text}\n\nResponde como Jota (ejecutivo, experto, natural, formato WhatsApp):"
 
@@ -1019,7 +1021,7 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
                     async with httpx.AsyncClient(timeout=15.0) as client:
                         gem_payload = {
                             "contents": [{"parts": [{"text": gem_prompt}]}],
-                            "generationConfig": {"temperature": 0.35, "maxOutputTokens": 1000}
+                            "generationConfig": {"temperature": 0.35, "maxOutputTokens": 450}
                         }
                         r = await client.post(
                             f"https://generativelanguage.googleapis.com/v1beta/models/{gem_model}:generateContent?key={gemini_key}",
@@ -1042,16 +1044,16 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
                     debug_errors.append(f"Gemini/{gem_model} exception: {str(e)}")
                     print(f"[JOTA] Gemini {gem_model} exception: {e}")
 
-        # 3. LAST RESORT: Both providers failed — send honest error with debug info
+        # 3. LAST RESORT: Groq falló — error honesto
         if not reply_msg:
-            errors_summary = " | ".join(debug_errors) if debug_errors else "No error details captured"
-            print(f"[JOTA FALLBACK] Both Gemini and Groq failed. gemini_key={bool(gemini_key)} groq_key={bool(groq_key)} errors: {errors_summary}")
+            errors_summary = " | ".join(debug_errors) if debug_errors else "Sin detalles"
+            print(f"[JOTA FALLBACK] Groq failed. errors: {errors_summary}")
             reply_msg = (
-                f"⚠️ Jota no pudo conectarse con el motor de IA en este momento.\n"
-                f"Gemini: {'✅ key OK' if gemini_key else '❌ sin key'} | "
+                f"⚠️ Jota no pudo conectarse con Groq en este momento.\n"
                 f"Groq: {'✅ key OK' if groq_key else '❌ sin key'}\n"
                 f"Intenta de nuevo en unos segundos."
             )
+
 
         # Save assistant reply to persistent conversation history
         save_copilot_message_db(role="assistant", content=reply_msg)
