@@ -376,9 +376,11 @@ async def get_whatsapp_gateway_status():
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             res = await client.get(f"{WHATSAPP_GATEWAY_URL}/status")
-            return res.json()
-    except Exception:
-        return {"connected": False, "phone": None, "has_qr": False, "gateway_online": False}
+            data = res.json()
+            data["gateway_online"] = True
+            return data
+    except Exception as e:
+        return {"connected": False, "phone": None, "has_qr": False, "gateway_online": False, "error": str(e)}
 
 @app.get("/api/whatsapp/qr")
 async def get_whatsapp_qr():
