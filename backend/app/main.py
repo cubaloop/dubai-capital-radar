@@ -88,6 +88,14 @@ async def dispatch_whatsapp_direct(to_phone: str, message: str, bypass_shield: b
         print(f"[dispatch_whatsapp_direct] HTTP Exception to {to_phone}: {e}")
         return {"success": False, "error": str(e), "simulated": True}
 
+@app.post("/api/whatsapp/send-message")
+async def send_whatsapp_endpoint(payload: Dict[str, Any]):
+    """Direct dispatch endpoint to verify WhatsApp gateway outbound messaging."""
+    to_phone = payload.get("to") or ADMIN_PHONE_DIGITS
+    message = payload.get("message") or "Test from Dubai Capital Radar"
+    target_jid = payload.get("jid")
+    return await dispatch_whatsapp_direct(to_phone=to_phone, message=message, bypass_shield=True, target_jid=target_jid)
+
 async def autopilot_daemon():
     """Continuous background worker with Anti-Ban Protection and CRM Synchronization."""
     global AUTOPILOT_ENABLED, AUTOPILOT_DISPATCH_COUNT
@@ -1031,8 +1039,8 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
     target_jid = sender_jid if sender_jid else f"{ADMIN_PHONE_DIGITS}@s.whatsapp.net"
     target_phone = sender_phone if (sender_phone and len(sender_phone) >= 8 and not sender_jid.endswith('@lid')) else ADMIN_PHONE_DIGITS
 
-    await dispatch_whatsapp_direct(to_phone=target_phone, message=reply_msg, bypass_shield=True, target_jid=target_jid)
-    return {"status": "admin_copilot_replied", "message": reply_msg, "target_jid": target_jid}
+    dispatch_res = await dispatch_whatsapp_direct(to_phone=target_phone, message=reply_msg, bypass_shield=True, target_jid=target_jid)
+    return {"status": "admin_copilot_replied", "message": reply_msg, "target_jid": target_jid, "dispatch_res": dispatch_res}
 
 @app.post("/api/whatsapp/inbound-webhook")
 async def handle_whatsapp_inbound(payload: Dict[str, Any]):
