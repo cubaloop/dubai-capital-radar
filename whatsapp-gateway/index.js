@@ -116,11 +116,34 @@ async function restoreAuthFromSupabase() {
 
     const bundle = JSON.parse(rows[0].comments);
     const fileKeys = Object.keys(bundle);
+    let restoredCount = 0;
+    let skippedCount = 0;
+
     for (const file of fileKeys) {
+      // CRITICAL FIX: Never restore session-*.json files (Signal ratchet states for contacts).
+      // These become stale across redeploys and cause "Esperando mensaje" on recipient devices
+      // because the ratchet is out of sync with what the contact's phone expects.
+      // Only restore the bot's own identity (creds.json) and app-state sync files.
+      if (file.startsWith('session-') || file === 'message_store.json') {
+        skippedCount++;
+        continue;
+      }
       fs.writeFileSync(path.join(AUTH_DIR, file), bundle[file], 'utf-8');
+      restoredCount++;
     }
 
-    console.log(`[Session Restore] ✅ Restored ${fileKeys.length} session auth keys from Supabase`);
+    // Also purge any stale session files already on disk (from previous deploys)
+    let purgedCount = 0;
+    if (fs.existsSync(AUTH_DIR)) {
+      for (const f of fs.readdirSync(AUTH_DIR)) {
+        if (f.startsWith('session-')) {
+          try { fs.unlinkSync(path.join(AUTH_DIR, f)); purgedCount++; } catch (_) {}
+        }
+      }
+    }
+
+    console.log(`[Session Restore] Restored ${restoredCount} identity files | Skipped ${skippedCount} stale session files | Purged ${purgedCount} disk session files`);
+    console.log('[Session Restore] Fresh Signal sessions will be negotiated with each contact on first message (prevents Esperando mensaje)');
     return true;
   } catch (err) {
     console.error('[Session Restore] Restore failed:', err.message);
