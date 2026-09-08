@@ -1001,7 +1001,7 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
         hist_text = "\n".join([f"{'Jota' if t['role'] in ['assistant', 'model', 'jota'] else 'David'}: {t['content']}" for t in past_history])
         gem_prompt = f"{system_prompt}\n\nHISTORIAL DE CONVERSACIÓN RECIENTE:\n{hist_text}\n\nMENSAJE ACTUAL DE DAVID:\n{text}\n\nResponde como Jota (ejecutivo, experto, natural, formato WhatsApp):"
 
-        for gem_model in ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]:
+        for gem_model in ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest", "gemini-3.5-flash"]:
             try:
                 async with httpx.AsyncClient(timeout=12.0) as client:
                     gem_payload = {
