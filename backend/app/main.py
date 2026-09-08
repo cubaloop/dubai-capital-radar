@@ -1,5 +1,6 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form, Depends
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from typing import List, Dict, Any, Optional
 import uvicorn
@@ -32,6 +33,9 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Enable GZip compression for mobile network acceleration (reduces bundle & API size by ~75%)
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
 # Enable CORS for frontend clients (Localhost and Render domains)
 app.add_middleware(
     CORSMiddleware,
@@ -40,6 +44,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def add_performance_and_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    # Aggressively cache immutable static assets in mobile browser memory
+    if path.startswith("/assets/") or any(path.endswith(ext) for ext in [".js", ".css", ".jpg", ".jpeg", ".png", ".svg", ".webp", ".woff2", ".ico"]):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif path.startswith("/api/"):
+        # Real-time fresh data for CRM endpoints
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
 
 # Mount static files directory for flyers and documents
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")

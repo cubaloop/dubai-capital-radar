@@ -46,6 +46,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
   const [isLoadingLeads, setIsLoadingLeads] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'sent'>('all');
+  const [displayLimit, setDisplayLimit] = useState<number>(30);
 
   // Single send feedback
   const [sendingLeadId, setSendingLeadId] = useState<string | null>(null);
@@ -800,7 +801,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
             </div>
 
             <div className="max-h-[580px] overflow-y-auto space-y-2.5 pr-2 custom-scrollbar">
-              {filteredLeads.map((lead, idx) => {
+              {filteredLeads.slice(0, displayLimit).map((lead, idx) => {
                 const isSent = lead.whatsapp_status === 'sent';
                 const isSendingThis = sendingLeadId === lead.id;
                 const cleanPhone = (lead.phone || '').replace(/[^0-9]/g, '');
@@ -897,6 +898,16 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                   </div>
                 );
               })}
+
+              {displayLimit < filteredLeads.length && (
+                <button
+                  type="button"
+                  onClick={() => setDisplayLimit((prev) => prev + 40)}
+                  className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-slate-100 text-slate-800 font-mono text-xs font-bold border border-slate-200 transition shadow-sm"
+                >
+                  ➕ Ver más leads ({filteredLeads.length - displayLimit} restantes)
+                </button>
+              )}
 
               {filteredLeads.length === 0 && (
                 <div className="py-16 text-center text-slate-400 text-xs font-mono">
