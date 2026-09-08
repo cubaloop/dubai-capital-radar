@@ -373,9 +373,10 @@ async function startWhatsApp() {
 
       const remoteJid = msg.key.remoteJid || '';
       const isGroup = remoteJid.endsWith('@g.us') || remoteJid.includes('@g.us');
+      const isBroadcast = remoteJid === 'status@broadcast' || remoteJid.includes('broadcast');
 
-      // STRICT FILTER: completely ignore all WhatsApp groups
-      if (isGroup) {
+      // STRICT FILTER: completely ignore all WhatsApp groups and status broadcasts
+      if (isGroup || isBroadcast) {
         continue;
       }
 

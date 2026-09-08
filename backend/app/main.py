@@ -1058,9 +1058,9 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     if not text:
         return {"status": "ignored", "reason": "empty_content"}
 
-    # STRICT FILTER 1: Completely ignore all WhatsApp group messages
-    if is_group or "@g.us" in jid:
-        return {"status": "ignored", "reason": "group_message_ignored"}
+    # STRICT FILTER 1: Completely ignore all WhatsApp group messages and status broadcasts
+    if is_group or "@g.us" in jid or "broadcast" in jid:
+        return {"status": "ignored", "reason": "group_or_broadcast_ignored"}
 
     # 0. SUPER-ADMIN COPILOT MODE (+971508379080 or "Jota" wake word)
     is_admin = (
