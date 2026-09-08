@@ -829,19 +829,24 @@ ADMIN_PHONE_DIGITS = "971508379080"
 
 async def handle_admin_copilot(command_text: str, sender_jid: str):
     """
-    Handles natural language operational inquiries directly from the Super-Admin / Broker (+971508379080).
-    Allows querying lead stats, active replies in the last 24h, campaign progress, etc.
+    Handles inquiries directly from the Super-Admin / Broker (+971508379080).
+    Uses 'Jota' as the wake word / bot identity, with instant fallback for direct operational queries.
     """
-    lower = command_text.lower()
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    lower = command_text.lower().strip()
     
-    reply_msg = ""
-    
-    # Check intent categories
+    # Check for wake word 'Jota' or standard operational intents
+    has_jota = "jota" in lower
     is_leads_inquiry = any(k in lower for k in ["respondieron", "respondio", "respuestas", "leads hoy", "ultimas 24", "últimas 24", "cuantos leads", "cuántos leads", "quienes", "quiénes"])
     is_summary_inquiry = any(k in lower for k in ["campaña", "campana", "estado", "resumen", "total leads", "reporte", "informe", "metricas", "métricas", "como vamos", "cómo vamos", "status"])
     is_credentials_inquiry = any(k in lower for k in ["credencial", "credenciales", "acceso", "accesos", "clave", "claves", "login", "password", "mi empresa", "contraseña", "usuario", "mi cuenta"])
+
+    # If message is not directed to Jota and is not an operational query, ignore to keep chat quiet
+    if not (has_jota or is_leads_inquiry or is_summary_inquiry or is_credentials_inquiry):
+        return {"status": "ignored", "reason": "no_wake_word_jota"}
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    reply_msg = ""
 
     # Query 0: Credentials for his agency & admin portal
     if is_credentials_inquiry:
@@ -896,9 +901,9 @@ async def handle_admin_copilot(command_text: str, sender_jid: str):
             is_fallback = False
         
         if not rows:
-            reply_msg = "📊 *Reporte Copiloto Dubai Capital Radar*\n\nActualmente no se han registrado respuestas entrantes en las últimas 24h.\nLas campañas activas continúan en seguimiento."
+            reply_msg = "📊 *Reporte Copiloto Jota*\n\nActualmente no se han registrado respuestas entrantes en las últimas 24h.\nLas campañas activas continúan en seguimiento."
         else:
-            title = "📊 *Reporte Copiloto Dubai Capital Radar*"
+            title = "📊 *Reporte Copiloto Jota — Leads Activos*"
             sub = f"Leads que respondieron recientemente ({len(rows)} activos):" if not is_fallback else f"Sin respuestas directas hoy. Últimos {len(rows)} contactados:"
             lines = [f"{title}\n{sub}"]
             for idx, r in enumerate(rows, 1):
@@ -911,9 +916,20 @@ async def handle_admin_copilot(command_text: str, sender_jid: str):
             
             lines.append("\n✅ _Todos los datos están sincronizados en tiempo real con tu CRM y Supabase._")
             reply_msg = "\n".join(lines)
-            
-    # Query 2: Executive Campaign Summary & Overall Pulse
-    elif is_summary_inquiry:
+
+    # Query 2: Standalone wake greeting (e.g. "Jota", "Hola Jota", "Hey Jota")
+    elif lower in ["jota", "hola jota", "oye jota", "hey jota", "buenas jota"]:
+        reply_msg = (
+            "👋 *¡Hola David! Aquí Jota, tu copiloto de IA en Dubai Capital Radar.*\n\n"
+            "¿En qué te puedo apoyar hoy? Puedes pedirme:\n"
+            "📊 *'Jota, resumen'* — Avance de campañas y envíos\n"
+            "👥 *'Jota, leads'* — Inversores que respondieron hoy\n"
+            "🔑 *'Jota, credenciales'* — Accesos del sistema\n"
+            "💡 O hacerme cualquier consulta libre sobre propiedades, objeciones de clientes o redacción de mensajes."
+        )
+
+    # Query 3: Executive Campaign Summary & Overall Pulse
+    elif is_summary_inquiry and not ("jota" in lower and len(lower.split()) > 3):
         cursor.execute("""
         SELECT c.name, COUNT(l.id) as total,
                SUM(CASE WHEN l.whatsapp_status = 'sent' THEN 1 ELSE 0 END) as sent,
@@ -923,7 +939,7 @@ async def handle_admin_copilot(command_text: str, sender_jid: str):
         GROUP BY c.id
         """)
         camps = cursor.fetchall()
-        lines = ["📈 *Resumen Ejecutivo - Dubai Capital Radar*"]
+        lines = ["📈 *Resumen Ejecutivo — Copiloto Jota*"]
         for c in camps:
             lines.append(f"\n• *{c['name']}*:\n  - 🎯 Total: {c['total']} leads\n  - 📨 Enviados: {c['sent']}\n  - 💬 Respuestas: {c['replied']}")
         
@@ -943,24 +959,36 @@ async def handle_admin_copilot(command_text: str, sender_jid: str):
 
         lines.append("\n🟢 *Bot WhatsApp:* Conectado y en línea (+971501378020)")
         reply_msg = "\n".join(lines)
-        
+
+    # Query 4: Open Intelligence / Copilot Advisory via Groq (Llama 3.3 70B) or Gemini
     else:
-        # Natural response via Groq / Gemini with broker assistant context
+        import re
+        clean_question = re.sub(r'^(oye\s+)?jota[,:\s]*', '', command_text, flags=re.IGNORECASE).strip()
+        if not clean_question:
+            clean_question = command_text
+
         groq_key = os.getenv("GROQ_API_KEY", "").strip()
         gemini_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
-        
+
+        sys_prompt = (
+            "Eres Jota, el copiloto de IA de David, Super-Admin de Dubai Capital Radar y broker senior de H.O.M.E Properties en Dubai. "
+            "Responde siempre en español, con tono ejecutivo, seguro y experto en inversiones inmobiliarias en Dubai "
+            "(Downtown, Palm Jumeirah, Dubai Hills, Business Bay, off-plan, Golden Visa, ROI del 8-10% neto, plusvalía, fiscalidad 0% y planes de pago flexibles). "
+            "Sé conciso, directo y usa formato de WhatsApp (negritas y viñetas cuando convenga). Máximo 3 o 4 párrafos cortos."
+        )
+
         if groq_key:
             for gm in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]:
                 try:
-                    async with httpx.AsyncClient(timeout=10.0) as client:
+                    async with httpx.AsyncClient(timeout=12.0) as client:
                         payload = {
                             "model": gm,
                             "messages": [
-                                {"role": "system", "content": "Eres el copiloto de IA de David, el Super-Admin del sistema Dubai Capital Radar. Responde de forma muy concisa, profesional y directa en formato WhatsApp."},
-                                {"role": "user", "content": command_text}
+                                {"role": "system", "content": sys_prompt},
+                                {"role": "user", "content": clean_question}
                             ],
                             "temperature": 0.3,
-                            "max_tokens": 400
+                            "max_tokens": 500
                         }
                         r = await client.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"})
                         if r.status_code == 200:
@@ -968,12 +996,14 @@ async def handle_admin_copilot(command_text: str, sender_jid: str):
                             break
                 except Exception:
                     pass
-                    
+
         if not reply_msg and gemini_key:
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with httpx.AsyncClient(timeout=12.0) as client:
                     gem_payload = {
-                        "contents": [{"parts": [{"text": f"Eres el copiloto de IA de David en Dubai Capital Radar. Responde en WhatsApp de forma concisa y ejecutiva a su mensaje: {command_text}"}]}]
+                        "contents": [
+                            {"parts": [{"text": f"{sys_prompt}\n\nPregunta de David: {clean_question}"}]}
+                        ]
                     }
                     r = await client.post(f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}", json=gem_payload)
                     if r.status_code == 200:
@@ -982,10 +1012,10 @@ async def handle_admin_copilot(command_text: str, sender_jid: str):
                             reply_msg = cand[0]["content"]["parts"][0]["text"].strip()
             except Exception:
                 pass
-        
+
         if not reply_msg:
-            reply_msg = f"👋 Hola David, recibí tu mensaje: \"{command_text}\". Puedes pedirme:\n1. 📊 *'Resumen de campañas'*\n2. 👥 *'¿Cuántos leads respondieron hoy?'*\n3. 📄 Reenviarme el PDF/ficha técnica de un proyecto para indexarlo."
-            
+            reply_msg = f"👋 Hola David, recibí tu consulta: \"{clean_question}\". Puedes pedirme tus reportes directos con *'Jota, resumen'* o *'Jota, leads'*."
+
     conn.close()
     
     # Send response back to admin via WhatsApp
