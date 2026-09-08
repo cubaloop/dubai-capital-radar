@@ -1010,9 +1010,8 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
                 if reply_msg:
                     break
 
-        # 2. GEMINI — EN MODO ESPERA (dormido para evitar respuestas dobles mientras Groq funciona bien)
-        # Para reactivar: cambiar False por: not reply_msg and gemini_key
-        if False and not reply_msg and gemini_key:
+        # 2. FALLBACK: Gemini (respaldo activo si Groq falla)
+        if not reply_msg and gemini_key:
             hist_text = "\n".join([f"{'Jota' if t['role'] in ['assistant', 'model', 'jota'] else 'David'}: {t['content']}" for t in past_history])
             gem_prompt = f"{system_prompt}\n\nHISTORIAL DE CONVERSACIÓN RECIENTE:\n{hist_text}\n\nMENSAJE ACTUAL DE DAVID:\n{text}\n\nResponde como Jota (ejecutivo, experto, natural, formato WhatsApp):"
 
