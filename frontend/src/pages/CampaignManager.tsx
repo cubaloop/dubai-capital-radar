@@ -854,6 +854,17 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                     </div>
 
                     <div className="flex items-center gap-2 self-end sm:self-center shrink-0 pt-1 sm:pt-0">
+                      {lead.phone && (
+                        <a
+                          href={`tel:${lead.phone.replace(/[^0-9+]/g, '')}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition shadow-sm flex items-center justify-center"
+                          title="Llamar directamente al lead"
+                        >
+                          <Phone className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+
                       <a
                         href={waDirectLink}
                         target="_blank"
@@ -1006,24 +1017,35 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
 
                 {/* Action Buttons: Real Send + Test to My WhatsApp */}
                 <div className="space-y-2.5 pt-1">
-                  {/* 1-Click Send Button to Client */}
-                  <button
-                    onClick={() => handleSendSingleLead(selectedLeadPreview)}
-                    disabled={sendingLeadId === selectedLeadPreview.id}
-                    className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3.5 rounded-2xl text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all disabled:opacity-50"
-                  >
-                    {sendingLeadId === selectedLeadPreview.id ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>{t('campaigns.sending', 'Dispatching...')}</span>
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4" />
-                        <span>{t('campaigns.sendNow', 'Send to')} {selectedLeadPreview.name.split(' ')[0]} ({selectedLeadPreview.phone})</span>
-                      </>
-                    )}
-                  </button>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* 1-Click Send Button to Client */}
+                    <button
+                      onClick={() => handleSendSingleLead(selectedLeadPreview)}
+                      disabled={sendingLeadId === selectedLeadPreview.id}
+                      className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3.5 rounded-2xl text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all disabled:opacity-50"
+                    >
+                      {sendingLeadId === selectedLeadPreview.id ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>{t('campaigns.sending', 'Dispatching...')}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" />
+                          <span>{t('campaigns.sendNow', 'Send WhatsApp')}</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Direct Phone Call Button */}
+                    <a
+                      href={`tel:${selectedLeadPreview.phone.replace(/[^0-9+]/g, '')}`}
+                      className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-3.5 rounded-2xl text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-95 transition-all"
+                    >
+                      <Phone className="w-4 h-4" />
+                      <span>Llamar al Lead</span>
+                    </a>
+                  </div>
 
                   {/* Send Test to My Personal WhatsApp */}
                   <div className="p-3 bg-sky-100/70 border border-sky-200/90 rounded-2xl space-y-2">

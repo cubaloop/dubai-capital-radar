@@ -131,6 +131,16 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                         {lead.campaign_name || lead.campaign_id}
                       </span>
                       <div className="flex items-center gap-2">
+                        {lead.phone && (
+                          <a
+                            href={`tel:${lead.phone.replace(/[^0-9+]/g, '')}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 transition"
+                            title="Llamar directamente al lead"
+                          >
+                            <Phone className="w-3.5 h-3.5" />
+                          </a>
+                        )}
                         <a
                           href={waLink}
                           target="_blank"

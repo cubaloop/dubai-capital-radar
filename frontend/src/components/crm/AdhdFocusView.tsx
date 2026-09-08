@@ -229,7 +229,7 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
             {currentLead.personalized_message || t('crm.noMessageGen', 'No message generated.')}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
             <button
               onClick={() => onSendWhatsApp(currentLead)}
               disabled={sendingLeadId === currentLead.id}
@@ -243,10 +243,18 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  <span>{t('crm.sendOfficialWa', 'Send Official WhatsApp (1 Click)')}</span>
+                  <span>{t('crm.sendOfficialWa', 'Send WhatsApp')}</span>
                 </>
               )}
             </button>
+
+            <a
+              href={`tel:${cleanDigits}`}
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-2xl text-xs font-mono flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 transition active:scale-95"
+            >
+              <Phone className="w-4 h-4" />
+              <span>Llamar al Lead</span>
+            </a>
 
             <a
               href={waWebLink}
@@ -255,7 +263,7 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
               className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 font-bold py-3.5 rounded-2xl text-xs font-mono flex items-center justify-center gap-2 transition"
             >
               <MessageSquare className="w-4 h-4 text-emerald-600" />
-              <span>{t('crm.openWaWeb', 'Open in WhatsApp Web')}</span>
+              <span>{t('crm.openWaWeb', 'WhatsApp Web')}</span>
             </a>
           </div>
         </div>

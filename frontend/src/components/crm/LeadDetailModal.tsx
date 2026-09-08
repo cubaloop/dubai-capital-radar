@@ -158,23 +158,33 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
             {lead.personalized_message || t('crm.noMessageGen', 'No message generated.')}
           </div>
 
-          <button
-            onClick={() => onSendWhatsApp(lead)}
-            disabled={sendingLeadId === lead.id}
-            className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-white font-black py-3 rounded-xl text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all disabled:opacity-50"
-          >
-            {sendingLeadId === lead.id ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>{t('crm.dispatching', 'Dispatching...')}</span>
-              </>
-            ) : (
-              <>
-                <Send className="w-4 h-4" />
-                <span>{t('crm.sendOfficialWaFlyer', 'Send Official WhatsApp with Flyer')}</span>
-              </>
-            )}
-          </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <button
+              onClick={() => onSendWhatsApp(lead)}
+              disabled={sendingLeadId === lead.id}
+              className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-white font-black py-3 rounded-xl text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all disabled:opacity-50"
+            >
+              {sendingLeadId === lead.id ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>{t('crm.dispatching', 'Dispatching...')}</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  <span>{t('crm.sendOfficialWaFlyer', 'Send Official WhatsApp with Flyer')}</span>
+                </>
+              )}
+            </button>
+
+            <a
+              href={`tel:${cleanDigits}`}
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl text-xs font-mono flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-95 transition-all"
+            >
+              <Phone className="w-4 h-4" />
+              <span>Llamar al Lead</span>
+            </a>
+          </div>
         </div>
 
         {/* Lead Notes & Chronological History */}
