@@ -158,6 +158,43 @@ if (SELF_URL) {
     }
   }, 3 * 60 * 1000); // Every 3 minutes
 }
+
+// In-memory message store for Baileys retry resolution (resolves "Esperando mensaje / Waiting for message")
+const messageStore = new Map();
+function saveToMessageStore(id, message) {
+  if (!id || !message) return;
+  if (messageStore.size > 2000) {
+    const oldestKey = messageStore.keys().next().value;
+    messageStore.delete(oldestKey);
+  }
+  messageStore.set(id, message);
+}
+
+// Debounced auth backup to avoid hammering Supabase while continuously persisting session keys
+let authBackupTimeout = null;
+function scheduleAuthBackup(delayMs = 15000) {
+  if (!AUTH_BACKUP_ENABLED) return;
+  if (authBackupTimeout) clearTimeout(authBackupTimeout);
+  authBackupTimeout = setTimeout(async () => {
+    try {
+      await uploadAuthToSupabase();
+    } catch (e) {
+      console.warn('[Session Backup] Debounced backup warning:', e.message);
+    }
+  }, delayMs);
+}
+
+// Periodic auth backup every 5 minutes when connected to safeguard Signal session ratchet files
+setInterval(async () => {
+  if (isConnected && AUTH_BACKUP_ENABLED) {
+    try {
+      await uploadAuthToSupabase();
+    } catch (e) {
+      // Non-blocking
+    }
+  }
+}, 5 * 60 * 1000);
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function startWhatsApp() {
@@ -173,13 +210,19 @@ async function startWhatsApp() {
     auth: state,
     browser: Browsers.ubuntu('Chrome'),
     syncFullHistory: false,
-    generateHighQualityLinkPreview: true,
+    generateHighQualityLinkPreview: false,
     markOnlineOnConnect: true,
     connectTimeoutMs: 60000,
     defaultQueryTimeoutMs: 60000,
     keepAliveIntervalMs: 25000,
     retryRequestDelayMs: 2000,
     maxMsgRetryCount: 5,
+    getMessage: async (key) => {
+      if (key && key.id && messageStore.has(key.id)) {
+        return messageStore.get(key.id);
+      }
+      return undefined;
+    }
   });
 
   sock.ev.on('creds.update', async (creds) => {
@@ -314,17 +357,29 @@ async function startWhatsApp() {
     return false;
   }
 
-  // Listen to incoming messages for Developer Launch auto-ingestion, Super-Admin copilot & Prospect AI replies
+  // Listen to incoming messages for Super-Admin copilot & Prospect AI replies
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
 
     for (const msg of messages) {
-      if (!msg.message || msg.key.fromMe) continue;
+      if (!msg.message) continue;
+
+      // Cache message in store to handle potential Baileys retry requests (Signal ratchet sync)
+      if (msg.key && msg.key.id) {
+        saveToMessageStore(msg.key.id, msg.message);
+      }
+
+      if (msg.key.fromMe) continue;
 
       const remoteJid = msg.key.remoteJid || '';
-      const isGroup = remoteJid.endsWith('@g.us');
+      const isGroup = remoteJid.endsWith('@g.us') || remoteJid.includes('@g.us');
+
+      // STRICT FILTER: completely ignore all WhatsApp groups
+      if (isGroup) {
+        continue;
+      }
+
       const senderNumber = extractPhoneNumber(remoteJid, msg.key.participant, msg.key.remoteJidAlt);
-      
       const { text, hasDocument, documentFileName, unwrappedMsg } = extractMessageData(msg);
 
       let documentBase64 = null;
@@ -347,13 +402,16 @@ async function startWhatsApp() {
 
       if (!text && !hasDocument) continue;
 
-      console.log(`[WhatsApp Inbound] 📩 Received from ${senderNumber} (${isGroup ? 'Group' : 'Direct'} | Push: ${msg.pushName || 'Anon'}): "${text.substring(0, 50)}"`);
+      console.log(`[WhatsApp Inbound] 📩 Direct message received from ${senderNumber} (Push: ${msg.pushName || 'Anon'}): "${text.substring(0, 50)}"`);
+
+      // Persist auth keys to Supabase
+      scheduleAuthBackup();
 
       // Forward to Python backend asynchronously
       forwardToBackendWebhook({
         sender: senderNumber,
         jid: remoteJid,
-        is_group: isGroup,
+        is_group: false,
         text: text,
         push_name: msg.pushName || '',
         has_document: hasDocument,
@@ -436,20 +494,28 @@ app.post('/send', async (req, res) => {
       const jid = onWa.jid || `${cleanNumber}@s.whatsapp.net`;
 
       const hasValidImage = image_path && fs.existsSync(image_path) && fs.statSync(image_path).size > 1000;
+      let sentMsg = null;
       if (hasValidImage) {
         const imageBuffer = fs.readFileSync(image_path);
-        await sock.sendMessage(jid, { image: imageBuffer, caption: message || '' });
+        sentMsg = await sock.sendMessage(jid, { image: imageBuffer, caption: message || '' });
       } else if (image_url) {
-        await sock.sendMessage(jid, { image: { url: image_url }, caption: message || '' });
+        sentMsg = await sock.sendMessage(jid, { image: { url: image_url }, caption: message || '' });
       } else {
-        await sock.sendMessage(jid, { text: message });
+        sentMsg = await sock.sendMessage(jid, { text: message });
       }
+
+      // Store in memory for Baileys retry handlers so recipients never get stuck on "Waiting for this message"
+      if (sentMsg?.key?.id && sentMsg?.message) {
+        saveToMessageStore(sentMsg.key.id, sentMsg.message);
+      }
+      // Persist auth ratchet state
+      scheduleAuthBackup();
 
       resetDailyCounterIfNeeded();
       messagesSentToday++;
       lastActivityAt = Date.now();
-      console.log(`[WhatsApp] Message delivered to +${cleanNumber}`);
-      return res.json({ success: true, delivered_to: cleanNumber, jid, exists: true });
+      console.log(`[WhatsApp] Message delivered to +${cleanNumber} (ID: ${sentMsg?.key?.id || 'n/a'})`);
+      return res.json({ success: true, delivered_to: cleanNumber, jid, message_id: sentMsg?.key?.id, exists: true });
 
     } catch (sendErr) {
       console.error(`[WhatsApp] Send error for ${cleanNumber}:`, sendErr.message);

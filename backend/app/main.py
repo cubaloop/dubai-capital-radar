@@ -67,7 +67,7 @@ async def dispatch_whatsapp_direct(to_phone: str, message: str, bypass_shield: b
     if not bypass_shield:
         can_send, reason = anti_ban_guard.can_send()
         if not can_send:
-            print(f"🛡️ [ANTI-BAN SHIELD] Outbound paused: {reason}")
+            print(f"[ANTI-BAN SHIELD] Outbound paused: {reason}")
             return {"success": False, "throttled": True, "reason": reason}
 
     try:
@@ -76,12 +76,12 @@ async def dispatch_whatsapp_direct(to_phone: str, message: str, bypass_shield: b
             data = res.json()
             if data.get("success"):
                 anti_ban_guard.record_send()
-                print(f"📨 [ANTI-BAN SHIELD] Message safely delivered to {to_phone} ({anti_ban_guard.daily_sent_count}/{anti_ban_guard.max_daily_limit} today)")
+                print(f"[ANTI-BAN SHIELD] Message safely delivered to {to_phone} ({anti_ban_guard.daily_sent_count}/{anti_ban_guard.max_daily_limit} today)")
             else:
-                print(f"⚠️ [dispatch_whatsapp_direct] Gateway returned error: {data.get('error')}")
+                print(f"[dispatch_whatsapp_direct] Gateway returned error: {data.get('error')}")
             return data
     except Exception as e:
-        print(f"❌ [dispatch_whatsapp_direct] HTTP Exception to {to_phone}: {e}")
+        print(f"[dispatch_whatsapp_direct] HTTP Exception to {to_phone}: {e}")
         return {"success": False, "error": str(e), "simulated": True}
 
 async def autopilot_daemon():
@@ -989,7 +989,10 @@ async def handle_admin_copilot(command_text: str, sender_jid: str):
     conn.close()
     
     # Send response back to admin via WhatsApp
-    print(f"🤖 [ADMIN COPILOT] Dispatching reply to Super-Admin ({ADMIN_PHONE_DIGITS}):\n{reply_msg}")
+    try:
+        print(f"[ADMIN COPILOT] Dispatching reply to Super-Admin ({ADMIN_PHONE_DIGITS}):\n{reply_msg}")
+    except UnicodeEncodeError:
+        print(f"[ADMIN COPILOT] Dispatching reply to Super-Admin ({ADMIN_PHONE_DIGITS}):\n{reply_msg.encode('ascii', 'backslashreplace').decode('ascii')}")
     await dispatch_whatsapp_direct(to_phone=ADMIN_PHONE_DIGITS, message=reply_msg, bypass_shield=True)
     return {"status": "admin_copilot_replied", "message": reply_msg}
 
@@ -1029,32 +1032,33 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     if not text:
         return {"status": "ignored", "reason": "empty_content"}
 
+    # STRICT FILTER 1: Completely ignore all WhatsApp group messages
+    if is_group or "@g.us" in jid:
+        return {"status": "ignored", "reason": "group_message_ignored"}
+
     # 0. SUPER-ADMIN COPILOT MODE (+971508379080)
-    if sender == ADMIN_PHONE_DIGITS or "508379080" in sender or sender.endswith("508379080") or "508379080" in jid:
+    is_admin = (
+        sender == ADMIN_PHONE_DIGITS or 
+        "508379080" in sender or 
+        sender.endswith("508379080") or 
+        "508379080" in jid
+    )
+
+    if is_admin:
         print(f"[ADMIN COPILOT] Message from Super-Admin ({sender}): '{text}'")
-        # Check if sending a developer launch or asking a system question
+        # Check if sending a developer launch brochure or asking a system question
         if not is_developer_or_launch_message(text, is_group=False):
             return await handle_admin_copilot(text, jid)
 
-    # 1. DEVELOPER PROJECT LAUNCH DETECTION (Texts or PDFs)
-    if is_developer_or_launch_message(text, is_group=is_group):
+        # If Super-Admin sends a new developer launch brochure
         parsed_project = await parse_project_from_text(text)
         if parsed_project:
             parsed_project["sender"] = sender
-            parsed_project["is_group"] = is_group
+            parsed_project["is_group"] = False
             parsed_project["detected_at"] = payload.get("timestamp")
             INGESTED_PROJECTS_FEED.insert(0, parsed_project)
-            print(f"[Auto-Ingestion] New project parsed: {parsed_project.get('project_name')} by {parsed_project.get('developer')}")
-            
-            # Send instant Telegram alert to broker
-            await notify_developer_launch(
-                project_name=parsed_project.get("project_name") or "Nuevo Lanzamiento",
-                developer=parsed_project.get("developer") or "Desarrolladora Dubai",
-                price_aed=parsed_project.get("starting_price_aed"),
-                payment_plan=parsed_project.get("payment_plan")
-            )
+            print(f"[Auto-Ingestion] New project parsed from Super-Admin: {parsed_project.get('project_name')} by {parsed_project.get('developer')}")
 
-            # Also notify Super-Admin on WhatsApp
             admin_notice = (
                 f"🏗️ *Nuevo Proyecto Ingestado Automáticamente*\n\n"
                 f"• *Proyecto:* {parsed_project.get('project_name')}\n"
@@ -1073,59 +1077,68 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
                 "starting_price_aed": parsed_project.get("starting_price_aed")
             }
 
-    # 2. PROSPECT REPLIES & AUTOMATIC CRM RECORD UPDATES
+    # STRICT FILTER 2: For any other sender, verify they exist in CRM leads
+    sender_digits = "".join([c for c in sender if c.isdigit()])
+    if len(sender_digits) < 7:
+        return {"status": "ignored", "reason": "invalid_phone_number", "sender": sender}
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    suffix = sender_digits[-8:] if len(sender_digits) >= 8 else sender_digits
+    cursor.execute(
+        "SELECT * FROM leads WHERE clean_phone = ? OR clean_phone LIKE ? OR phone LIKE ?", 
+        (sender_digits, f"%{suffix}", f"%{suffix}%")
+    )
+    matched_lead = cursor.fetchone()
+
+    # Non-lead number: immediately discard without triggering AI or alerts
+    if not matched_lead:
+        conn.close()
+        print(f"[WhatsApp Inbound Filter] Ignored message from unlisted number +{sender}. Not in CRM leads.")
+        return {
+            "status": "ignored",
+            "reason": "not_in_crm_leads",
+            "sender": sender
+        }
+
+    # SENDER IS A REGISTERED LEAD: Process intent & update CRM records
+    lid = matched_lead["id"]
+    lead_name = matched_lead["name"]
+
     intent_data = await classify_message_intent(text)
     intent = intent_data.get("intent", "info_request")
     urgency = intent_data.get("urgency", "low")
     summary = intent_data.get("summary") or text[:70]
 
-    # Search for matching lead in SQLite & Supabase
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    new_crm_status = "INTERESTED" if intent in ["ready_to_buy", "interested", "scheduling"] else "CONTACTED"
+    note_content = f"💬 [Respuesta WhatsApp]: {text}\n🤖 [IA Triage]: {intent.upper()} - {summary}"
     
-    # Match clean phone digits (suffix matching to handle +1 / 1 / +34 etc.)
-    sender_digits = "".join([c for c in sender if c.isdigit()])
-    cursor.execute("SELECT * FROM leads WHERE clean_phone = ? OR clean_phone LIKE ? OR phone LIKE ?", 
-                   (sender_digits, f"%{sender_digits[-8:]}", f"%{sender_digits[-8:]}%"))
-    matched_lead = cursor.fetchone()
+    # Add note to lead_notes table
+    add_lead_note_db(lid, author="WhatsApp IA Inbound", content=note_content, note_type="reply")
     
-    lead_name = f"Inversor (+{sender})"
-    updated_in_crm = False
-
-    if matched_lead:
-        lid = matched_lead["id"]
-        lead_name = matched_lead["name"]
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        new_crm_status = "INTERESTED" if intent in ["ready_to_buy", "interested", "scheduling"] else "CONTACTED"
-        note_content = f"💬 [Respuesta WhatsApp]: {text}\n🤖 [IA Triage]: {intent.upper()} - {summary}"
-        
-        # Add note to lead_notes table
-        add_lead_note_db(lid, author="WhatsApp IA Inbound", content=note_content, note_type="reply")
-        
-        # Append to lead notes column and update status
-        existing_notes = (matched_lead["notes"] or "").strip()
-        combined_notes = f"{existing_notes}\n[{now_str[:10]}]: {summary}" if existing_notes else f"[{now_str[:10]}]: {summary}"
-        
-        cursor.execute("""
-        UPDATE leads 
-        SET crm_status = ?,
-            whatsapp_status = 'replied',
-            last_contact_date = ?,
-            notes = ?
-        WHERE id = ?
-        """, (new_crm_status, now_str, combined_notes, lid))
-        conn.commit()
-        
-        # Sync updated lead to Supabase PostgreSQL
-        cursor.execute("SELECT * FROM leads WHERE id = ?", (lid,))
-        fresh_lead = cursor.fetchone()
-        if fresh_lead:
-            sync_lead_background(dict(fresh_lead))
-        updated_in_crm = True
-        print(f"[CRM Auto-Update] Lead '{lead_name}' updated: status={new_crm_status}, note='{summary}'")
-
+    # Append to lead notes column and update status
+    existing_notes = (matched_lead["notes"] or "").strip()
+    combined_notes = f"{existing_notes}\n[{now_str[:10]}]: {summary}" if existing_notes else f"[{now_str[:10]}]: {summary}"
+    
+    cursor.execute("""
+    UPDATE leads 
+    SET crm_status = ?,
+        whatsapp_status = 'replied',
+        last_contact_date = ?,
+        notes = ?
+    WHERE id = ?
+    """, (new_crm_status, now_str, combined_notes, lid))
+    conn.commit()
+    
+    # Sync updated lead to Supabase PostgreSQL
+    cursor.execute("SELECT * FROM leads WHERE id = ?", (lid,))
+    fresh_lead = cursor.fetchone()
+    if fresh_lead:
+        sync_lead_background(dict(fresh_lead))
     conn.close()
+
+    print(f"[CRM Auto-Update] Lead '{lead_name}' (+{sender}) updated: status={new_crm_status}, note='{summary}'")
 
     # If lead shows high intent, objection to resolve, or ready to buy -> trigger Telegram & WhatsApp alerts to broker!
     is_hot = intent in ["ready_to_buy", "interested", "scheduling", "objection_price", "objection_trust", "objection_spouse"] or urgency in ["high", "medium"]
@@ -1147,7 +1160,7 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
             f"📱 *Teléfono:* +{sender}\n"
             f"🎯 *Intención:* {intent.upper()}\n"
             f"💬 *Mensaje:* \"{text}\"\n\n"
-            f"📌 *CRM:* {'✅ Nota y estado actualizados automáticamente' if updated_in_crm else '⚠️ Número no registrado previamente'}\n"
+            f"📌 *CRM:* ✅ Nota y estado actualizados automáticamente\n"
             f"👉 Abre la app o WhatsApp para responderle de inmediato."
         )
         await dispatch_whatsapp_direct(to_phone=ADMIN_PHONE_DIGITS, message=hot_alert, bypass_shield=True)
@@ -1156,7 +1169,7 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
         "status": "prospect_message_processed",
         "sender": sender,
         "lead_name": lead_name,
-        "crm_updated": updated_in_crm,
+        "crm_updated": True,
         "intent": intent,
         "urgency": urgency,
         "notify_human": intent_data.get("notify_human", False)
