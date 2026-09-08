@@ -96,6 +96,17 @@ async def send_whatsapp_endpoint(payload: Dict[str, Any]):
     target_jid = payload.get("jid")
     return await dispatch_whatsapp_direct(to_phone=to_phone, message=message, bypass_shield=True, target_jid=target_jid)
 
+@app.post("/api/whatsapp/reset-contact-session")
+async def api_reset_contact_session(payload: Optional[Dict[str, Any]] = None):
+    """Clears stale Signal session ratchet keys for a contact to force a fresh pre-key handshake."""
+    phone = (payload and payload.get("phone")) or ADMIN_PHONE_DIGITS
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.post(f"{WHATSAPP_GATEWAY_URL}/reset-contact-session", json={"phone": phone})
+            return r.json()
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 async def autopilot_daemon():
     """Continuous background worker with Anti-Ban Protection and CRM Synchronization."""
     global AUTOPILOT_ENABLED, AUTOPILOT_DISPATCH_COUNT

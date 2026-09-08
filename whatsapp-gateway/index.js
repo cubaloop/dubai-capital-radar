@@ -581,6 +581,38 @@ app.post('/verify-numbers', async (req, res) => {
   }
 });
 
+// Endpoint: Reset encryption session for a specific contact (forces fresh Signal pre-key handshake)
+app.post('/reset-contact-session', async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ error: 'Missing phone' });
+    const clean = phone.replace(/[^0-9]/g, '');
+    let deletedCount = 0;
+    
+    if (fs.existsSync(AUTH_DIR)) {
+      const files = fs.readdirSync(AUTH_DIR);
+      for (const f of files) {
+        if (f.startsWith(`session-${clean}`) || f.includes(clean)) {
+          try {
+            fs.unlinkSync(path.join(AUTH_DIR, f));
+            deletedCount++;
+          } catch (e) {}
+        }
+      }
+    }
+    
+    // Update Supabase backup
+    if (AUTH_BACKUP_ENABLED) {
+      await uploadAuthToSupabase();
+    }
+    
+    console.log(`[Session Reset] Cleared ${deletedCount} session files for +${clean}`);
+    return res.json({ success: true, phone: clean, deleted_files: deletedCount });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // Endpoint: Generate 8-digit Pairing Code for phone number (No camera / QR scan needed)
 app.post('/pairing-code', async (req, res) => {
   try {
