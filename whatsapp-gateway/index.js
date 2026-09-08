@@ -461,9 +461,9 @@ app.get('/qr', (req, res) => {
 
 app.post('/send', async (req, res) => {
   try {
-    const { to, message, image_path, image_url } = req.body;
+    const { to, message, image_path, image_url, jid: directJid } = req.body;
 
-    if (!to || (!message && !image_path && !image_url)) {
+    if ((!to && !directJid) || (!message && !image_path && !image_url)) {
       return res.status(400).json({ error: 'Missing recipient phone number or content' });
     }
 
@@ -475,24 +475,31 @@ app.post('/send', async (req, res) => {
       });
     }
 
-    const cleanNumber = to.replace(/[^0-9]/g, '');
+    const cleanNumber = (to || '').replace(/[^0-9]/g, '');
 
-    // Verify number exists on WhatsApp
-    try {
-      const checkResults = await sock.onWhatsApp(cleanNumber);
-      const onWa = Array.isArray(checkResults) ? checkResults[0] : checkResults;
-
-      if (!onWa || !onWa.exists) {
-        console.log(`[WhatsApp] ${cleanNumber} is NOT registered on WhatsApp`);
-        return res.json({ 
-          success: false, 
-          exists: false, 
-          error: `The number ${to} is not registered on WhatsApp.` 
-        });
+    // Resolve target JID: if directJid provided (e.g. from incoming chat or @lid), prioritize it!
+    let jid = directJid;
+    if (!jid) {
+      if (!cleanNumber) {
+        return res.status(400).json({ error: 'Missing target phone number or JID' });
       }
+      jid = `${cleanNumber}@s.whatsapp.net`;
 
-      const jid = onWa.jid || `${cleanNumber}@s.whatsapp.net`;
+      // Try onWhatsApp to refine JID, but never block sending if onWhatsApp fails or is rate-limited
+      try {
+        const checkResults = await sock.onWhatsApp(cleanNumber);
+        const onWa = Array.isArray(checkResults) ? checkResults[0] : checkResults;
+        if (onWa && onWa.exists && onWa.jid) {
+          jid = onWa.jid;
+        }
+      } catch (onWaErr) {
+        console.warn(`[WhatsApp] onWhatsApp check warning for ${cleanNumber}:`, onWaErr.message);
+      }
+    }
 
+    console.log(`[WhatsApp] Dispatching to JID: ${jid} (to: ${to || 'direct'})...`);
+
+    try {
       const hasValidImage = image_path && fs.existsSync(image_path) && fs.statSync(image_path).size > 1000;
       let sentMsg = null;
       if (hasValidImage) {
@@ -514,11 +521,11 @@ app.post('/send', async (req, res) => {
       resetDailyCounterIfNeeded();
       messagesSentToday++;
       lastActivityAt = Date.now();
-      console.log(`[WhatsApp] Message delivered to +${cleanNumber} (ID: ${sentMsg?.key?.id || 'n/a'})`);
-      return res.json({ success: true, delivered_to: cleanNumber, jid, message_id: sentMsg?.key?.id, exists: true });
+      console.log(`[WhatsApp] Message delivered to ${jid} (ID: ${sentMsg?.key?.id || 'n/a'})`);
+      return res.json({ success: true, delivered_to: cleanNumber || jid, jid, message_id: sentMsg?.key?.id, exists: true });
 
     } catch (sendErr) {
-      console.error(`[WhatsApp] Send error for ${cleanNumber}:`, sendErr.message);
+      console.error(`[WhatsApp] Send error for ${jid}:`, sendErr.message);
       return res.status(500).json({ success: false, error: sendErr.message });
     }
 

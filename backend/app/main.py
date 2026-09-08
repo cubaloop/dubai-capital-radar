@@ -60,7 +60,7 @@ from .crm.sync_tadh import crm_bridge
 
 WHATSAPP_GATEWAY_URL = os.getenv("WHATSAPP_GATEWAY_URL", "http://127.0.0.1:3001")
 
-async def dispatch_whatsapp_direct(to_phone: str, message: str, bypass_shield: bool = False):
+async def dispatch_whatsapp_direct(to_phone: str, message: str, bypass_shield: bool = False, target_jid: Optional[str] = None):
     """
     Delivers message via WhatsApp Web Gateway while respecting the Anti-Ban Safety Protocol.
     """
@@ -71,8 +71,12 @@ async def dispatch_whatsapp_direct(to_phone: str, message: str, bypass_shield: b
             return {"success": False, "throttled": True, "reason": reason}
 
     try:
+        payload = {"to": to_phone, "message": message}
+        if target_jid:
+            payload["jid"] = target_jid
+
         async with httpx.AsyncClient(timeout=15.0) as client:
-            res = await client.post(f"{WHATSAPP_GATEWAY_URL}/send", json={"to": to_phone, "message": message})
+            res = await client.post(f"{WHATSAPP_GATEWAY_URL}/send", json=payload)
             data = res.json()
             if data.get("success"):
                 anti_ban_guard.record_send()
@@ -827,7 +831,7 @@ from datetime import datetime
 INGESTED_PROJECTS_FEED: List[Dict[str, Any]] = []
 ADMIN_PHONE_DIGITS = "971508379080"
 
-async def handle_admin_copilot(command_text: str, sender_jid: str):
+async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_phone: str = ""):
     """
     Handles inquiries directly from the Super-Admin / Broker (+971508379080).
     Uses 'Jota' as the wake word / bot identity, with instant fallback for direct operational queries.
@@ -1023,14 +1027,18 @@ async def handle_admin_copilot(command_text: str, sender_jid: str):
         print(f"[ADMIN COPILOT] Dispatching reply to Super-Admin ({ADMIN_PHONE_DIGITS}):\n{reply_msg}")
     except UnicodeEncodeError:
         print(f"[ADMIN COPILOT] Dispatching reply to Super-Admin ({ADMIN_PHONE_DIGITS}):\n{reply_msg.encode('ascii', 'backslashreplace').decode('ascii')}")
-    await dispatch_whatsapp_direct(to_phone=ADMIN_PHONE_DIGITS, message=reply_msg, bypass_shield=True)
-    return {"status": "admin_copilot_replied", "message": reply_msg}
+
+    target_jid = sender_jid if sender_jid else f"{ADMIN_PHONE_DIGITS}@s.whatsapp.net"
+    target_phone = sender_phone if (sender_phone and len(sender_phone) >= 8 and not sender_jid.endswith('@lid')) else ADMIN_PHONE_DIGITS
+
+    await dispatch_whatsapp_direct(to_phone=target_phone, message=reply_msg, bypass_shield=True, target_jid=target_jid)
+    return {"status": "admin_copilot_replied", "message": reply_msg, "target_jid": target_jid}
 
 @app.post("/api/whatsapp/inbound-webhook")
 async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     """
     Receives incoming WhatsApp messages in real-time.
-    0. If from Super-Admin (+971508379080) -> Copilot Mode (Answers queries, executes CRM actions).
+    0. If from Super-Admin (+971508379080) or mentions "Jota" -> Copilot Mode.
     1. If from developer/launch group -> Groq/Gemini parses project facts and adds to inventory knowledge.
     2. If from prospect -> Groq/Gemini classifies intent, auto-updates CRM notes & triggers hot lead alerts.
     """
@@ -1066,19 +1074,20 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     if is_group or "@g.us" in jid:
         return {"status": "ignored", "reason": "group_message_ignored"}
 
-    # 0. SUPER-ADMIN COPILOT MODE (+971508379080)
+    # 0. SUPER-ADMIN COPILOT MODE (+971508379080 or "Jota" wake word)
     is_admin = (
         sender == ADMIN_PHONE_DIGITS or 
         "508379080" in sender or 
         sender.endswith("508379080") or 
-        "508379080" in jid
+        "508379080" in jid or
+        "jota" in text.lower()
     )
 
     if is_admin:
-        print(f"[ADMIN COPILOT] Message from Super-Admin ({sender}): '{text}'")
+        print(f"[ADMIN COPILOT] Message from Super-Admin ({sender} | JID: {jid}): '{text}'")
         # Check if sending a developer launch brochure or asking a system question
         if not is_developer_or_launch_message(text, is_group=False):
-            return await handle_admin_copilot(text, jid)
+            return await handle_admin_copilot(text, sender_jid=jid, sender_phone=sender)
 
         # If Super-Admin sends a new developer launch brochure
         parsed_project = await parse_project_from_text(text)
