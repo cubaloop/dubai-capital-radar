@@ -14,8 +14,17 @@ interface NavbarProps {
   onOpenLicenseModal?: () => void;
   remainingTrialDays?: number;
   isUnlocked?: boolean;
+  currentUser?: {
+    email: string;
+    name: string;
+    role: string;
+    agencyName: string;
+    logoUrl?: string;
+    messagesLimit?: number;
+    messagesUsed?: number;
+    plan?: string;
+  };
   onLogout?: () => void;
-  currentUser?: { email: string; name: string; role: string; agencyName: string; logoUrl?: string };
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -95,6 +104,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* Right side */}
             <div className="flex items-center gap-2 shrink-0">
+
+              {/* AI Messages Quota Pill */}
+              <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <span>🎁</span>
+                <span>{currentUser?.messagesLimit && currentUser.messagesLimit !== -1 ? `${Math.max(0, (currentUser.messagesLimit - (currentUser.messagesUsed || 0)))} / ${currentUser.messagesLimit} msgs IA` : '500 msgs IA gratis'}</span>
+              </div>
 
               {/* Theme Toggle */}
               <ThemeToggleButton className="hidden sm:inline-flex" />

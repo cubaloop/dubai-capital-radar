@@ -1497,7 +1497,15 @@ def get_daily_activity(days: int = 30):
     return activity
 
 # --- Agency API Endpoints ---
-from .database.crm_db import create_agency, get_agency_by_id, get_agency_by_email, update_agency_wa_config, list_agencies
+from .database.crm_db import (
+    create_agency,
+    get_agency_by_id,
+    get_agency_by_email,
+    update_agency_wa_config,
+    list_agencies,
+    get_agency_quota,
+    consume_agency_quota
+)
 
 @app.post("/api/agencies")
 def api_create_agency(payload: Dict[str, Any]):
@@ -1525,6 +1533,62 @@ def api_update_agency_wa_config(agency_id: str, payload: Dict[str, Any]):
 @app.get("/api/agencies")
 def api_list_agencies():
     return list_agencies()
+
+# --- Auth & 500 Free AI Messages Quota Endpoints ---
+@app.get("/api/agency/quota")
+def api_get_agency_quota(email: Optional[str] = None, agency_id: Optional[str] = None):
+    target = agency_id or email or "default"
+    return get_agency_quota(target)
+
+@app.post("/api/auth/register")
+def api_auth_register(payload: Dict[str, Any]):
+    email = payload.get("email", "").strip()
+    name = payload.get("name", "").strip()
+    agency_name = payload.get("agency_name", "My Agency").strip()
+    plan = payload.get("plan", "free").lower()
+    
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+        
+    existing = get_agency_by_email(email)
+    if existing:
+        return {
+            "success": True,
+            "agency": existing,
+            "quota": get_agency_quota(existing["id"]),
+            "message": "Welcome back"
+        }
+        
+    agency = create_agency({
+        "name": agency_name or name or "My Agency",
+        "email": email,
+        "plan": plan,
+    })
+    return {
+        "success": True,
+        "agency": agency,
+        "quota": get_agency_quota(agency["id"]),
+        "message": "Registration successful. Enjoy your 500 free AI messages!"
+    }
+
+@app.post("/api/auth/login")
+def api_auth_login(payload: Dict[str, Any]):
+    email = payload.get("email", "").strip()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+    agency = get_agency_by_email(email)
+    if not agency:
+        agency = create_agency({
+            "name": email.split("@")[0].capitalize(),
+            "email": email,
+            "plan": "free",
+        })
+    return {
+        "success": True,
+        "agency": agency,
+        "quota": get_agency_quota(agency["id"])
+    }
+
 
 # --- Demo Data Seeding ---
 from .demo.seed_demo import seed_demo_data, demo_data_exists

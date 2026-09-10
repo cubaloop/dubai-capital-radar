@@ -16,6 +16,35 @@ import { TermsPage } from './pages/TermsPage';
 import { DemoBanner } from './components/DemoBanner';
 import { useTranslation } from './i18n/LanguageContext';
 
+function DemoLauncher() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    localStorage.setItem('outpilot_demo_mode', 'true');
+    const demoUser = {
+      email: 'demo@outpilot.ae',
+      name: 'Demo Visitor',
+      role: 'agency_owner',
+      agencyName: 'Outpilot Sample Agency',
+      plan: 'free',
+      messagesUsed: 18,
+      messagesLimit: 500,
+    };
+    localStorage.setItem('dcr_user_session', JSON.stringify(demoUser));
+    // Trigger seed in background
+    fetch('/api/demo/seed', { method: 'POST' }).catch(() => {});
+    navigate('/crm?demo=true');
+    window.location.reload();
+  }, [navigate]);
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white font-mono text-sm">
+      <div className="flex items-center gap-3">
+        <div className="w-5 h-5 border-2 border-gold-500 border-t-transparent rounded-full animate-spin" />
+        <span>Cargando entorno demo interactivo...</span>
+      </div>
+    </div>
+  );
+}
+
 export function App() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -39,6 +68,7 @@ export function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('dcr_user_session');
+    localStorage.removeItem('outpilot_demo_mode');
     setCurrentUser(null);
     navigate('/');
   };
@@ -48,6 +78,7 @@ export function App() {
       <DemoBanner />
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/demo" element={<DemoLauncher />} />
         <Route path="/login" element={<AuthScreen />} />
         <Route path="/register" element={<AuthScreen />} />
         <Route path="/onboarding" element={<AgencyOnboarding />} />

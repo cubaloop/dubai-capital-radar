@@ -7,7 +7,7 @@
   body {
     font-family: 'Plus Jakarta Sans', sans-serif;
     @apply text-slate-900 dark:text-slate-100;
-    @apply bg-outpilot-bg dark:bg-outpilot-bg-dark;
+    background-color: var(--color-bg);
     transition: background-color 0.2s ease, color 0.2s ease;
   }
   

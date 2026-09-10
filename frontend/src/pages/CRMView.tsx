@@ -44,19 +44,35 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
   const fetchLeads = async () => {
     try {
       setIsLoading(true);
-      // If user is H.O.M.E Properties, show isolated workspace for new client
+      const isDemo = localStorage.getItem('outpilot_demo_mode') === 'true' || new URLSearchParams(window.location.search).get('demo') === 'true';
       const isHomeAgency = currentUser?.agencyName?.toLowerCase().includes('home') || currentUser?.email?.includes('homeproperties');
       const res = await apiService.getAllCrmLeads();
       if (res?.leads) {
-        if (isHomeAgency) {
+        if (isDemo) {
+          // Isolated Demo Mode: only sample leads
+          let demoLeads = res.leads.filter((l: CrmLead) => l.campaign_id === 'demo_leads_outpilot' || l.id.startsWith('demo_lead_'));
+          if (demoLeads.length === 0) {
+            try {
+              await fetch('/api/demo/seed', { method: 'POST' });
+              const freshRes = await apiService.getAllCrmLeads();
+              demoLeads = (freshRes?.leads || []).filter((l: CrmLead) => l.campaign_id === 'demo_leads_outpilot' || l.id.startsWith('demo_lead_'));
+            } catch (e) {
+              console.warn('Auto-seed demo leads:', e);
+            }
+          }
+          setLeads(demoLeads);
+        } else if (isHomeAgency) {
           // Isolated: only show leads specifically uploaded for HOME Properties
           const homeLeads = res.leads.filter((l: CrmLead) => 
-            l.campaign_name?.toLowerCase().includes('home') || 
-            l.campaign_category?.toLowerCase().includes('home')
+            (l.campaign_name?.toLowerCase().includes('home') || 
+            l.campaign_category?.toLowerCase().includes('home')) &&
+            !l.id.startsWith('demo_lead_') && l.campaign_id !== 'demo_leads_outpilot'
           );
           setLeads(homeLeads);
         } else {
-          setLeads(res.leads);
+          // Real live system: show real leads, NEVER show demo mock leads
+          const realLeads = res.leads.filter((l: CrmLead) => !l.id.startsWith('demo_lead_') && l.campaign_id !== 'demo_leads_outpilot');
+          setLeads(realLeads);
         }
       }
     } catch (err) {
@@ -78,19 +94,25 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
     if (selectedLead && selectedLead.id === leadId) {
       setSelectedLead({ ...selectedLead, crm_status: status });
     }
-    try {
-      await apiService.patchCrmLead(leadId, { crm_status: status });
-    } catch (err) {
-      console.error('Error updating status:', err);
+    const isDemo = localStorage.getItem('outpilot_demo_mode') === 'true' || new URLSearchParams(window.location.search).get('demo') === 'true';
+    if (!isDemo) {
+      try {
+        await apiService.patchCrmLead(leadId, { crm_status: status });
+      } catch (err) {
+        console.error('Error updating status:', err);
+      }
     }
   };
 
   const handleAddNote = async (leadId: string, content: string) => {
     try {
-      await apiService.addLeadNote(leadId, { author: 'Agente', content, type: 'note' });
+      const isDemo = localStorage.getItem('outpilot_demo_mode') === 'true' || new URLSearchParams(window.location.search).get('demo') === 'true';
+      if (!isDemo) {
+        await apiService.addLeadNote(leadId, { author: 'Agente', content, type: 'note' });
+      }
       setNotificationMsg('✅ Nota guardada en el historial.');
       setTimeout(() => setNotificationMsg(null), 3000);
-      fetchLeads();
+      if (!isDemo) fetchLeads();
     } catch (err) {
       console.error('Error adding note:', err);
     }
@@ -101,12 +123,38 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
     setLeads((prev) =>
       prev.map((l) => (l.id === leadId ? { ...l, next_reminder_date: reminderIso } : l))
     );
-    await apiService.patchCrmLead(leadId, { next_reminder_date: reminderIso });
+    const isDemo = localStorage.getItem('outpilot_demo_mode') === 'true' || new URLSearchParams(window.location.search).get('demo') === 'true';
+    if (!isDemo) {
+      await apiService.patchCrmLead(leadId, { next_reminder_date: reminderIso });
+    }
     setNotificationMsg(`⏰ Recordatorio programado para dentro de ${hoursAhead}h.`);
     setTimeout(() => setNotificationMsg(null), 3000);
   };
 
   const handleSendWhatsApp = async (lead: CrmLead) => {
+    const isDemo = localStorage.getItem('outpilot_demo_mode') === 'true' || new URLSearchParams(window.location.search).get('demo') === 'true';
+    
+    // In Demo Mode: simulate safely without calling real WhatsApp gateway
+    if (isDemo) {
+      setSendingLeadId(lead.id);
+      setTimeout(() => {
+        setLeads((prev) =>
+          prev.map((l) =>
+            l.id === lead.id
+              ? { ...l, whatsapp_status: 'sent', last_sent_type: 'manual', last_contact_date: new Date().toLocaleString() }
+              : l
+          )
+        );
+        if (selectedLead && selectedLead.id === lead.id) {
+          setSelectedLead({ ...selectedLead, whatsapp_status: 'sent', last_sent_type: 'manual' });
+        }
+        setSendingLeadId(null);
+        setNotificationMsg(`🎯 [Modo Demo]: Simulación exitosa para ${lead.name}. (No se envió ningún WhatsApp real)`);
+        setTimeout(() => setNotificationMsg(null), 4000);
+      }, 600);
+      return;
+    }
+
     try {
       setSendingLeadId(lead.id);
       const res = await apiService.sendLeadWhatsApp(lead.id);

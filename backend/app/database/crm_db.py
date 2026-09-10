@@ -108,7 +108,9 @@ def init_crm_db():
         id TEXT PRIMARY KEY,
         name TEXT,
         email TEXT UNIQUE,
-        plan TEXT DEFAULT 'starter',
+        plan TEXT DEFAULT 'free',
+        messages_limit INTEGER DEFAULT 500,
+        messages_used INTEGER DEFAULT 0,
         whatsapp_mode TEXT DEFAULT 'baileys',
         wa_api_key TEXT,
         wa_phone_number_id TEXT,
@@ -118,7 +120,18 @@ def init_crm_db():
     )
     """)
 
+    # Migrations for existing agencies table
+    for col, definition in [
+        ("messages_limit", "INTEGER DEFAULT 500"),
+        ("messages_used", "INTEGER DEFAULT 0"),
+    ]:
+        try:
+            cursor.execute(f"ALTER TABLE agencies ADD COLUMN {col} {definition}")
+        except Exception:
+            pass
+
     conn.commit()
+
     
     # Auto-seed initial campaigns if empty
     cursor.execute("SELECT COUNT(*) FROM campaigns")
@@ -815,20 +828,36 @@ def mount_novotel_madrid_reminder_campaign() -> Dict[str, Any]:
         "protected_leads": protected_leads
     }
 
-# --- Agency CRUD ---
+# --- Agency CRUD & Quotas ---
+PLAN_LIMITS = {
+    "free": 500,
+    "starter": 2000,
+    "professional": 15000,
+    "enterprise": -1 # Unlimited
+}
+
 def create_agency(agency_data: Dict[str, Any]) -> Dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     aid = agency_data.get("id") or f"agency_{int(datetime.now().timestamp())}"
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    plan = agency_data.get("plan", "free")
+    messages_limit = agency_data.get("messages_limit", PLAN_LIMITS.get(plan, 500))
+    messages_used = agency_data.get("messages_used", 0)
+
     cursor.execute("""
-    INSERT INTO agencies (id, name, email, plan, whatsapp_mode, wa_api_key, wa_phone_number_id, wa_accepted_risk, created_at, is_active)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO agencies (
+        id, name, email, plan, messages_limit, messages_used,
+        whatsapp_mode, wa_api_key, wa_phone_number_id, wa_accepted_risk, created_at, is_active
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         aid,
         agency_data.get("name", "New Agency"),
         agency_data.get("email"),
-        agency_data.get("plan", "starter"),
+        plan,
+        messages_limit,
+        messages_used,
         agency_data.get("whatsapp_mode", "baileys"),
         agency_data.get("wa_api_key"),
         agency_data.get("wa_phone_number_id"),
@@ -839,6 +868,64 @@ def create_agency(agency_data: Dict[str, Any]) -> Dict[str, Any]:
     conn.commit()
     conn.close()
     return get_agency_by_id(aid)
+
+def get_agency_quota(agency_id_or_email: str) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM agencies WHERE id = ? OR email = ?", (agency_id_or_email, agency_id_or_email))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        # Default fallback for new unregistered agency or guest: 500 free trial
+        return {
+            "plan": "free",
+            "messages_limit": 500,
+            "messages_used": 0,
+            "messages_remaining": 500,
+            "is_unlimited": False,
+            "has_quota": True
+        }
+    data = dict(row)
+    limit = data.get("messages_limit", 500)
+    used = data.get("messages_used", 0)
+    is_unlimited = (limit == -1)
+    remaining = -1 if is_unlimited else max(0, limit - used)
+    return {
+        "agency_id": data.get("id"),
+        "name": data.get("name"),
+        "plan": data.get("plan", "free"),
+        "messages_limit": limit,
+        "messages_used": used,
+        "messages_remaining": remaining,
+        "is_unlimited": is_unlimited,
+        "has_quota": is_unlimited or (remaining > 0)
+    }
+
+def consume_agency_quota(agency_id_or_email: str, count: int = 1) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, plan, messages_limit, messages_used FROM agencies WHERE id = ? OR email = ?", (agency_id_or_email, agency_id_or_email))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return {"success": True, "remaining": max(0, 500 - count)}
+    data = dict(row)
+    aid = data["id"]
+    limit = data.get("messages_limit", 500)
+    used = data.get("messages_used", 0)
+    if limit != -1 and (used + count) > limit:
+        conn.close()
+        return {
+            "success": False,
+            "error": "Has alcanzado el límite de 500 mensajes de prueba gratuitos. Actualiza tu plan para continuar.",
+            "remaining": 0
+        }
+    new_used = used + count
+    cursor.execute("UPDATE agencies SET messages_used = ? WHERE id = ?", (new_used, aid))
+    conn.commit()
+    conn.close()
+    remaining = -1 if limit == -1 else max(0, limit - new_used)
+    return {"success": True, "remaining": remaining, "messages_used": new_used}
 
 def get_agency_by_id(agency_id: str) -> Optional[Dict[str, Any]]:
     conn = get_db_connection()

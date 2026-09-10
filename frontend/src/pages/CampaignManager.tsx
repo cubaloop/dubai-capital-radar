@@ -90,15 +90,33 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
   const fetchCampaigns = async () => {
     try {
       setIsLoadingCampaigns(true);
+      const isDemo = localStorage.getItem('outpilot_demo_mode') === 'true' || new URLSearchParams(window.location.search).get('demo') === 'true';
       const isHomeAgency = currentUser?.agencyName?.toLowerCase().includes('home') || currentUser?.email?.includes('homeproperties');
       const res = await apiService.getCrmCampaigns();
       if (res?.campaigns) {
         let availableCampaigns = res.campaigns;
-        if (isHomeAgency) {
+        if (isDemo) {
+          // Demo mode: show only demo campaign
+          let demoCamps = res.campaigns.filter((c: CrmCampaign) => c.id === 'demo_leads_outpilot');
+          if (demoCamps.length === 0) {
+            try {
+              await fetch('/api/demo/seed', { method: 'POST' });
+              const freshRes = await apiService.getCrmCampaigns();
+              demoCamps = (freshRes?.campaigns || []).filter((c: CrmCampaign) => c.id === 'demo_leads_outpilot');
+            } catch (e) {
+              console.warn('Auto-seed demo campaign:', e);
+            }
+          }
+          availableCampaigns = demoCamps;
+        } else if (isHomeAgency) {
           availableCampaigns = res.campaigns.filter((c: CrmCampaign) => 
-            c.name?.toLowerCase().includes('home') || 
-            c.category?.toLowerCase().includes('home')
+            (c.name?.toLowerCase().includes('home') || 
+            c.category?.toLowerCase().includes('home')) &&
+            c.id !== 'demo_leads_outpilot'
           );
+        } else {
+          // Real live system: show real campaigns, hide demo campaign
+          availableCampaigns = res.campaigns.filter((c: CrmCampaign) => c.id !== 'demo_leads_outpilot');
         }
         setCampaigns(availableCampaigns);
         if (availableCampaigns.length > 0) {
@@ -288,6 +306,33 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
 
   // Single Lead Send Handler
   const handleSendSingleLead = async (lead: CrmLead) => {
+    const isDemo = localStorage.getItem('outpilot_demo_mode') === 'true' || new URLSearchParams(window.location.search).get('demo') === 'true';
+    if (isDemo) {
+      setSendingLeadId(lead.id);
+      setTimeout(() => {
+        const nowStr = new Date().toLocaleString();
+        setLeads((prev) =>
+          prev.map((l) =>
+            l.id === lead.id
+              ? { ...l, whatsapp_status: 'sent', last_sent_type: 'manual', last_contact_date: nowStr }
+              : l
+          )
+        );
+        if (selectedLeadPreview?.id === lead.id) {
+          setSelectedLeadPreview({
+            ...selectedLeadPreview,
+            whatsapp_status: 'sent',
+            last_sent_type: 'manual',
+            last_contact_date: nowStr
+          });
+        }
+        setSendingLeadId(null);
+        setStatusMsg(`🎯 [Modo Demo]: Simulación exitosa para ${lead.name}. (No se envió ningún WhatsApp real)`);
+        setTimeout(() => setStatusMsg(null), 4000);
+      }, 600);
+      return;
+    }
+
     try {
       setSendingLeadId(lead.id);
       const res = await apiService.sendLeadWhatsApp(lead.id);
@@ -325,6 +370,17 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
   // Send Test Message to My Personal WhatsApp Handler
   const handleSendTestToMyPhone = async () => {
     if (!selectedLeadPreview) return;
+    const isDemo = localStorage.getItem('outpilot_demo_mode') === 'true' || new URLSearchParams(window.location.search).get('demo') === 'true';
+    if (isDemo) {
+      setIsSendingTestMsg(true);
+      setTimeout(() => {
+        setIsSendingTestMsg(false);
+        setStatusMsg(`🎯 [Modo Demo]: Mensaje de prueba simulado hacia ${testPhoneNumber}`);
+        setTimeout(() => setStatusMsg(null), 4000);
+      }, 600);
+      return;
+    }
+
     try {
       setIsSendingTestMsg(true);
       const msgToSend = `🧪 *[PRUEBA DE CAMPAÑA - Lead: ${selectedLeadPreview.name}]*\n\n${selectedLeadPreview.personalized_message || ''}`;
@@ -352,6 +408,13 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
 
   // Batch Automation Controls
   const handleStartBatch = async () => {
+    const isDemo = localStorage.getItem('outpilot_demo_mode') === 'true' || new URLSearchParams(window.location.search).get('demo') === 'true';
+    if (isDemo) {
+      setStatusMsg('🎯 [Modo Demo]: El envío automático masivo real está deshabilitado para datos de prueba.');
+      setTimeout(() => setStatusMsg(null), 4000);
+      return;
+    }
+
     try {
       setIsStartingBatch(true);
       const res = await apiService.startBatchDispatch(selectedCampaignId, batchDelay);
