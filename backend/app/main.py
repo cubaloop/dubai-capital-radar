@@ -1177,11 +1177,12 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
             "target_jid": target_jid,
             "dispatch_res": dispatch_res,
             "debug_errors": debug_errors,
-            "groq_key_len": len(groq_key),
+        "groq_key_len": len(groq_key),
             "gemini_key_len": len(gemini_key)
         }
 
 @app.post("/api/whatsapp/inbound-webhook")
+@app.post("/api/whatsapp/inbound")
 async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     """
     Receives incoming WhatsApp messages in real-time.
@@ -1203,10 +1204,10 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
             pdf_bytes = base64.b64decode(payload["document_base64"])
             reader = PdfReader(io.BytesIO(pdf_bytes))
             extracted_pages = []
-            for page in reader.pages[:6]:
-                page_text = page.extract_text()
-                if page_text:
-                    extracted_pages.append(page_text)
+            for p in reader.pages:
+                t = p.extract_text()
+                if t:
+                    extracted_pages.append(t)
             if extracted_pages:
                 pdf_text = "\n".join(extracted_pages)
                 text = f"{text}\n{pdf_text}".strip() if text else pdf_text
@@ -1221,12 +1222,15 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     if is_group or "@g.us" in jid or "broadcast" in jid:
         return {"status": "ignored", "reason": "group_or_broadcast_ignored"}
 
-    # 0. SUPER-ADMIN COPILOT MODE (+971508379080)
+    # 0. SUPER-ADMIN COPILOT MODE (+971508379080, "Jota" wake word, or pushName David)
+    push_name = (payload.get("push_name") or "").lower()
     is_admin = (
         sender == ADMIN_PHONE_DIGITS or 
         "508379080" in sender or 
         sender.endswith("508379080") or 
-        "508379080" in jid
+        "508379080" in jid or
+        "jota" in text.lower() or
+        "david" in push_name
     )
 
     if is_admin:
@@ -1262,7 +1266,7 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
                 "starting_price_aed": parsed_project.get("starting_price_aed")
             }
 
-    # STRICT FILTER 2: For any other sender, verify they exist in CRM leads
+    # SENDER IS A CLIENT / PROSPECT (Direct 1-on-1 private WhatsApp message)
     sender_digits = "".join([c for c in sender if c.isdigit()])
     if len(sender_digits) < 7:
         return {"status": "ignored", "reason": "invalid_phone_number", "sender": sender}
@@ -1276,15 +1280,21 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     )
     matched_lead = cursor.fetchone()
 
-    # Unlisted number: do NOT add to CRM unless explicitly requested by the user
+    # If lead not registered yet in CRM, auto-capture from direct private chat!
     if not matched_lead:
-        conn.close()
-        print(f"[Inbound Filter] Ignored message from unlisted number +{sender}. Not in CRM leads (auto-add disabled per user policy).")
-        return {
-            "status": "ignored",
-            "reason": "unlisted_number_not_in_crm",
-            "sender": sender
-        }
+        push_name_lead = payload.get("push_name") or f"Inbound +{sender}"
+        lead_id = f"inbound_{sender_digits[-8:]}_{int(datetime.now().timestamp())}"
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        cursor.execute("""
+        INSERT INTO leads (id, name, phone, clean_phone, crm_status, whatsapp_status, last_contact_date, notes)
+        VALUES (?, ?, ?, ?, 'INTERESTED', 'replied', ?, ?)
+        """, (lead_id, push_name_lead, f"+{sender}", sender_digits, now_str, f"Lead directo WhatsApp: {text}"))
+        conn.commit()
+        
+        cursor.execute("SELECT * FROM leads WHERE id = ?", (lead_id,))
+        matched_lead = cursor.fetchone()
+        print(f"[Inbound Lead Auto-Created] Created lead '{push_name_lead}' (+{sender}) from direct WhatsApp message.")
 
     # SENDER IS A REGISTERED LEAD: Process intent & update CRM records
     lid = matched_lead["id"]
