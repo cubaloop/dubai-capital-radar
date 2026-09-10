@@ -94,11 +94,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-primary-500/10 hover:bg-primary-500/20 border border-primary-500/30 text-primary-600 dark:text-primary-400 transition-all text-xs font-bold shadow-sm hover:scale-105 active:scale-95"
             title="Abrir Jota Copilot IA (Voz & Rostro)"
           >
-            <div className="relative w-5 h-5 rounded-full overflow-hidden ring-1 ring-primary-500">
-              <img src="/jota_avatar.jpg" alt="Jota" className="w-full h-full object-cover" />
-              <span className="absolute bottom-0 right-0 w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+            <div className="relative w-5 h-5 rounded-full flex items-center justify-center bg-gradient-to-tr from-primary-600 to-fuchsia-500 ring-1 ring-primary-500 shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-white shadow-sm" />
+              <span className="absolute bottom-0 right-0 w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
             </div>
-            <span className="hidden md:inline">Jota AI</span>
+            <span className="hidden md:inline">Jota Core</span>
             <Sparkles className="w-3.5 h-3.5 text-primary-500" />
           </button>
         )}
