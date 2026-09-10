@@ -38,4 +38,5 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 8000
 
 WORKDIR /app
-CMD ["sh", "-c", "node whatsapp-gateway/index.js & cd backend && uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "while true; do node whatsapp-gateway/index.js; echo '[Gateway Supervisor] WhatsApp Gateway exited. Restarting in 2s...'; sleep 2; done & cd backend && uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+

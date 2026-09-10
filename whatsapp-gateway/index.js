@@ -12,6 +12,15 @@ import makeWASocket, {
 import fs from 'fs';
 import path from 'path';
 
+// Prevent Node process from crashing on unhandled exceptions or socket rejections
+process.on('uncaughtException', (err) => {
+  console.error('[CRITICAL] Uncaught Exception in WhatsApp Gateway:', err.message || err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[CRITICAL] Unhandled Rejection in WhatsApp Gateway:', reason);
+});
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -128,7 +137,18 @@ async function restoreAuthFromSupabase() {
         skippedCount++;
         continue;
       }
-      fs.writeFileSync(path.join(AUTH_DIR, file), bundle[file], 'utf-8');
+      let content = bundle[file];
+      if (file === 'creds.json') {
+        try {
+          const parsedCreds = JSON.parse(content);
+          if (parsedCreds.me && !parsedCreds.registered) {
+            console.log('[Session Restore] Sanitizing creds.registered to true (phone is already linked as ' + (parsedCreds.me.id || '') + ')');
+            parsedCreds.registered = true;
+            content = JSON.stringify(parsedCreds, null, 2);
+          }
+        } catch (_) {}
+      }
+      fs.writeFileSync(path.join(AUTH_DIR, file), content, 'utf-8');
       restoredCount++;
     }
 
@@ -308,33 +328,24 @@ setInterval(async () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+let isInitialStartup = true;
+
 async function startWhatsApp() {
-  // Try to restore session from Supabase on startup
-  const restoredAuth = await restoreAuthFromSupabase();
-  // Restore message store from Supabase so Signal retry requests can be resolved across redeploys
-  await restoreMessageStoreFromSupabase();
+  // Only restore from Supabase on fresh container start if no creds.json exists locally
+  if (isInitialStartup) {
+    isInitialStartup = false;
+    const credsExistLocally = fs.existsSync(path.join(AUTH_DIR, 'creds.json'));
+    if (!credsExistLocally) {
+      console.log('[Startup] No local creds.json found. Restoring from Supabase...');
+      await restoreAuthFromSupabase();
+    } else {
+      console.log('[Startup] Existing local creds.json found on disk. Preserving local session.');
+    }
+    await restoreMessageStoreFromSupabase();
+  }
 
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   const { version } = await fetchLatestBaileysVersion();
-  
-  const authFilesExist = fs.existsSync(AUTH_DIR) && fs.readdirSync(AUTH_DIR).length > 0;
-  
-  if (authFilesExist) {
-    setTimeout(async () => {
-      if (!isConnected) {
-         console.log('[WhatsApp Gateway] Startup: Auth files exist but failed to connect within 30s. Automatically clearing and restarting...');
-         await clearAuthFromSupabase();
-         if (fs.existsSync(AUTH_DIR)) {
-           fs.rmSync(AUTH_DIR, { recursive: true, force: true });
-           fs.mkdirSync(AUTH_DIR, { recursive: true });
-         }
-         if (sock) {
-            try { sock.end(undefined); } catch (_) {}
-         }
-         setTimeout(startWhatsApp, 2000);
-      }
-    }, 30000);
-  }
 
   sock = makeWASocket({
     version,
@@ -370,10 +381,13 @@ async function startWhatsApp() {
     }
   });
 
-  sock.ev.on('creds.update', async (creds) => {
-    saveCreds();
-    // Backup to Supabase every time credentials update
-    await uploadAuthToSupabase();
+  sock.ev.on('creds.update', async () => {
+    try {
+      await saveCreds();
+      scheduleAuthBackup(2000);
+    } catch (e) {
+      console.error('[creds.update] Error saving credentials:', e.message);
+    }
   });
 
   sock.ev.on('connection.update', async (update) => {
