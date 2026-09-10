@@ -73,6 +73,11 @@ AUTOPILOT_DISPATCH_COUNT: int = 0
 
 from .safety.anti_ban import anti_ban_guard
 from .crm.sync_tadh import crm_bridge
+from .crm.david_copilot import (
+    extract_property_requirements,
+    find_matching_projects,
+    generate_david_response
+)
 
 WHATSAPP_GATEWAY_URL = os.getenv("WHATSAPP_GATEWAY_URL", "http://127.0.0.1:3001")
 
@@ -1213,13 +1218,12 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     if is_group or "@g.us" in jid or "broadcast" in jid:
         return {"status": "ignored", "reason": "group_or_broadcast_ignored"}
 
-    # 0. SUPER-ADMIN COPILOT MODE (+971508379080 or "Jota" wake word)
+    # 0. SUPER-ADMIN COPILOT MODE (+971508379080)
     is_admin = (
         sender == ADMIN_PHONE_DIGITS or 
         "508379080" in sender or 
         sender.endswith("508379080") or 
-        "508379080" in jid or
-        "jota" in text.lower()
+        "508379080" in jid
     )
 
     if is_admin:
@@ -1288,9 +1292,24 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     urgency = intent_data.get("urgency", "low")
     summary = intent_data.get("summary") or text[:70]
 
+    # 1. Parse real estate requirements & query matches
+    requirements = extract_property_requirements(text)
+    matches = find_matching_projects(requirements, INGESTED_PROJECTS_FEED)
+    prior_notes = get_lead_notes_db(lid)
+
+    # 2. Generate personalized response as David (first person, thread continuity) + David briefing
+    lead_reply, david_alert = await generate_david_response(
+        incoming_text=text,
+        lead=dict(matched_lead),
+        prior_notes=prior_notes,
+        requirements=requirements,
+        matches=matches
+    )
+
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    new_crm_status = "INTERESTED" if intent in ["ready_to_buy", "interested", "scheduling"] else "CONTACTED"
-    note_content = f"💬 [Respuesta WhatsApp]: {text}\n🤖 [IA Triage]: {intent.upper()} - {summary}"
+    has_prop_req = requirements.get("has_property_request", False)
+    new_crm_status = "INTERESTED" if (has_prop_req or intent in ["ready_to_buy", "interested", "scheduling"]) else "CONTACTED"
+    note_content = f"💬 [WhatsApp Lead]: {text}\n🤖 [IA Triage]: {intent.upper()} - {summary}"
     
     # Add note to lead_notes table
     add_lead_note_db(lid, author="WhatsApp IA Inbound", content=note_content, note_type="reply")
@@ -1318,30 +1337,31 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
 
     print(f"[CRM Auto-Update] Lead '{lead_name}' (+{sender}) updated: status={new_crm_status}, note='{summary}'")
 
-    # If lead shows high intent, objection to resolve, or ready to buy -> trigger Telegram & WhatsApp alerts to broker!
-    is_hot = intent in ["ready_to_buy", "interested", "scheduling", "objection_price", "objection_trust", "objection_spouse"] or urgency in ["high", "medium"]
-    
+    # 3. Deliver lead reply via WhatsApp (simulate natural typing pause of 4s)
+    async def dispatch_client_reply(target_phone: str, reply_msg: str, lead_id: str):
+        try:
+            await asyncio.sleep(4)  # Natural human pause
+            res = await dispatch_whatsapp_direct(to_phone=target_phone, message=reply_msg, bypass_shield=True)
+            print(f"[David Copilot] Delivered reply to client {target_phone}: {res.get('success')}")
+            add_lead_note_db(lead_id, author="David (IA Autopilot)", content=f"🤖 [Respuesta como David]:\n{reply_msg}", note_type="whatsapp")
+        except Exception as e:
+            print(f"[David Copilot] Error delivering reply to {target_phone}: {e}")
+
+    asyncio.create_task(dispatch_client_reply(sender, lead_reply, lid))
+
+    # 4. Deliver private executive briefing to David's personal WhatsApp (+971508379080)
+    await dispatch_whatsapp_direct(to_phone=ADMIN_PHONE_DIGITS, message=david_alert, bypass_shield=True)
+
+    # 5. Telegram Alert for high intent or property inquiry
+    is_hot = has_prop_req or intent in ["ready_to_buy", "interested", "scheduling", "objection_price", "objection_trust", "objection_spouse"] or urgency in ["high", "medium"]
     if is_hot:
-        # 1. Telegram Alert
         await notify_hot_prospect_reply(
             lead_name=lead_name,
             lead_phone=f"+{sender}",
             message=text,
-            intent=intent,
+            intent="property_inquiry" if has_prop_req else intent,
             country="España / Internacional"
         )
-        
-        # 2. WhatsApp Alert directly to Super-Admin (+971508379080)
-        hot_alert = (
-            f"🔥 *LEAD CALIENTE DETECTADO EN WHATSAPP*\n\n"
-            f"👤 *Cliente:* {lead_name}\n"
-            f"📱 *Teléfono:* +{sender}\n"
-            f"🎯 *Intención:* {intent.upper()}\n"
-            f"💬 *Mensaje:* \"{text}\"\n\n"
-            f"📌 *CRM:* ✅ Nota y estado actualizados automáticamente\n"
-            f"👉 Abre la app o WhatsApp para responderle de inmediato."
-        )
-        await dispatch_whatsapp_direct(to_phone=ADMIN_PHONE_DIGITS, message=hot_alert, bypass_shield=True)
 
     return {
         "status": "prospect_message_processed",
@@ -1350,7 +1370,37 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
         "crm_updated": True,
         "intent": intent,
         "urgency": urgency,
-        "notify_human": intent_data.get("notify_human", False)
+        "lead_reply": lead_reply,
+        "david_alert_sent": True
+    }
+
+@app.post("/api/copilot/simulate-lead-inquiry")
+async def simulate_lead_inquiry(payload: Dict[str, Any]):
+    """
+    Simulator endpoint for David Copilot: tests property parsing, matching, and response generation.
+    """
+    text = payload.get("message", "Quiero un apt de un cuarto por 1M de euros")
+    lead_name = payload.get("name", "Inversor Test")
+    phone = payload.get("phone", "34600112233")
+    
+    requirements = extract_property_requirements(text)
+    matches = find_matching_projects(requirements, INGESTED_PROJECTS_FEED)
+    
+    dummy_lead = {"name": lead_name, "phone": phone, "whatsapp_status": "sent"}
+    lead_reply, david_alert = await generate_david_response(
+        incoming_text=text,
+        lead=dummy_lead,
+        prior_notes=[],
+        requirements=requirements,
+        matches=matches
+    )
+    
+    return {
+        "text": text,
+        "requirements": requirements,
+        "matches": matches,
+        "lead_reply": lead_reply,
+        "david_alert": david_alert
     }
 
 @app.get("/api/inventory/ingested-launches")
