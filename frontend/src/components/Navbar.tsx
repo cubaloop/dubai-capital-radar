@@ -23,6 +23,7 @@ interface NavbarProps {
   onOpenWhatsAppModal: () => void;
   onOpenAgencyModal?: () => void;
   onOpenLicenseModal?: () => void;
+  onOpenJotaModal?: () => void;
   onToggleMobileSidebar?: () => void;
   remainingTrialDays?: number;
   isUnlocked?: boolean;
@@ -43,6 +44,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenWhatsAppModal,
   onOpenAgencyModal,
   onOpenLicenseModal,
+  onOpenJotaModal,
   onToggleMobileSidebar,
   onLogout,
   currentUser
@@ -85,6 +87,22 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Right section: Status, Quota, Theme Toggle & Profile */}
       <div className="flex items-center gap-2.5">
         
+        {/* Jota Copilot AI Quick Trigger */}
+        {onOpenJotaModal && (
+          <button
+            onClick={onOpenJotaModal}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-primary-500/10 hover:bg-primary-500/20 border border-primary-500/30 text-primary-600 dark:text-primary-400 transition-all text-xs font-bold shadow-sm hover:scale-105 active:scale-95"
+            title="Abrir Jota Copilot IA (Voz & Rostro)"
+          >
+            <div className="relative w-5 h-5 rounded-full overflow-hidden ring-1 ring-primary-500">
+              <img src="/jota_avatar.jpg" alt="Jota" className="w-full h-full object-cover" />
+              <span className="absolute bottom-0 right-0 w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+            </div>
+            <span className="hidden md:inline">Jota AI</span>
+            <Sparkles className="w-3.5 h-3.5 text-primary-500" />
+          </button>
+        )}
+
         {/* AI Messages Quota Badge (Materio Pill) */}
         <div 
           onClick={onOpenLicenseModal}

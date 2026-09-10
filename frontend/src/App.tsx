@@ -17,6 +17,8 @@ import { DemoBanner } from './components/DemoBanner';
 import { useTranslation } from './i18n/LanguageContext';
 
 import { Sidebar } from './components/Sidebar';
+import { JotaAvatarModal } from './components/JotaAvatarModal';
+import { JotaFloatingTrigger } from './components/JotaFloatingTrigger';
 
 function DemoLauncher() {
   const navigate = useNavigate();
@@ -71,6 +73,7 @@ export function App() {
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState<boolean>(false);
   const [isAgencyModalOpen, setIsAgencyModalOpen] = useState<boolean>(false);
   const [isLicenseModalOpen, setIsLicenseModalOpen] = useState<boolean>(false);
+  const [isJotaModalOpen, setIsJotaModalOpen] = useState<boolean>(false);
   const [licenseState, setLicenseState] = useState(() => getLicenseState(currentUser?.email));
 
   useEffect(() => {
@@ -117,6 +120,7 @@ export function App() {
                       onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
                       onOpenAgencyModal={() => setIsAgencyModalOpen(true)}
                       onOpenLicenseModal={() => setIsLicenseModalOpen(true)}
+                      onOpenJotaModal={() => setIsJotaModalOpen(true)}
                       onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
                       remainingTrialDays={getRemainingTrialDays(licenseState)}
                       isUnlocked={licenseState.isUnlocked}
@@ -142,6 +146,8 @@ export function App() {
                     userEmail={currentUser?.email}
                     onSuccess={() => setLicenseState(getLicenseState(currentUser?.email))}
                   />
+                  <JotaFloatingTrigger onClick={() => setIsJotaModalOpen(true)} />
+                  <JotaAvatarModal isOpen={isJotaModalOpen} onClose={() => setIsJotaModalOpen(false)} />
                 </div>
               ) : (
                 <Navigate to="/login" replace />

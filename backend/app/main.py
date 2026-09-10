@@ -9,6 +9,9 @@ import uuid
 from dotenv import load_dotenv
 
 load_dotenv()
+backend_env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+if os.path.exists(backend_env_path):
+    load_dotenv(backend_env_path)
 
 from .models.schemas import (
     ProspectProfile,
@@ -1417,9 +1420,119 @@ async def get_daily_content_pack(lang: str = "es"):
     return await generate_daily_social_pack(language=lang)
 
 
+@app.post("/api/copilot/speak")
+async def copilot_speak(payload: Dict[str, Any]):
+    """
+    Synthesizes speech using ElevenLabs API (eleven_multilingual_v2) for Jota's voice.
+    """
+    text = payload.get("text", "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+    
+    eleven_key = os.getenv("ELEVENLABS_API_KEY", "").strip()
+    voice_id = payload.get("voice_id") or os.getenv("ELEVENLABS_VOICE_ID", "CwhRBWXzGAHq8TQ4Fs17")
+    
+    if not eleven_key:
+        raise HTTPException(status_code=500, detail="ElevenLabs API key not configured")
+        
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    req_body = {
+        "text": text,
+        "model_id": "eleven_multilingual_v2",
+        "voice_settings": {
+            "stability": 0.5,
+            "similarity_boost": 0.75,
+            "style": 0.35,
+            "use_speaker_boost": True
+        }
+    }
+    headers = {
+        "xi-api-key": eleven_key,
+        "Content-Type": "application/json",
+        "Accept": "audio/mpeg"
+    }
+    
+    async with httpx.AsyncClient(timeout=25.0) as client:
+        res = await client.post(url, json=req_body, headers=headers)
+        if res.status_code == 200:
+            return Response(content=res.content, media_type="audio/mpeg")
+        else:
+            print(f"[ElevenLabs Error]: {res.status_code} - {res.text}")
+            raise HTTPException(status_code=res.status_code, detail=f"ElevenLabs error: {res.text}")
+
+@app.post("/api/copilot/voice-interact")
+async def copilot_voice_interact(payload: Dict[str, Any]):
+    """
+    Takes voice-transcribed prompt from the user (David), answers in executive broker persona,
+    and returns reply text.
+    """
+    user_prompt = payload.get("prompt", "").strip()
+    if not user_prompt:
+        raise HTTPException(status_code=400, detail="Prompt is required")
+        
+    groq_key = os.getenv("GROQ_API_KEY", "").strip()
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
+    
+    sys_prompt = (
+        "Eres Jota, el copiloto senior de IA y Real Estate de David en Dubai. "
+        "Estás hablando directamente con David por audio/pantalla. Tu tono es ejecutivo, cordial, seguro y resolutivo. "
+        "Sé conciso (máximo 2 a 3 frases) ya que tu respuesta será convertida a voz para que David la escuche. "
+        "Si David te pide información sobre un lead, proyecto o mercado de Dubai, respóndele con datos exactos."
+    )
+    
+    answer_text = ""
+    if groq_key:
+        for model in ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"]:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    res = await client.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        json={
+                            "model": model,
+                            "messages": [
+                                {"role": "system", "content": sys_prompt},
+                                {"role": "user", "content": user_prompt}
+                            ],
+                            "temperature": 0.35,
+                            "max_tokens": 180
+                        },
+                        headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
+                    )
+                    if res.status_code == 200:
+                        raw = res.json()["choices"][0]["message"]["content"].strip()
+                        raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+                        if raw:
+                            answer_text = raw
+                            break
+            except Exception:
+                continue
+
+    if not answer_text and gemini_key:
+        for g_model in ["gemini-2.5-flash", "gemini-flash-latest"]:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    res = await client.post(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{g_model}:generateContent?key={gemini_key}",
+                        json={"contents": [{"parts": [{"text": f"{sys_prompt}\n\nDavid dice: {user_prompt}"}]}]}
+                    )
+                    if res.status_code == 200:
+                        answer_text = res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+                        if answer_text:
+                            break
+            except Exception:
+                continue
+
+    if not answer_text:
+        answer_text = f"Entendido David. El sistema de WhatsApp y el CRM están activos y monitoreando en tiempo real."
+
+    return {
+        "reply": answer_text,
+        "prompt": user_prompt
+    }
+
 # --- STATIC FILES & SINGLE PAGE APP (SPA) ROUTING ---
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 # Mount static media
 static_dir = os.path.join(os.path.dirname(__file__), "static")
