@@ -38,7 +38,7 @@ interface CampaignManagerProps {
 export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser }) => {
   const { t, language } = useTranslation();
   const [campaigns, setCampaigns] = useState<CrmCampaign[]>([]);
-  const [selectedCampaignId, setSelectedCampaignId] = useState<string>('spain_madrid_expo');
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>('q3_outreach_campaign');
   const [leads, setLeads] = useState<CrmLead[]>([]);
   const [selectedLeadPreview, setSelectedLeadPreview] = useState<CrmLead | null>(null);
 
@@ -193,37 +193,37 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
 
   const PROMPT_PRESETS = language === 'en' ? [
     {
-      label: '🏨 Novotel Madrid Event',
-      text: 'Recall their previous interest and announce our exclusive in-person event at Novotel Madrid Center on September 9-10. Request confirmation for VIP list.'
+      label: '🗓️ Webinar Invitation',
+      text: 'Recall their previous interest and invite them to our upcoming live webinar. Request confirmation to save their spot.'
     },
     {
-      label: '📱 Entry Offers from $50K (Zoom)',
-      text: 'Highlight entry opportunities in the Dubai property market starting from $50K. Ask which day/time works best this week for a brief online presentation.'
+      label: '📱 New Feature Release',
+      text: 'Highlight our new product features that save 20 hours a week. Ask which day/time works best this week for a brief online demo.'
     },
     {
-      label: '📈 Capital Appreciation / Flipping',
-      text: 'Emphasize off-plan pre-launches with high estimated 24-month capital growth, direct developer 1% monthly payment plans with 0% interest, and complimentary 1-on-1 structuring.'
+      label: '📈 ROI & Case Study',
+      text: 'Emphasize the 300% ROI seen by similar clients. Mention our current promotional offer and suggest a 1-on-1 strategy call.'
     },
     {
-      label: '🛂 Golden Visa & 0% Tax',
-      text: 'Highlight the 0% personal income & capital gains tax in Dubai, plus 10-year Golden Visa qualification for investor and family.'
+      label: '🎯 Cold Outreach',
+      text: 'Introduce the value proposition briefly, focusing on cost reduction and efficiency. End with a low-friction question.'
     }
   ] : [
     {
-      label: '🏨 Evento Novotel Madrid',
-      text: 'Recordar su interés previo y anunciar que tenemos el evento presencial exclusivo en Novotel Madrid Center los días 9 y 10 de Septiembre. Pedir confirmación para lista VIP.'
+      label: '🗓️ Invitación a Webinar',
+      text: 'Recordar su interés previo e invitarles a nuestro próximo webinar en vivo. Pedir confirmación para guardar su plaza.'
     },
     {
-      label: '📱 Ofertas desde 50K (Zoom)',
-      text: 'Informar que tenemos nuevas ofertas para entrar al mercado inmobiliario de Dubai a partir de 50K. Pedir que me escriba qué día y hora le viene bien esta semana para hacerle una breve presentación online.'
+      label: '📱 Nuevas Funciones',
+      text: 'Destacar nuestras nuevas funciones que ahorran 20 horas a la semana. Preguntar qué día y hora le viene bien para una demo rápida.'
     },
     {
-      label: '📈 Revalorización / Flipping',
-      text: 'Destacar lanzamientos en preventa (off-plan) con alta plusvalía estimada a 24 meses, planes de pago directos desde 1% mensual sin intereses bancarios y asesoría 1 a 1 sin coste.'
+      label: '📈 Caso de Éxito',
+      text: 'Enfatizar el ROI del 300% de clientes similares. Mencionar la promoción actual y proponer una llamada de estrategia.'
     },
     {
-      label: '🛂 Golden Visa & 0% Impuestos',
-      text: 'Mencionar la ventaja del 0% de impuestos sobre rentas y plusvalías en Dubai, y tramitación gratuita de la Golden Visa de 10 años para él y su familia.'
+      label: '🎯 Contacto en Frío',
+      text: 'Introducir la propuesta de valor brevemente, enfocándose en reducción de costes. Terminar con una pregunta sencilla.'
     }
   ];
 
@@ -757,7 +757,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                   rows={3}
                   value={campaignAiPrompt}
                   onChange={(e) => setCampaignAiPrompt(e.target.value)}
-                  placeholder={t('campaigns.aiPromptPlaceholder', 'Example: Focus on high rental yields in Palm Jumeirah, mention 5-year post-handover payment plan, maintain an exclusive private banking tone...')}
+                  placeholder={t('campaigns.aiPromptPlaceholder', 'Example: Focus on how our platform reduces manual data entry by 40%, mention our upcoming integration, maintain a professional B2B tone...')}
                   className="w-full bg-white border border-sky-300 focus:border-sky-500 rounded-2xl p-4 text-xs text-slate-900 placeholder-slate-400 focus:outline-none leading-relaxed custom-scrollbar transition font-sans shadow-inner"
                 />
               </div>
