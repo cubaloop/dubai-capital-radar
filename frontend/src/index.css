@@ -73,48 +73,21 @@
 }
 
 
-/* ===== LUXURY GREEN MARBLE BACKGROUND OPTIMIZED FOR MOBILE (60fps) ===== */
-.outpilot-bg {
-  background-color: #06281a;
-}
-.outpilot-bg-dark {
-  background-color: #03170e;
-}
-
+/* ===== MATERIO CANVAS & SURFACES ===== */
 .page-bg {
-  background-color: #06281a;
-  background-image: 
-    url('/green_marble_bg.svg'),
-    radial-gradient(at 15% 15%, rgba(20, 89, 61, 0.45) 0px, transparent 65%),
-    radial-gradient(at 85% 85%, rgba(6, 40, 26, 0.7) 0px, transparent 65%);
-  background-repeat: repeat;
-  background-size: 1440px auto;
-  background-position: top center;
-  /* Optimized for mobile: avoids background-attachment: fixed which causes mobile GPU repaint lag */
-  background-attachment: scroll;
+  background-color: var(--color-bg);
   min-height: 100vh;
-}
-
-@media (max-width: 768px) {
-  .page-bg {
-    background-size: 850px auto;
-    background-attachment: scroll;
-  }
+  transition: background-color 0.2s ease;
 }
 
 .dark .page-bg {
-  background-color: #03170e;
-  background-image: 
-    url('/green_marble_bg.svg'),
-    radial-gradient(at 15% 15%, rgba(10, 50, 34, 0.6) 0px, transparent 65%),
-    radial-gradient(at 85% 85%, rgba(3, 23, 14, 0.8) 0px, transparent 65%);
-  background-repeat: repeat;
-  background-size: 1440px auto;
-  background-position: top center;
+  background-color: var(--color-bg);
 }
 
-/* Keep marble-bg as alias */
-.marble-bg { @apply page-bg; }
+.marble-bg {
+  background-color: var(--color-bg);
+}
+
 
 
 /* ===== CARD SYSTEM — 3D ELEVATED CARDS ===== */

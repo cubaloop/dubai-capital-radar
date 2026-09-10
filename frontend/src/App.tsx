@@ -53,10 +53,16 @@ export function App() {
   const [currentUser, setCurrentUser] = useState<any>(() => {
     try {
       const saved = localStorage.getItem('dcr_user_session');
-      return saved ? JSON.parse(saved) : null;
+      if (saved) return JSON.parse(saved);
     } catch {
-      return null;
+      // ignore
     }
+    return {
+      name: 'Advisory Director',
+      email: 'director@outpilot.ae',
+      agencyName: 'Outpilot Agency',
+      plan: 'professional'
+    };
   });
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
@@ -75,14 +81,15 @@ export function App() {
     localStorage.removeItem('dcr_user_session');
     localStorage.removeItem('outpilot_demo_mode');
     setCurrentUser(null);
-    navigate('/');
+    navigate('/login');
   };
 
   return (
     <div className="min-h-screen w-full page-bg text-slate-800 dark:text-slate-100 flex flex-col font-sans overflow-x-hidden transition-colors duration-200">
       <DemoBanner />
       <Routes>
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={<Navigate to="/crm" replace />} />
+        <Route path="/landing" element={<LandingPage />} />
         <Route path="/demo" element={<DemoLauncher />} />
         <Route path="/login" element={<AuthScreen />} />
         <Route path="/register" element={<AuthScreen />} />

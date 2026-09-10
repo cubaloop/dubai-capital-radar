@@ -139,31 +139,30 @@ export const AuthScreen: React.FC = () => {
   const currentPlanInfo = PLANS.find(p => p.id === plan);
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center page-bg font-sans p-4">
-      {/* Background glow */}
-      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gold-500/6 via-transparent to-transparent pointer-events-none" />
-
+    <div className="min-h-screen w-full flex items-center justify-center bg-[#F4F5FA] dark:bg-[#201D34] font-sans p-4 transition-colors duration-200">
       <div className="w-full max-w-md relative z-10">
         {/* Brand */}
         <div className="text-center mb-8">
-          <a href="/" className="inline-flex items-center gap-2.5 text-white hover:opacity-80 transition">
-            <div className="w-10 h-10 bg-gradient-to-br from-gold-500 to-gold-700 rounded-xl flex items-center justify-center shadow-lg">
+          <a href="/crm" className="inline-flex items-center gap-2.5 text-slate-900 dark:text-white hover:opacity-80 transition">
+            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center shadow-md shadow-primary-500/25">
               <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <span className="text-2xl font-black tracking-tight">Outpilot</span>
+            <span className="text-2xl font-bold tracking-tight">Outpilot</span>
           </a>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden">
+        <div className="materio-card bg-white dark:bg-[#28243D] border border-slate-200/80 dark:border-[#3A354C] rounded-2xl shadow-xl overflow-hidden">
           {/* Tabs */}
-          <div className="flex border-b border-slate-800">
+          <div className="flex border-b border-slate-100 dark:border-[#3A354C]">
             <button
               type="button"
               onClick={() => setIsRegister(false)}
               className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                !isRegister ? 'bg-slate-800 text-white border-b-2 border-gold-500' : 'text-slate-500 hover:text-slate-300'
+                !isRegister 
+                  ? 'bg-slate-50 dark:bg-[#3A354C]/40 text-primary-600 dark:text-primary-400 border-b-2 border-primary-500' 
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
               }`}
             >
               <LogIn className="w-4 h-4" /> Log In
@@ -172,7 +171,9 @@ export const AuthScreen: React.FC = () => {
               type="button"
               onClick={() => setIsRegister(true)}
               className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                isRegister ? 'bg-slate-800 text-white border-b-2 border-gold-500' : 'text-slate-500 hover:text-slate-300'
+                isRegister 
+                  ? 'bg-slate-50 dark:bg-[#3A354C]/40 text-primary-600 dark:text-primary-400 border-b-2 border-primary-500' 
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
               }`}
             >
               <UserPlus className="w-4 h-4" /> Create Account
@@ -182,17 +183,17 @@ export const AuthScreen: React.FC = () => {
           <div className="p-8">
             {/* Register: Free trial banner */}
             {isRegister && plan === 'free' && (
-              <div className="mb-6 p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/25 flex items-start gap-3">
-                <Sparkles className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+              <div className="mb-6 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-500/25 flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-emerald-400 font-bold text-sm">500 free AI messages included</p>
-                  <p className="text-slate-400 text-xs mt-0.5">No credit card required. Start sending personalized messages today.</p>
+                  <p className="text-emerald-800 dark:text-emerald-300 font-bold text-sm">500 free AI messages included</p>
+                  <p className="text-slate-600 dark:text-slate-400 text-xs mt-0.5">No credit card required. Start sending personalized messages today.</p>
                 </div>
               </div>
             )}
 
             {error && (
-              <div className="p-3 mb-5 rounded-xl bg-red-950/50 border border-red-500/40 text-red-300 text-sm text-center">
+              <div className="p-3 mb-5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-300 text-sm text-center">
                 {error}
               </div>
             )}
@@ -202,26 +203,26 @@ export const AuthScreen: React.FC = () => {
               {isRegister && (
                 <>
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1.5">Full Name</label>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Full Name</label>
                     <div className="relative">
-                      <User className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                      <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                       <input
                         type="text" required
                         placeholder="John Smith"
                         value={name} onChange={e => setName(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder:text-slate-600 focus:border-gold-500 focus:outline-none transition"
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#201D34] border border-slate-200 dark:border-[#3A354C] text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-primary-500 focus:outline-none transition text-sm"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1.5">Agency / Company Name</label>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Agency / Company Name</label>
                     <div className="relative">
-                      <Building className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                      <Building className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                       <input
                         type="text" required
-                        placeholder="Acme Real Estate"
+                        placeholder="Apex Realty LLC"
                         value={agencyName} onChange={e => setAgencyName(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder:text-slate-600 focus:border-gold-500 focus:outline-none transition"
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#201D34] border border-slate-200 dark:border-[#3A354C] text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-primary-500 focus:outline-none transition text-sm"
                       />
                     </div>
                   </div>
@@ -230,28 +231,28 @@ export const AuthScreen: React.FC = () => {
 
               {/* Email */}
               <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1.5">Email Address</label>
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Work Email</label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                   <input
                     type="email" required
-                    placeholder="you@company.com"
+                    placeholder="you@agency.com"
                     value={email} onChange={e => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder:text-slate-600 focus:border-gold-500 focus:outline-none transition"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#201D34] border border-slate-200 dark:border-[#3A354C] text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-primary-500 focus:outline-none transition text-sm"
                   />
                 </div>
               </div>
 
               {/* Password */}
               <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1.5">Password</label>
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Password</label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                   <input
                     type="password" required
                     placeholder="••••••••"
                     value={password} onChange={e => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder:text-slate-600 focus:border-gold-500 focus:outline-none transition"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#201D34] border border-slate-200 dark:border-[#3A354C] text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-primary-500 focus:outline-none transition text-sm"
                   />
                 </div>
               </div>
@@ -259,14 +260,14 @@ export const AuthScreen: React.FC = () => {
               {/* Confirm password (register only) */}
               {isRegister && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-1.5">Confirm Password</label>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Confirm Password</label>
                   <div className="relative">
-                    <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                     <input
                       type="password" required
                       placeholder="••••••••"
                       value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder:text-slate-600 focus:border-gold-500 focus:outline-none transition"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#201D34] border border-slate-200 dark:border-[#3A354C] text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-primary-500 focus:outline-none transition text-sm"
                     />
                   </div>
                 </div>
@@ -275,7 +276,7 @@ export const AuthScreen: React.FC = () => {
               {/* Plan selector (register only) */}
               {isRegister && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-2">Select Plan</label>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Select Plan</label>
                   <div className="grid grid-cols-2 gap-2">
                     {PLANS.map(p => (
                       <button
@@ -284,27 +285,20 @@ export const AuthScreen: React.FC = () => {
                         onClick={() => setPlan(p.id)}
                         className={`relative text-left p-3 rounded-xl border text-xs transition-all ${
                           plan === p.id
-                            ? p.color === 'emerald' ? 'bg-emerald-950/50 border-emerald-500 text-emerald-300'
-                            : p.color === 'gold' ? 'bg-gold-950/40 border-gold-500 text-gold-300'
-                            : 'bg-slate-800 border-slate-600 text-white'
-                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                            ? p.color === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-800 dark:text-emerald-300'
+                            : 'bg-primary-50 dark:bg-primary-950/30 border-primary-500 text-primary-700 dark:text-primary-300'
+                            : 'bg-slate-50 dark:bg-[#201D34] border-slate-200 dark:border-[#3A354C] text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
                         }`}
                       >
                         <div className="font-bold mb-0.5">{p.label}</div>
                         <div className="text-[10px] opacity-70">{p.sublabel}</div>
                         {p.badge && (
-                          <div className={`absolute top-1.5 right-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                            p.color === 'emerald' ? 'bg-emerald-500/20 text-emerald-400' :
-                            p.color === 'gold' ? 'bg-gold-500/20 text-gold-400' :
-                            'bg-slate-700 text-slate-300'
-                          }`}>{p.badge}</div>
+                          <div className="absolute top-1.5 right-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-300">
+                            {p.badge}
+                          </div>
                         )}
                         {plan === p.id && (
-                          <CheckCircle2 className={`absolute bottom-1.5 right-1.5 w-3.5 h-3.5 ${
-                            p.color === 'emerald' ? 'text-emerald-400' :
-                            p.color === 'gold' ? 'text-gold-400' :
-                            'text-slate-400'
-                          }`} />
+                          <CheckCircle2 className="absolute bottom-1.5 right-1.5 w-3.5 h-3.5 text-primary-500" />
                         )}
                       </button>
                     ))}
@@ -315,11 +309,11 @@ export const AuthScreen: React.FC = () => {
               {/* Remember me (login only) */}
               {!isRegister && (
                 <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
-                    <input type="checkbox" className="rounded border-slate-700 bg-slate-950 text-gold-500 focus:ring-gold-500" />
+                  <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 cursor-pointer">
+                    <input type="checkbox" className="rounded border-slate-300 dark:border-[#3A354C] bg-slate-50 dark:bg-[#201D34] text-primary-500 focus:ring-primary-500" />
                     Remember me
                   </label>
-                  <a href="#" className="text-sm text-gold-400 hover:underline">Forgot password?</a>
+                  <a href="#" className="text-sm text-primary-500 hover:underline">Forgot password?</a>
                 </div>
               )}
 
@@ -327,8 +321,8 @@ export const AuthScreen: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3.5 mt-2 rounded-xl font-black flex items-center justify-center gap-2 transition-all disabled:opacity-50
-                  bg-gold-500 hover:bg-gold-400 text-slate-950 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/30"
+                className="w-full py-3.5 mt-2 rounded-xl font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50
+                  bg-primary-500 hover:bg-primary-600 text-white shadow-md shadow-primary-500/25 hover:shadow-lg hover:shadow-primary-500/35"
               >
                 {loading ? (
                   <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
@@ -349,9 +343,9 @@ export const AuthScreen: React.FC = () => {
 
             {/* Footer note */}
             {isRegister && (
-              <p className="text-center text-xs text-slate-600 mt-5">
+              <p className="text-center text-xs text-slate-500 mt-5">
                 By registering you agree to our{' '}
-                <a href="/terms" className="text-slate-500 hover:text-gold-400 underline">Terms & Conditions</a>
+                <a href="/terms" className="text-primary-500 hover:underline">Terms & Conditions</a>
               </p>
             )}
           </div>
@@ -359,8 +353,8 @@ export const AuthScreen: React.FC = () => {
 
         {/* Back link */}
         <div className="text-center mt-6">
-          <a href="/" className="text-sm text-slate-600 hover:text-slate-400 transition">
-            ← Back to homepage
+          <a href="/crm" className="text-sm text-slate-500 hover:text-primary-500 transition">
+            ← Entrar al CRM directamente
           </a>
         </div>
       </div>
