@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" preserveAspectRatio="none">
+  <defs>
+    <!-- Rich Emerald & Jade Base Gradients -->
+    <radialGradient id="deepGreen" cx="30%" cy="25%" r="85%">
+      <stop offset="0%" stop-color="#0e4b33"/>
+      <stop offset="35%" stop-color="#0a3926"/>
+      <stop offset="70%" stop-color="#06281a"/>
+      <stop offset="100%" stop-color="#031b11"/>
+    </radialGradient>
+
+    <radialGradient id="emeraldLight" cx="75%" cy="65%" r="65%">
+      <stop offset="0%" stop-color="#14593d" stop-opacity="0.7"/>
+      <stop offset="50%" stop-color="#0b3e2a" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#041f14" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="mintCloud" cx="45%" cy="80%" r="50%">
+      <stop offset="0%" stop-color="#1b6b4a" stop-opacity="0.35"/>
+      <stop offset="60%" stop-color="#0d4630" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#052417" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Filters for organic marble texture & soft vein glow -->
+    <filter id="marbleGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="softVein" x="-5%" y="-5%" width="110%" height="110%">
+      <feGaussianBlur stdDeviation="1.5"/>
+    </filter>
+  </defs>
+
+  <!-- Base Marble Background -->
+  <rect width="1440" height="900" fill="url(#deepGreen)"/>
+  <rect width="1440" height="900" fill="url(#emeraldLight)"/>
+  <rect width="1440" height="900" fill="url(#mintCloud)"/>
+
+  <!-- Mineral Clouding / Swirls -->
+  <path d="M-50,220 Q280,120 540,320 T1120,240 T1500,450 L1500,0 L-50,0 Z" 
+        fill="#125439" opacity="0.45"/>
+  <path d="M-50,680 Q320,540 680,720 T1280,590 T1500,780 L1500,950 L-50,950 Z" 
+        fill="#083523" opacity="0.5"/>
+
+  <!-- Secondary Soft Vein Layer (Translucent White / Quartz) -->
+  <g opacity="0.35" filter="url(#marbleGlow)" stroke="#ffffff" fill="none">
+    <path d="M-80,140 C140,80 320,260 520,190 S820,380 1080,290 S1380,480 1520,390" stroke-width="4.5" opacity="0.6"/>
+    <path d="M220,-40 C340,160 280,380 440,540 S680,720 860,940" stroke-width="3" opacity="0.5"/>
+    <path d="M720,-50 C860,180 1020,320 1140,580 S1360,820 1480,950" stroke-width="3.5" opacity="0.5"/>
+    <path d="M-60,540 C180,420 420,600 700,490 S1150,660 1520,530" stroke-width="3.5" opacity="0.5"/>
+  </g>
+
+  <!-- Primary Crisp White Marble Veins (Carrara-style White Calcite Fractures) -->
+  <g filter="url(#softVein)" stroke="#ffffff" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Major diagonal vein across screen -->
+    <path d="M-30,80 
+             Q120,160 260,110 
+             T490,260 
+             Q620,180 780,340 
+             T1060,280 
+             Q1240,420 1390,370 
+             T1490,520" 
+          stroke-width="2.2" opacity="0.85"/>
+
+    <!-- Fine branching tributaries -->
+    <path d="M260,110 Q340,60 410,95" stroke-width="1.1" opacity="0.75"/>
+    <path d="M490,260 Q530,340 590,360" stroke-width="1.2" opacity="0.7"/>
+    <path d="M780,340 Q830,280 910,295" stroke-width="1.4" opacity="0.8"/>
+    <path d="M1060,280 Q1120,200 1210,230" stroke-width="1.1" opacity="0.75"/>
+    <path d="M1390,370 Q1420,310 1470,330" stroke-width="1" opacity="0.65"/>
+
+    <!-- Counter-vein diagonal -->
+    <path d="M180,-30 
+             Q290,180 360,340 
+             T520,580 
+             Q640,730 790,820 
+             T960,950" 
+          stroke-width="1.8" opacity="0.75"/>
+    <path d="M360,340 Q430,370 470,340" stroke-width="1" opacity="0.65"/>
+    <path d="M520,580 Q480,660 440,700" stroke-width="1.1" opacity="0.65"/>
+
+    <!-- Lower branch vein -->
+    <path d="M-40,640 
+             Q160,520 340,630 
+             T680,560 
+             Q880,680 1100,590 
+             T1480,720" 
+          stroke-width="2.2" opacity="0.8"/>
+    <path d="M340,630 Q390,710 450,730" stroke-width="1" opacity="0.6"/>
+    <path d="M680,560 Q740,490 820,510" stroke-width="1.2" opacity="0.7"/>
+    <path d="M1100,590 Q1170,520 1260,540" stroke-width="1.1" opacity="0.65"/>
+
+    <!-- Right corner vein system -->
+    <path d="M840,-20 
+             Q960,160 1080,240 
+             T1260,490 
+             Q1380,680 1460,860" 
+          stroke-width="1.7" opacity="0.75"/>
+    <path d="M1080,240 Q1140,290 1190,270" stroke-width="1" opacity="0.6"/>
+    <path d="M1260,490 Q1310,540 1350,520" stroke-width="1.1" opacity="0.65"/>
+
+    <!-- Micro-fracture hairline cracks -->
+    <path d="M80,480 Q130,510 170,495 T240,540" stroke-width="0.8" opacity="0.55"/>
+    <path d="M600,120 Q650,150 710,135 T780,180" stroke-width="0.8" opacity="0.55"/>
+    <path d="M940,740 Q990,770 1040,750 T1120,800" stroke-width="0.9" opacity="0.6"/>
+    <path d="M1280,110 Q1330,130 1370,115" stroke-width="0.75" opacity="0.5"/>
+  </g>
+
+  <!-- Subtle crystalline sparkles along main veins -->
+  <g fill="#ffffff" opacity="0.65">
+    <circle cx="260" cy="110" r="1.5"/>
+    <circle cx="490" cy="260" r="2"/>
+    <circle cx="780" cy="340" r="2.2"/>
+    <circle cx="1060" cy="280" r="1.8"/>
+    <circle cx="1390" cy="370" r="1.5"/>
+    <circle cx="360" cy="340" r="1.7"/>
+    <circle cx="680" cy="560" r="2"/>
+    <circle cx="1100" cy="590" r="1.8"/>
+  </g>
+</svg>

@@ -55,38 +55,49 @@
   --shadow-gold-hover:   0 8px 28px rgba(212,175,55,0.35), 0 4px 12px rgba(212,175,55,0.18);
 }
 
-/* ===== BACKGROUND ===== */
+/* ===== LUXURY GREEN MARBLE BACKGROUND OPTIMIZED FOR MOBILE (60fps) ===== */
 .outpilot-bg {
-  background-color: var(--color-bg);
+  background-color: #06281a;
 }
 .outpilot-bg-dark {
-  background-color: #0a0f1a;
+  background-color: #03170e;
 }
 
-/* ===== PAGE BACKGROUND with gradient ===== */
 .page-bg {
-  background-color: var(--color-bg);
-  background-image:
-    radial-gradient(at 10% 15%, rgba(99, 102, 241, 0.07) 0px, transparent 50%),
-    radial-gradient(at 90% 15%, rgba(168, 85, 247, 0.05) 0px, transparent 50%),
-    radial-gradient(at 50% 55%, rgba(59, 130, 246, 0.05) 0px, transparent 50%),
-    radial-gradient(at 80% 85%, rgba(139, 92, 246, 0.06) 0px, transparent 50%),
-    radial-gradient(at 15% 85%, rgba(212, 175, 55, 0.06) 0px, transparent 45%);
+  background-color: #06281a;
+  background-image: 
+    url('/green_marble_bg.svg'),
+    radial-gradient(at 15% 15%, rgba(20, 89, 61, 0.45) 0px, transparent 65%),
+    radial-gradient(at 85% 85%, rgba(6, 40, 26, 0.7) 0px, transparent 65%);
+  background-repeat: repeat;
+  background-size: 1440px auto;
+  background-position: top center;
+  /* Optimized for mobile: avoids background-attachment: fixed which causes mobile GPU repaint lag */
+  background-attachment: scroll;
   min-height: 100vh;
 }
 
-.dark .page-bg {
-  background-color: #0a0f1a;
-  background-image:
-    radial-gradient(at 10% 15%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
-    radial-gradient(at 90% 15%, rgba(168, 85, 247, 0.09) 0px, transparent 50%),
-    radial-gradient(at 50% 55%, rgba(59, 130, 246, 0.08) 0px, transparent 50%),
-    radial-gradient(at 80% 85%, rgba(139, 92, 246, 0.10) 0px, transparent 50%),
-    radial-gradient(at 15% 85%, rgba(212, 175, 55, 0.10) 0px, transparent 45%);
+@media (max-width: 768px) {
+  .page-bg {
+    background-size: 850px auto;
+    background-attachment: scroll;
+  }
 }
 
-/* Keep marble-bg as alias for compatibility */
+.dark .page-bg {
+  background-color: #03170e;
+  background-image: 
+    url('/green_marble_bg.svg'),
+    radial-gradient(at 15% 15%, rgba(10, 50, 34, 0.6) 0px, transparent 65%),
+    radial-gradient(at 85% 85%, rgba(3, 23, 14, 0.8) 0px, transparent 65%);
+  background-repeat: repeat;
+  background-size: 1440px auto;
+  background-position: top center;
+}
+
+/* Keep marble-bg as alias */
 .marble-bg { @apply page-bg; }
+
 
 /* ===== CARD SYSTEM — 3D ELEVATED CARDS ===== */
 /* Base card — light & dark aware, strong 3D shadow effect */

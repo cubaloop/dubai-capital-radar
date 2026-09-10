@@ -139,7 +139,7 @@ export const AuthScreen: React.FC = () => {
   const currentPlanInfo = PLANS.find(p => p.id === plan);
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 font-sans p-4">
+    <div className="min-h-screen w-full flex items-center justify-center page-bg font-sans p-4">
       {/* Background glow */}
       <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gold-500/6 via-transparent to-transparent pointer-events-none" />
 

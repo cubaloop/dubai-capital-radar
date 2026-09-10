@@ -110,7 +110,7 @@ export const LandingPage: React.FC = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-gold-500 selection:text-slate-950">
+    <div className="min-h-screen page-bg text-slate-100 font-sans selection:bg-gold-500 selection:text-slate-950">
 
       {/* Navigation */}
       <nav className="fixed top-0 w-full z-50 bg-slate-950/90 backdrop-blur-xl border-b border-slate-800/80">
