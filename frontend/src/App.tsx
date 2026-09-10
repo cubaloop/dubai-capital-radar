@@ -44,7 +44,7 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-50 text-slate-900 flex flex-col font-sans overflow-x-hidden">
+    <div className="min-h-screen w-full page-bg text-primary flex flex-col font-sans overflow-x-hidden transition-colors duration-200">
       <DemoBanner />
       <Routes>
         <Route path="/" element={<LandingPage />} />
