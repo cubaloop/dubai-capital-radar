@@ -1378,8 +1378,10 @@ if os.path.exists(static_dir):
 
 # Check potential frontend dist directories
 possible_dist_dirs = [
-    os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"),
-    os.path.join(os.getcwd(), "frontend", "dist"),
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")),
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")),
+    os.path.abspath(os.path.join(os.getcwd(), "frontend", "dist")),
+    os.path.abspath(os.path.join(os.getcwd(), "..", "frontend", "dist")),
     "/app/frontend/dist"
 ]
 
@@ -1612,15 +1614,28 @@ def get_system_info():
         "env": "production"
     }
 
-    @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str):
-        # Don't intercept API routes
-        if full_path.startswith("api/"):
-            raise HTTPException(status_code=404, detail="Endpoint not found")
+@app.get("/")
+async def serve_root():
+    if frontend_dist:
+        index_file = os.path.join(frontend_dist, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+    return {"name": "Outpilot", "status": "online", "docs": "/docs"}
+
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    # Don't intercept API routes or Swagger docs
+    if full_path.startswith("api/") or full_path in ["docs", "openapi.json", "redoc"]:
+        raise HTTPException(status_code=404, detail="Endpoint not found")
+    if frontend_dist:
         target_file = os.path.join(frontend_dist, full_path)
-        if os.path.exists(target_file) and os.path.isfile(target_file):
+        if full_path and os.path.exists(target_file) and os.path.isfile(target_file):
             return FileResponse(target_file)
-        return FileResponse(os.path.join(frontend_dist, "index.html"))
+        index_file = os.path.join(frontend_dist, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+    raise HTTPException(status_code=404, detail="Page not found")
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
