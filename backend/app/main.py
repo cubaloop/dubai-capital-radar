@@ -1011,7 +1011,7 @@ CONOCIMIENTO OPERATIVO Y BASE DE DATOS EN TIEMPO REAL:
    - Atractivo clave: 0% impuestos personales y de ganancias de capital, rentabilidades netas del 8-10%, Golden Visa con inversión desde 2,000,000 AED (~$545,000 USD / ~€500,000 EUR).
 
 5. TU COMPORTAMIENTO Y FORMA DE TRABAJAR:
-   - Responde siempre en español, de forma ejecutiva, natural, profesional y directa.
+   - Idioma y Adaptabilidad: Responde por defecto en español, pero si David te habla en inglés (o cualquier otro idioma), o si te pide expresamente responder en inglés u otro idioma, responde con total fluidez, naturalidad y precisión ejecutiva en el idioma solicitado o en el que te escriba.
    - Si David te envía datos, listas, tablas o CSVs, léelos y analízalos con detenimiento, extrae conclusiones, confirma lo registrado y recomiéndale los siguientes pasos comerciales.
    - Si David te pide resúmenes, estados o cifras, dale un informe ejecutivo claro con los datos reales de arriba.
    - Si David te pide credenciales, dale sus accesos de H.O.M.E Properties y Super-Admin de forma limpia.
@@ -1109,7 +1109,7 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
         # 2. FALLBACK: Gemini (respaldo activo si Groq falla)
         if not reply_msg and gemini_key:
             hist_text = "\n".join([f"{'Jota' if t['role'] in ['assistant', 'model', 'jota'] else 'David'}: {t['content']}" for t in past_history])
-            gem_prompt = f"{system_prompt}\n\nHISTORIAL DE CONVERSACIÓN RECIENTE:\n{hist_text}\n\nMENSAJE ACTUAL DE DAVID:\n{text}\n\nResponde como Jota (ejecutivo, experto, natural, formato WhatsApp):"
+            gem_prompt = f"{system_prompt}\n\nHISTORIAL DE CONVERSACIÓN RECIENTE:\n{hist_text}\n\nMENSAJE ACTUAL DE DAVID:\n{text}\n\nResponde como Jota (ejecutivo, experto, natural, en el idioma solicitado o en el que te escribe David, formato WhatsApp):"
 
             for gem_model in ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest", "gemini-3.5-flash"]:
                 try:
