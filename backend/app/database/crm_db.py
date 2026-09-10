@@ -44,6 +44,11 @@ def init_crm_db():
     except Exception:
         pass
 
+    try:
+        cursor.execute("ALTER TABLE campaigns ADD COLUMN agency_id TEXT")
+    except Exception:
+        pass
+
     # 2. Leads table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS leads (
@@ -69,6 +74,11 @@ def init_crm_db():
     )
     """)
 
+    try:
+        cursor.execute("ALTER TABLE leads ADD COLUMN agency_id TEXT")
+    except Exception:
+        pass
+
     # 3. Lead Notes table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS lead_notes (
@@ -89,6 +99,22 @@ def init_crm_db():
         role TEXT NOT NULL,
         content TEXT NOT NULL,
         created_at TEXT NOT NULL
+    )
+    """)
+
+    # 5. Agencies table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS agencies (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        email TEXT UNIQUE,
+        plan TEXT DEFAULT 'starter',
+        whatsapp_mode TEXT DEFAULT 'baileys',
+        wa_api_key TEXT,
+        wa_phone_number_id TEXT,
+        wa_accepted_risk BOOLEAN DEFAULT FALSE,
+        created_at TEXT,
+        is_active BOOLEAN DEFAULT TRUE
     )
     """)
 
@@ -788,6 +814,67 @@ def mount_novotel_madrid_reminder_campaign() -> Dict[str, Any]:
         "protected_count": len(protected_leads),
         "protected_leads": protected_leads
     }
+
+# --- Agency CRUD ---
+def create_agency(agency_data: Dict[str, Any]) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    aid = agency_data.get("id") or f"agency_{int(datetime.now().timestamp())}"
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+    INSERT INTO agencies (id, name, email, plan, whatsapp_mode, wa_api_key, wa_phone_number_id, wa_accepted_risk, created_at, is_active)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        aid,
+        agency_data.get("name", "New Agency"),
+        agency_data.get("email"),
+        agency_data.get("plan", "starter"),
+        agency_data.get("whatsapp_mode", "baileys"),
+        agency_data.get("wa_api_key"),
+        agency_data.get("wa_phone_number_id"),
+        agency_data.get("wa_accepted_risk", False),
+        now_str,
+        True
+    ))
+    conn.commit()
+    conn.close()
+    return get_agency_by_id(aid)
+
+def get_agency_by_id(agency_id: str) -> Optional[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM agencies WHERE id = ?", (agency_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def get_agency_by_email(email: str) -> Optional[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM agencies WHERE email = ?", (email,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def update_agency_wa_config(agency_id: str, wa_api_key: str, wa_phone_number_id: str, mode: str, accepted_risk: bool) -> bool:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    UPDATE agencies 
+    SET wa_api_key = ?, wa_phone_number_id = ?, whatsapp_mode = ?, wa_accepted_risk = ?
+    WHERE id = ?
+    """, (wa_api_key, wa_phone_number_id, mode, accepted_risk, agency_id))
+    conn.commit()
+    conn.close()
+    return True
+
+def list_agencies() -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM agencies ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 # Initialize on import
 init_crm_db()

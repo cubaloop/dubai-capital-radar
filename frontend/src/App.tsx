@@ -1,21 +1,24 @@
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { CRMView } from './pages/CRMView';
 import { CampaignManager } from './pages/CampaignManager';
 import { ExcelCampaignDashboard } from './pages/ExcelCampaignDashboard';
-import { RadarDashboard } from './pages/RadarDashboard';
 import { DossierView } from './pages/DossierView';
-import { OffPlanMatcher } from './pages/OffPlanMatcher';
 import { WhatsAppQRModal } from './components/WhatsAppQRModal';
 import { AgencySettingsModal } from './components/AgencySettingsModal';
 import { LicenseModal, getLicenseState, getRemainingTrialDays } from './components/LicenseModal';
-import { AuthLandingView } from './pages/AuthLandingView';
-import { Lock, ShieldCheck, PhoneCall } from 'lucide-react';
+import { AuthScreen } from './pages/AuthScreen';
+import { LandingPage } from './pages/LandingPage';
+import { AgencyOnboarding } from './pages/AgencyOnboarding';
+import { AnalyticsDashboard } from './pages/AnalyticsDashboard';
+import { TermsPage } from './pages/TermsPage';
+import { DemoBanner } from './components/DemoBanner';
 import { useTranslation } from './i18n/LanguageContext';
-import { LanguageSwitch } from './components/LanguageSwitch';
 
 export function App() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<any>(() => {
     try {
       const saved = localStorage.getItem('dcr_user_session');
@@ -24,174 +27,75 @@ export function App() {
       return null;
     }
   });
-  const [activeTab, setActiveTab] = useState<'crm' | 'campaigns' | 'excels' | 'radar' | 'dossiers' | 'inventory'>('campaigns');
-  const [selectedDossierSlug, setSelectedDossierSlug] = useState<string>('');
+
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState<boolean>(false);
   const [isAgencyModalOpen, setIsAgencyModalOpen] = useState<boolean>(false);
   const [isLicenseModalOpen, setIsLicenseModalOpen] = useState<boolean>(false);
   const [licenseState, setLicenseState] = useState(() => getLicenseState(currentUser?.email));
-  const [isClientDirectView, setIsClientDirectView] = useState<boolean>(false);
 
-  // Sync license state when user changes
   useEffect(() => {
     setLicenseState(getLicenseState(currentUser?.email));
   }, [currentUser]);
 
-  // Parse direct URL on initial mount and browser navigation
-  useEffect(() => {
-    const handleUrlRoute = () => {
-      const path = window.location.pathname;
-      if (path.startsWith('/dossier/')) {
-        const slug = path.replace('/dossier/', '').split('/')[0].split('?')[0];
-        if (slug) {
-          setSelectedDossierSlug(slug);
-          setActiveTab('dossiers');
-          setIsClientDirectView(true);
-          return;
-        }
-      }
-      setIsClientDirectView(false);
-    };
-
-    handleUrlRoute();
-    window.addEventListener('popstate', handleUrlRoute);
-    return () => window.removeEventListener('popstate', handleUrlRoute);
-  }, []);
-
-  const handleOpenDossier = (slug: string) => {
-    setSelectedDossierSlug(slug);
-    setActiveTab('dossiers');
-    setIsClientDirectView(false);
-    window.history.pushState(null, '', `/dossier/${slug}`);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleOpenCampaigns = () => {
-    setActiveTab('campaigns');
-    setIsClientDirectView(false);
-    window.history.pushState(null, '', '/');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleTabChange = (tab: 'crm' | 'campaigns' | 'excels' | 'radar' | 'dossiers' | 'inventory') => {
-    setActiveTab(tab);
-    setIsClientDirectView(false);
-    if (tab === 'dossiers' && selectedDossierSlug) {
-      window.history.pushState(null, '', `/dossier/${selectedDossierSlug}`);
-    } else {
-      window.history.pushState(null, '', '/');
-    }
-  };
-
   const handleLogout = () => {
     localStorage.removeItem('dcr_user_session');
     setCurrentUser(null);
+    navigate('/');
   };
 
-  // If user is not logged in and not viewing a confidential dossier direct link, show Auth Landing
-  if (!currentUser && !isClientDirectView) {
-    return <AuthLandingView onLoginSuccess={(u) => setCurrentUser(u)} />;
-  }
-
   return (
-    <div className="min-h-screen w-full marble-bg text-slate-900 flex flex-col selection:bg-gold-500 selection:text-slate-950 font-sans overflow-x-hidden">
-      {/* If the prospect is viewing directly via their link, show an exclusive private banking header */}
-      {isClientDirectView ? (
-        <header className="sticky top-0 z-50 glass-panel border-b border-slate-200/80 bg-white/90 backdrop-blur-md py-3.5 px-4 sm:px-8 shadow-sm">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-gold-600 via-gold-400 to-amber-200 flex items-center justify-center shadow-lg shadow-gold-500/20">
-                <ShieldCheck className="w-5 h-5 text-slate-950" />
-              </div>
-              <div>
-                <span className="font-serif-luxury font-bold text-base tracking-wider text-white">
-                  DUBAI CAPITAL <span className="text-gold-400 font-black">ADVISORY</span>
-                </span>
-                <span className="block text-[10px] text-slate-400 font-mono uppercase tracking-wider">
-                  {t('dossier.privateBankingHeader', 'Private Wealth & Sovereign Asset Structuring • DIFC')}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <LanguageSwitch variant="compact" />
-              <a
-                href="https://wa.me/971501378020?text=Hello,%20I%20am%20reviewing%20my%20Confidential%20Dubai%20Wealth%20Dossier."
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950 border border-emerald-600/40 text-emerald-400 text-xs font-semibold hover:bg-emerald-900/60 transition-all"
-              >
-                <PhoneCall className="w-3.5 h-3.5" /> +971 50 137 8020
-              </a>
-              <div className="inline-flex items-center gap-1.5 text-xs text-gold-400 font-mono bg-gold-950/60 border border-gold-800/60 px-3 py-1.5 rounded-xl">
-                <Lock className="w-3.5 h-3.5" /> {t('common.status', 'CONFIDENTIAL')}
-              </div>
-            </div>
-          </div>
-        </header>
-      ) : (
-        <Navbar 
-          activeTab={activeTab} 
-          setActiveTab={handleTabChange} 
-          selectedDossierSlug={selectedDossierSlug} 
-          onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
-          onOpenAgencyModal={() => setIsAgencyModalOpen(true)}
-          onOpenLicenseModal={() => setIsLicenseModalOpen(true)}
-          remainingTrialDays={getRemainingTrialDays(licenseState)}
-          isUnlocked={licenseState.isUnlocked}
-          onLogout={handleLogout}
-          currentUser={currentUser}
+    <div className="min-h-screen w-full bg-slate-50 text-slate-900 flex flex-col font-sans overflow-x-hidden">
+      <DemoBanner />
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<AuthScreen />} />
+        <Route path="/register" element={<AuthScreen />} />
+        <Route path="/onboarding" element={<AgencyOnboarding />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<TermsPage />} />
+        <Route
+          path="/*"
+          element={
+            <>
+              {currentUser ? (
+                <>
+                  <Navbar 
+                    activeTab="campaigns" // Fallback since we removed the state
+                    setActiveTab={(tab) => navigate(`/${tab}`)} 
+                    onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
+                    onOpenAgencyModal={() => setIsAgencyModalOpen(true)}
+                    onOpenLicenseModal={() => setIsLicenseModalOpen(true)}
+                    remainingTrialDays={getRemainingTrialDays(licenseState)}
+                    isUnlocked={licenseState.isUnlocked}
+                    onLogout={handleLogout}
+                    currentUser={currentUser}
+                  />
+                  <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-6 sm:pt-8">
+                    <Routes>
+                      <Route path="/crm" element={<CRMView currentUser={currentUser} />} />
+                      <Route path="/campaigns" element={<CampaignManager currentUser={currentUser} />} />
+                      <Route path="/analytics" element={<AnalyticsDashboard />} />
+                      <Route path="/excels" element={<ExcelCampaignDashboard currentUser={currentUser} />} />
+                      <Route path="/dossiers/:slug?" element={<DossierView slugOrId="alexander-wright-fintech-demo" onBack={() => navigate('/campaigns')} />} />
+                      <Route path="*" element={<Navigate to="/campaigns" replace />} />
+                    </Routes>
+                  </main>
+                  <WhatsAppQRModal isOpen={isWhatsAppModalOpen} onClose={() => setIsWhatsAppModalOpen(false)} />
+                  <AgencySettingsModal isOpen={isAgencyModalOpen} onClose={() => setIsAgencyModalOpen(false)} />
+                  <LicenseModal
+                    isOpen={isLicenseModalOpen}
+                    onClose={() => setIsLicenseModalOpen(false)}
+                    userEmail={currentUser?.email}
+                    onSuccess={() => setLicenseState(getLicenseState(currentUser?.email))}
+                  />
+                </>
+              ) : (
+                <Navigate to="/login" replace />
+              )}
+            </>
+          }
         />
-      )}
-
-      <WhatsAppQRModal 
-        isOpen={isWhatsAppModalOpen} 
-        onClose={() => setIsWhatsAppModalOpen(false)} 
-      />
-
-      <AgencySettingsModal
-        isOpen={isAgencyModalOpen}
-        onClose={() => setIsAgencyModalOpen(false)}
-      />
-
-      <LicenseModal
-        isOpen={isLicenseModalOpen}
-        onClose={() => setIsLicenseModalOpen(false)}
-        userEmail={currentUser?.email}
-        onSuccess={() => setLicenseState(getLicenseState(currentUser?.email))}
-      />
-
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-6 sm:pt-8">
-        {activeTab === 'crm' && (
-          <CRMView currentUser={currentUser} />
-        )}
-
-        {activeTab === 'campaigns' && (
-          <CampaignManager currentUser={currentUser} />
-        )}
-
-        {activeTab === 'excels' && (
-          <ExcelCampaignDashboard currentUser={currentUser} />
-        )}
-
-        {activeTab === 'dossiers' && (
-          <DossierView 
-            slugOrId={selectedDossierSlug || 'alexander-wright-fintech-demo'} 
-            onBack={() => handleTabChange('campaigns')} 
-            isClientDirectView={isClientDirectView}
-          />
-        )}
-
-        {activeTab === 'inventory' && (
-          <OffPlanMatcher />
-        )}
-      </main>
-
-      <footer className="border-t border-slate-200/80 bg-white/75 backdrop-blur-md py-6 text-center text-xs text-slate-500 mt-12 shadow-sm">
-        <p className="font-mono">
-          Dubai Capital Advisory • Sovereign Wealth & Golden Visa Gateway • DIFC • Dubai Land Department Registered
-        </p>
-      </footer>
+      </Routes>
     </div>
   );
 }

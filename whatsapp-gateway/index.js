@@ -310,12 +310,31 @@ setInterval(async () => {
 
 async function startWhatsApp() {
   // Try to restore session from Supabase on startup
-  await restoreAuthFromSupabase();
+  const restoredAuth = await restoreAuthFromSupabase();
   // Restore message store from Supabase so Signal retry requests can be resolved across redeploys
   await restoreMessageStoreFromSupabase();
 
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   const { version } = await fetchLatestBaileysVersion();
+  
+  const authFilesExist = fs.existsSync(AUTH_DIR) && fs.readdirSync(AUTH_DIR).length > 0;
+  
+  if (authFilesExist) {
+    setTimeout(async () => {
+      if (!isConnected) {
+         console.log('[WhatsApp Gateway] Startup: Auth files exist but failed to connect within 30s. Automatically clearing and restarting...');
+         await clearAuthFromSupabase();
+         if (fs.existsSync(AUTH_DIR)) {
+           fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+           fs.mkdirSync(AUTH_DIR, { recursive: true });
+         }
+         if (sock) {
+            try { sock.end(undefined); } catch (_) {}
+         }
+         setTimeout(startWhatsApp, 2000);
+      }
+    }, 30000);
+  }
 
   sock = makeWASocket({
     version,
@@ -746,6 +765,26 @@ app.post('/pairing-code', async (req, res) => {
     });
   } catch (err) {
     console.error('[WhatsApp] Pairing code error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/force-clear-restart', async (req, res) => {
+  try {
+    if (sock) {
+      try { await sock.logout(); } catch (e) { try { sock.end(undefined); } catch (_) {} }
+    }
+    if (fs.existsSync(AUTH_DIR)) {
+      fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+      fs.mkdirSync(AUTH_DIR, { recursive: true });
+    }
+    await clearAuthFromSupabase();
+    isConnected = false;
+    currentQR = null;
+    connectedNumber = null;
+    setTimeout(startWhatsApp, 2000);
+    return res.json({ success: true, message: 'Cleared and restarting...' });
+  } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
 });

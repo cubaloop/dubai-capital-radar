@@ -445,6 +445,15 @@ async def restart_whatsapp_gateway():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.post("/api/whatsapp/force-clear-restart")
+async def force_clear_restart_whatsapp():
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.post(f"{WHATSAPP_GATEWAY_URL}/force-clear-restart")
+            return res.json()
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @app.post("/api/whatsapp/verify-numbers")
 async def verify_whatsapp_numbers(payload: Dict[str, Any]):
     try:
@@ -739,7 +748,35 @@ async def api_send_lead_whatsapp(lead_id: str, payload: Optional[Dict[str, Any]]
     message = (payload and payload.get("message")) or lead.get("personalized_message") or ""
     image_path = (payload and payload.get("image_path")) or None
 
-    # Only attach image if explicitly valid and > 1000 bytes
+    agency_id = lead.get("agency_id")
+    
+    from .crm.wa_official_api import get_wa_sender, WaOfficialAPIClient
+    wa_mode = get_wa_sender(agency_id)
+
+    if wa_mode == "official_api":
+        agency = get_agency_by_id(agency_id)
+        api_key = agency.get("wa_api_key")
+        phone_number_id = agency.get("wa_phone_number_id")
+        if not api_key or not phone_number_id:
+            return {"success": False, "error": "Official WA API configured but missing keys"}
+        
+        client = WaOfficialAPIClient()
+        res = await client.send_message(phone, message, api_key, phone_number_id)
+        if res.get("success"):
+            mark_lead_whatsapp_sent(lead_id, sent_type="manual")
+            return {
+                "success": True,
+                "lead_id": lead_id,
+                "whatsapp_status": "sent",
+                "last_sent_type": "manual"
+            }
+        else:
+            return {
+                "success": False,
+                "error": res.get("error", "Error de entrega con API Oficial")
+            }
+
+    # Fallback to baileys gateway
     valid_image = None
     if image_path and os.path.exists(image_path) and os.path.getsize(image_path) > 1000:
         valid_image = image_path
@@ -798,7 +835,7 @@ def api_control_campaign_batch(campaign_id: str, payload: Dict[str, Any]):
         batch_manager.resume(campaign_id)
     elif action == "stop":
         batch_manager.stop(campaign_id)
-    return {"success": True, "status": batch_manager.get_status(campaign_id)}
+    return {"success": True, "action": action, "status": batch_manager.get_status(campaign_id)}
 
 @app.post("/api/crm/campaigns/{campaign_id}/reset-status")
 def api_reset_campaign_status(campaign_id: str):
@@ -1352,6 +1389,164 @@ if frontend_dist:
     assets_dir = os.path.join(frontend_dist, "assets")
     if os.path.exists(assets_dir):
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+# --- Analytics Endpoints ---
+@app.get("/api/analytics/overview")
+def get_analytics_overview():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT COUNT(*) FROM leads")
+    total_leads = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM campaigns")
+    total_campaigns = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM leads WHERE whatsapp_status = 'sent'")
+    total_sent = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM leads WHERE whatsapp_status = 'pending'")
+    total_pending = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT crm_status, COUNT(*) FROM leads GROUP BY crm_status")
+    status_counts = {row[0]: row[1] for row in cursor.fetchall()}
+    
+    # 7 days calculation
+    seven_days_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("SELECT COUNT(*) FROM leads WHERE created_at >= ?", (seven_days_ago,))
+    leads_added_last_7_days = cursor.fetchone()[0]
+    
+    response_rate = 0.0
+    if total_leads > 0:
+        not_created = total_leads - status_counts.get('CREATED', 0)
+        response_rate = (not_created / total_leads) * 100
+        
+    cursor.execute("""
+    SELECT c.name, COUNT(l.id) as lead_count 
+    FROM campaigns c 
+    LEFT JOIN leads l ON c.id = l.campaign_id 
+    GROUP BY c.id 
+    ORDER BY lead_count DESC 
+    LIMIT 5
+    """)
+    top_campaigns = [{"name": r[0], "count": r[1]} for r in cursor.fetchall()]
+    
+    conn.close()
+    return {
+        "total_leads": total_leads,
+        "total_campaigns": total_campaigns,
+        "total_sent": total_sent,
+        "total_pending": total_pending,
+        "leads_by_status": status_counts,
+        "leads_added_last_7_days": leads_added_last_7_days,
+        "response_rate": response_rate,
+        "top_campaigns": top_campaigns
+    }
+
+@app.get("/api/analytics/campaigns/{campaign_id}/funnel")
+def get_campaign_funnel(campaign_id: str):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT crm_status, whatsapp_status FROM leads WHERE campaign_id = ?", (campaign_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    
+    funnel = {
+        "total": len(rows),
+        "pending": sum(1 for r in rows if r[1] == 'pending'),
+        "sent": sum(1 for r in rows if r[1] == 'sent'),
+        "replied": sum(1 for r in rows if r[0] != 'CREATED'),
+        "interested": sum(1 for r in rows if r[0] in ['INTERESTED', 'APPOINTMENT', 'WON']),
+        "appointments": sum(1 for r in rows if r[0] in ['APPOINTMENT', 'WON']),
+        "won": sum(1 for r in rows if r[0] == 'WON')
+    }
+    return funnel
+
+@app.get("/api/analytics/activity/daily")
+def get_daily_activity(days: int = 30):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    start_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    
+    cursor.execute("""
+    SELECT substr(created_at, 1, 10) as date, COUNT(*) as leads_added
+    FROM leads
+    WHERE created_at >= ?
+    GROUP BY date
+    """, (start_date,))
+    leads_added = {r[0]: r[1] for r in cursor.fetchall()}
+    
+    cursor.execute("""
+    SELECT substr(created_at, 1, 10) as date, COUNT(*) as messages_sent
+    FROM lead_notes
+    WHERE type = 'whatsapp' AND created_at >= ?
+    GROUP BY date
+    """, (start_date,))
+    messages_sent = {r[0]: r[1] for r in cursor.fetchall()}
+    conn.close()
+    
+    activity = []
+    for i in range(days):
+        date_str = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+        activity.append({
+            "date": date_str,
+            "leads_added": leads_added.get(date_str, 0),
+            "messages_sent": messages_sent.get(date_str, 0)
+        })
+    activity.reverse()
+    return activity
+
+# --- Agency API Endpoints ---
+from .database.crm_db import create_agency, get_agency_by_id, get_agency_by_email, update_agency_wa_config, list_agencies
+
+@app.post("/api/agencies")
+def api_create_agency(payload: Dict[str, Any]):
+    return create_agency(payload)
+
+@app.get("/api/agencies/{agency_id}")
+def api_get_agency(agency_id: str):
+    agency = get_agency_by_id(agency_id)
+    if not agency:
+        raise HTTPException(status_code=404, detail="Agency not found")
+    return agency
+
+@app.patch("/api/agencies/{agency_id}/whatsapp-config")
+def api_update_agency_wa_config(agency_id: str, payload: Dict[str, Any]):
+    wa_api_key = payload.get("wa_api_key", "")
+    wa_phone_number_id = payload.get("wa_phone_number_id", "")
+    mode = payload.get("whatsapp_mode", "baileys")
+    accepted_risk = payload.get("wa_accepted_risk", False)
+    
+    success = update_agency_wa_config(agency_id, wa_api_key, wa_phone_number_id, mode, accepted_risk)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to update config")
+    return {"success": True, "agency": get_agency_by_id(agency_id)}
+
+@app.get("/api/agencies")
+def api_list_agencies():
+    return list_agencies()
+
+# --- Demo Data Seeding ---
+from .demo.seed_demo import seed_demo_data, demo_data_exists
+
+@app.get("/api/demo/status")
+def get_demo_status():
+    return {"demo_data_exists": demo_data_exists()}
+
+@app.post("/api/demo/seed")
+def seed_demo():
+    success = seed_demo_data()
+    return {"success": success, "message": "Demo data seeded" if success else "Demo data already exists"}
+
+# --- System Rebranding ---
+@app.get("/api/system/info")
+def get_system_info():
+    return {
+        "name": "Outpilot",
+        "version": "1.0.0",
+        "tagline": "AI-Powered Lead Outreach & CRM",
+        "env": "production"
+    }
 
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
