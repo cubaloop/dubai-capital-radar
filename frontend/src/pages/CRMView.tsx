@@ -226,29 +226,29 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
   }, [leads]);
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 pb-20 font-sans">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-serif-luxury font-bold text-slate-900 flex items-center gap-3">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-3">
             <span>{t('crm.title', 'Investor Pipeline & CRM')}</span>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-gold-500/20 text-gold-700 border border-gold-400 font-mono font-bold">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#8C57FF]/15 text-[#8C57FF] font-bold">
               {t('common.active', 'Active')}
             </span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1">
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
             {t('crm.subtitle', 'Track qualified prospects, follow-up cadence, and deal progression in real-time.')}
           </p>
         </div>
 
-        {/* View Switcher Buttons */}
-        <div className="flex items-center gap-2 bg-white p-1 rounded-2xl border border-slate-200 card-3d self-start md:self-auto">
+        {/* View Switcher Buttons (Materio Segmented Control) */}
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white dark:bg-[#28243D] border border-slate-200/80 dark:border-slate-800 shadow-sm self-start md:self-auto">
           <button
             onClick={() => setViewMode('focus')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold font-mono transition ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
               viewMode === 'focus'
-                ? 'bg-gold-500 text-slate-950 shadow-md shadow-gold-500/20'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-gradient-to-r from-[#8C57FF] to-[#7E4EE6] text-white shadow-md shadow-[#8C57FF]/25'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -256,10 +256,10 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
           </button>
           <button
             onClick={() => setViewMode('kanban')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold font-mono transition ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
               viewMode === 'kanban'
-                ? 'bg-gold-500 text-slate-950 shadow-md shadow-gold-500/20'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-gradient-to-r from-[#8C57FF] to-[#7E4EE6] text-white shadow-md shadow-[#8C57FF]/25'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
@@ -268,33 +268,67 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
         </div>
       </div>
 
-      {/* Stats Counters Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="p-3.5 rounded-2xl bg-white border border-slate-200 card-3d space-y-1">
-          <div className="text-[11px] font-mono text-slate-500">{t('campaigns.statsTotal', 'Total Leads')}</div>
-          <div className="text-lg font-bold text-slate-900 font-mono">{stats.total}</div>
+      {/* Materio KPI Avatar Stats Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        {/* Total Leads */}
+        <div className="p-4 rounded-xl bg-white dark:bg-[#28243D] border border-slate-200/80 dark:border-slate-800/80 shadow-sm hover:shadow-md transition flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-[#8C57FF]/12 flex items-center justify-center text-[#8C57FF] shrink-0">
+            <Users className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{t('campaigns.statsTotal', 'Total Leads')}</div>
+            <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{stats.total}</div>
+          </div>
         </div>
-        <div className="p-3.5 rounded-2xl bg-white border border-slate-200 card-3d space-y-1">
-          <div className="text-[11px] font-mono text-emerald-600">{t('crm.stageContacted', 'Contacted')}</div>
-          <div className="text-lg font-bold text-emerald-700 font-mono">{stats.contacted}</div>
+
+        {/* Contacted */}
+        <div className="p-4 rounded-xl bg-white dark:bg-[#28243D] border border-slate-200/80 dark:border-slate-800/80 shadow-sm hover:shadow-md transition flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/12 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{t('crm.stageContacted', 'Contacted')}</div>
+            <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{stats.contacted}</div>
+          </div>
         </div>
-        <div className="p-3.5 rounded-2xl bg-white border border-slate-200 card-3d space-y-1">
-          <div className="text-[11px] font-mono text-rose-600">{t('crm.urgentOnly', 'Uncontacted')}</div>
-          <div className="text-lg font-bold text-rose-700 font-mono">{stats.uncontacted}</div>
+
+        {/* Uncontacted */}
+        <div className="p-4 rounded-xl bg-white dark:bg-[#28243D] border border-slate-200/80 dark:border-slate-800/80 shadow-sm hover:shadow-md transition flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-rose-500/12 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+            <AlertTriangle className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{t('crm.urgentOnly', 'Uncontacted')}</div>
+            <div className="text-xl font-bold text-rose-600 dark:text-rose-400">{stats.uncontacted}</div>
+          </div>
         </div>
-        <div className="p-3.5 rounded-2xl bg-white border border-slate-200 card-3d space-y-1">
-          <div className="text-[11px] font-mono text-indigo-600">{t('crm.stageClosing', 'Appointments / Zoom')}</div>
-          <div className="text-lg font-bold text-indigo-700 font-mono">{stats.appointments}</div>
+
+        {/* Appointments */}
+        <div className="p-4 rounded-xl bg-white dark:bg-[#28243D] border border-slate-200/80 dark:border-slate-800/80 shadow-sm hover:shadow-md transition flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-[#16B1FF]/12 flex items-center justify-center text-[#16B1FF] shrink-0">
+            <Calendar className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{t('crm.stageClosing', 'Appointments')}</div>
+            <div className="text-xl font-bold text-[#16B1FF]">{stats.appointments}</div>
+          </div>
         </div>
-        <div className="p-3.5 rounded-2xl bg-white border border-slate-200 card-3d space-y-1 col-span-2 sm:col-span-1">
-          <div className="text-[11px] font-mono text-amber-700">{t('crm.stageWon', 'Closed Deals')}</div>
-          <div className="text-lg font-bold text-amber-800 font-mono">{stats.closed}</div>
+
+        {/* Closed Won */}
+        <div className="p-4 rounded-xl bg-white dark:bg-[#28243D] border border-slate-200/80 dark:border-slate-800/80 shadow-sm hover:shadow-md transition flex items-center gap-3.5 col-span-2 sm:col-span-1">
+          <div className="w-11 h-11 rounded-xl bg-amber-500/12 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+            <TrendingUp className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{t('crm.stageWon', 'Closed Deals')}</div>
+            <div className="text-xl font-bold text-amber-600 dark:text-amber-400">{stats.closed}</div>
+          </div>
         </div>
       </div>
 
       {/* Notification Toast */}
       {notificationMsg && (
-        <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs p-3.5 rounded-2xl font-mono text-center shadow-lg animate-fade-in">
+        <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300 text-xs p-3.5 rounded-xl text-center shadow-lg animate-fade-in font-medium">
           {notificationMsg}
         </div>
       )}

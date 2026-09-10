@@ -8,6 +8,29 @@ export default {
   theme: {
     extend: {
       colors: {
+        primary: {
+          50: '#f4f0ff',
+          100: '#eae4ff',
+          200: '#d6c8ff',
+          300: '#bda2ff',
+          400: '#a277ff',
+          500: '#8c57ff', // Materio Violet Primary
+          600: '#7e4ee6',
+          700: '#6a3ec4',
+          800: '#5530a1',
+          900: '#422380',
+        },
+        materio: {
+          bg: '#F4F5FA',
+          'dark-bg': '#201D34',
+          card: '#FFFFFF',
+          'dark-card': '#28243D',
+          'dark-surface': '#312D4B',
+          success: '#56CA00',
+          warning: '#FFB400',
+          info: '#16B1FF',
+          error: '#FF4C51',
+        },
         gold: {
           50: '#fbf8ed',
           100: '#f5efcf',

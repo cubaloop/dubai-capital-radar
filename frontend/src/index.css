@@ -16,44 +16,62 @@
   }
 }
 
-/* ===== CSS VARIABLES: LIGHT & DARK ===== */
+/* ===== CSS VARIABLES: MATERIO DESIGN SYSTEM (LIGHT & DARK) ===== */
 :root {
-  /* Light mode palette */
-  --color-bg:            #f8fafc;
-  --color-bg-card:       #ffffff;
-  --color-bg-subtle:     #f1f5f9;
-  --color-border:        rgba(226, 232, 240, 0.9);
-  --color-text-primary:  #0f172a;
-  --color-text-secondary:#475569;
-  --color-text-muted:    #94a3b8;
-  --color-gold:          #c59f27;
-  --color-gold-dark:     #875d1b;
-  --shadow-sm:           0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04);
-  --shadow-md:           0 4px 12px rgba(15,23,42,0.08), 0 2px 6px rgba(15,23,42,0.05);
-  --shadow-lg:           0 10px 30px rgba(15,23,42,0.10), 0 4px 12px rgba(15,23,42,0.06);
-  --shadow-xl:           0 20px 50px rgba(15,23,42,0.12), 0 8px 20px rgba(15,23,42,0.06);
-  --shadow-gold:         0 4px 16px rgba(197,159,39,0.18), 0 2px 6px rgba(197,159,39,0.10);
-  --shadow-gold-hover:   0 8px 28px rgba(197,159,39,0.28), 0 4px 12px rgba(197,159,39,0.14);
+  /* Materio Light Palette */
+  --color-bg:            #F4F5FA;
+  --color-bg-card:       #FFFFFF;
+  --color-bg-subtle:     #ECEEF1;
+  --color-border:        rgba(58, 53, 65, 0.12);
+  --color-text-primary:  rgba(58, 53, 65, 0.87);
+  --color-text-secondary:rgba(58, 53, 65, 0.68);
+  --color-text-muted:    rgba(58, 53, 65, 0.38);
+  --color-primary:       #8C57FF;
+  --color-primary-hover: #7E4EE6;
+  --shadow-sm:           0 1px 3px rgba(58, 53, 65, 0.08);
+  --shadow-md:           0 2px 10px 0 rgba(58, 53, 65, 0.10);
+  --shadow-lg:           0 4px 18px 0 rgba(58, 53, 65, 0.14);
+  --shadow-xl:           0 8px 30px 0 rgba(58, 53, 65, 0.18);
+  --shadow-primary:      0 4px 14px rgba(140, 87, 255, 0.28);
 }
 
 .dark {
-  /* Dark mode palette */
-  --color-bg:            #0a0f1a;
-  --color-bg-card:       #111827;
-  --color-bg-subtle:     #1a2235;
-  --color-border:        rgba(51, 65, 85, 0.8);
-  --color-text-primary:  #f1f5f9;
-  --color-text-secondary:#94a3b8;
-  --color-text-muted:    #64748b;
-  --color-gold:          #d4af37;
-  --color-gold-dark:     #aa7e1e;
-  --shadow-sm:           0 1px 3px rgba(0,0,0,0.25), 0 1px 2px rgba(0,0,0,0.15);
-  --shadow-md:           0 4px 12px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.20);
-  --shadow-lg:           0 10px 30px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.25);
-  --shadow-xl:           0 20px 50px rgba(0,0,0,0.55), 0 8px 20px rgba(0,0,0,0.30);
-  --shadow-gold:         0 4px 16px rgba(212,175,55,0.25), 0 2px 6px rgba(212,175,55,0.12);
-  --shadow-gold-hover:   0 8px 28px rgba(212,175,55,0.35), 0 4px 12px rgba(212,175,55,0.18);
+  /* Materio Dark Palette */
+  --color-bg:            #201D34;
+  --color-bg-card:       #28243D;
+  --color-bg-subtle:     #312D4B;
+  --color-border:        rgba(231, 227, 252, 0.12);
+  --color-text-primary:  rgba(231, 227, 252, 0.87);
+  --color-text-secondary:rgba(231, 227, 252, 0.68);
+  --color-text-muted:    rgba(231, 227, 252, 0.38);
+  --color-primary:       #8C57FF;
+  --color-primary-hover: #9E69FF;
+  --shadow-sm:           0 1px 3px rgba(19, 17, 32, 0.30);
+  --shadow-md:           0 2px 10px 0 rgba(19, 17, 32, 0.45);
+  --shadow-lg:           0 4px 20px 0 rgba(19, 17, 32, 0.60);
+  --shadow-xl:           0 8px 32px 0 rgba(19, 17, 32, 0.75);
+  --shadow-primary:      0 4px 14px rgba(140, 87, 255, 0.35);
 }
+
+/* Base Page Background */
+.page-bg {
+  background-color: var(--color-bg);
+  min-height: 100vh;
+  transition: background-color 0.2s ease;
+}
+
+.materio-card {
+  background-color: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem; /* 12px */
+  box-shadow: var(--shadow-md);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.materio-card:hover {
+  box-shadow: var(--shadow-lg);
+}
+
 
 /* ===== LUXURY GREEN MARBLE BACKGROUND OPTIMIZED FOR MOBILE (60fps) ===== */
 .outpilot-bg {

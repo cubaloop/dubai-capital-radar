@@ -16,6 +16,8 @@ import { TermsPage } from './pages/TermsPage';
 import { DemoBanner } from './components/DemoBanner';
 import { useTranslation } from './i18n/LanguageContext';
 
+import { Sidebar } from './components/Sidebar';
+
 function DemoLauncher() {
   const navigate = useNavigate();
   useEffect(() => {
@@ -38,7 +40,7 @@ function DemoLauncher() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white font-mono text-sm">
       <div className="flex items-center gap-3">
-        <div className="w-5 h-5 border-2 border-gold-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
         <span>Cargando entorno demo interactivo...</span>
       </div>
     </div>
@@ -57,6 +59,9 @@ export function App() {
     }
   });
 
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
+
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState<boolean>(false);
   const [isAgencyModalOpen, setIsAgencyModalOpen] = useState<boolean>(false);
   const [isLicenseModalOpen, setIsLicenseModalOpen] = useState<boolean>(false);
@@ -74,7 +79,7 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen w-full page-bg text-primary flex flex-col font-sans overflow-x-hidden transition-colors duration-200">
+    <div className="min-h-screen w-full page-bg text-slate-800 dark:text-slate-100 flex flex-col font-sans overflow-x-hidden transition-colors duration-200">
       <DemoBanner />
       <Routes>
         <Route path="/" element={<LandingPage />} />
@@ -89,28 +94,39 @@ export function App() {
           element={
             <>
               {currentUser ? (
-                <>
-                  <Navbar 
-                    activeTab="campaigns" // Fallback since we removed the state
-                    setActiveTab={(tab) => navigate(`/${tab}`)} 
+                <div className="flex min-h-screen w-full">
+                  <Sidebar
+                    isCollapsed={isSidebarCollapsed}
+                    setIsCollapsed={setIsSidebarCollapsed}
+                    isOpenMobile={isMobileSidebarOpen}
+                    setIsOpenMobile={setIsMobileSidebarOpen}
                     onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
                     onOpenAgencyModal={() => setIsAgencyModalOpen(true)}
                     onOpenLicenseModal={() => setIsLicenseModalOpen(true)}
-                    remainingTrialDays={getRemainingTrialDays(licenseState)}
-                    isUnlocked={licenseState.isUnlocked}
-                    onLogout={handleLogout}
                     currentUser={currentUser}
                   />
-                  <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-6 sm:pt-8">
-                    <Routes>
-                      <Route path="/crm" element={<CRMView currentUser={currentUser} />} />
-                      <Route path="/campaigns" element={<CampaignManager currentUser={currentUser} />} />
-                      <Route path="/analytics" element={<AnalyticsDashboard />} />
-                      <Route path="/excels" element={<ExcelCampaignDashboard currentUser={currentUser} />} />
-                      <Route path="/dossiers/:slug?" element={<DossierView slugOrId="alexander-wright-fintech-demo" onBack={() => navigate('/campaigns')} />} />
-                      <Route path="*" element={<Navigate to="/campaigns" replace />} />
-                    </Routes>
-                  </main>
+                  <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarCollapsed ? 'lg:pl-[74px]' : 'lg:pl-64'}`}>
+                    <Navbar 
+                      onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
+                      onOpenAgencyModal={() => setIsAgencyModalOpen(true)}
+                      onOpenLicenseModal={() => setIsLicenseModalOpen(true)}
+                      onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+                      remainingTrialDays={getRemainingTrialDays(licenseState)}
+                      isUnlocked={licenseState.isUnlocked}
+                      onLogout={handleLogout}
+                      currentUser={currentUser}
+                    />
+                    <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+                      <Routes>
+                        <Route path="/crm" element={<CRMView currentUser={currentUser} />} />
+                        <Route path="/campaigns" element={<CampaignManager currentUser={currentUser} />} />
+                        <Route path="/analytics" element={<AnalyticsDashboard />} />
+                        <Route path="/excels" element={<ExcelCampaignDashboard currentUser={currentUser} />} />
+                        <Route path="/dossiers/:slug?" element={<DossierView slugOrId="alexander-wright-fintech-demo" onBack={() => navigate('/campaigns')} />} />
+                        <Route path="*" element={<Navigate to="/crm" replace />} />
+                      </Routes>
+                    </main>
+                  </div>
                   <WhatsAppQRModal isOpen={isWhatsAppModalOpen} onClose={() => setIsWhatsAppModalOpen(false)} />
                   <AgencySettingsModal isOpen={isAgencyModalOpen} onClose={() => setIsAgencyModalOpen(false)} />
                   <LicenseModal
@@ -119,7 +135,7 @@ export function App() {
                     userEmail={currentUser?.email}
                     onSuccess={() => setLicenseState(getLicenseState(currentUser?.email))}
                   />
-                </>
+                </div>
               ) : (
                 <Navigate to="/login" replace />
               )}
