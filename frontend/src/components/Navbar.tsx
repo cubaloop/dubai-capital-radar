@@ -126,14 +126,14 @@ export const Navbar: React.FC<NavbarProps> = ({
               {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
             </div>
             <div className="hidden lg:flex flex-col text-left">
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight">
+              <span className="text-xs font-extrabold text-slate-950 dark:text-white leading-tight">
                 {currentUser?.name || 'David Admin'}
               </span>
-              <span className="text-[10px] text-slate-400 leading-tight">
+              <span className="text-[10px] text-slate-800 dark:text-slate-300 font-bold leading-tight">
                 {currentUser?.agencyName || 'Outpilot CRM'}
               </span>
             </div>
-            <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-3.5 h-3.5 text-slate-700 dark:text-slate-300 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {/* Dropdown Menu */}
@@ -143,13 +143,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="fixed inset-0 z-40" 
                 onClick={() => setIsUserMenuOpen(false)} 
               />
-              <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white dark:bg-[#28243D] border border-[rgba(58,53,65,0.12)] dark:border-[rgba(231,227,252,0.12)] shadow-xl z-50 p-2 text-xs divide-y divide-slate-100 dark:divide-slate-800 font-sans">
+              <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white dark:bg-[#28243D] border border-slate-300 dark:border-[#3A354C] shadow-2xl z-50 p-2 text-xs divide-y divide-slate-200 dark:divide-slate-800 font-sans">
                 <div className="p-3">
-                  <p className="font-bold text-slate-800 dark:text-slate-100 text-sm">
+                  <p className="font-extrabold text-slate-950 dark:text-white text-sm">
                     {currentUser?.name || 'Administrador'}
                   </p>
-                  <p className="text-slate-400 truncate mt-0.5">{currentUser?.email}</p>
-                  <div className="mt-2 inline-block px-2 py-0.5 rounded-full bg-[#8C57FF]/10 text-[#8C57FF] text-[10px] font-bold uppercase">
+                  <p className="text-slate-750 dark:text-slate-200 font-bold truncate mt-0.5">{currentUser?.email}</p>
+                  <div className="mt-2 inline-block px-2.5 py-0.5 rounded-full bg-[#8C57FF]/15 text-[#8C57FF] text-[10px] font-black uppercase">
                     Plan {currentUser?.plan || 'Free Trial'}
                   </div>
                 </div>
@@ -160,9 +160,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                       setIsUserMenuOpen(false);
                       onOpenAgencyModal?.();
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-[#8C57FF]/10 hover:text-[#8C57FF] transition font-medium text-left"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-900 dark:text-slate-100 hover:bg-[#8C57FF]/15 hover:text-[#8C57FF] transition font-bold text-left"
                   >
-                    <Settings className="w-4 h-4 text-slate-400" />
+                    <Settings className="w-4 h-4 text-slate-700 dark:text-slate-300" />
                     <span>Ajustes de Agencia</span>
                   </button>
                   <button
@@ -170,9 +170,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                       setIsUserMenuOpen(false);
                       onOpenLicenseModal?.();
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-[#8C57FF]/10 hover:text-[#8C57FF] transition font-medium text-left"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-900 dark:text-slate-100 hover:bg-[#8C57FF]/15 hover:text-[#8C57FF] transition font-bold text-left"
                   >
-                    <CreditCard className="w-4 h-4 text-slate-400" />
+                    <CreditCard className="w-4 h-4 text-slate-700 dark:text-slate-300" />
                     <span>Planes y Licencia</span>
                   </button>
                 </div>
@@ -183,9 +183,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                       setIsUserMenuOpen(false);
                       onLogout?.();
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition font-medium text-left"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition font-bold text-left"
                   >
-                    <LogOut className="w-4 h-4 text-rose-500" />
+                    <LogOut className="w-4 h-4 text-rose-600" />
                     <span>Cerrar Sesión</span>
                   </button>
                 </div>

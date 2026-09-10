@@ -169,12 +169,12 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
                 </span>
               )}
             </h2>
-            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 font-mono mt-1">
-              <a href={`tel:${cleanDigits}`} className="hover:text-gold-700 transition flex items-center gap-1 font-semibold">
-                <Phone className="w-3.5 h-3.5 text-gold-600" /> {currentLead.phone}
+            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-950 dark:text-white font-mono font-bold mt-1">
+              <a href={`tel:${cleanDigits}`} className="hover:text-primary-600 transition flex items-center gap-1 font-bold">
+                <Phone className="w-3.5 h-3.5 text-primary-600" /> {currentLead.phone}
               </a>
               {currentLead.email && (
-                <span className="flex items-center gap-1 text-slate-600">
+                <span className="flex items-center gap-1 text-slate-900 dark:text-slate-200 font-bold">
                   <Mail className="w-3.5 h-3.5" /> {currentLead.email}
                 </span>
               )}
@@ -182,7 +182,7 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-300 text-xs font-bold text-slate-800 font-mono uppercase">
+            <span className="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-black text-slate-950 dark:text-white font-mono uppercase">
               {stageLabels[currentLead.crm_status] || currentLead.crm_status}
             </span>
           </div>
@@ -190,17 +190,17 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
 
         {/* Lead Context Data Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-            <div className="text-slate-500 font-mono">{t('crm.objective', 'Objective')}</div>
-            <div className="text-slate-900 font-semibold">{currentLead.objective || 'Investment'}</div>
+          <div className="p-3.5 rounded-xl bg-slate-100/90 dark:bg-[#201D34] border border-slate-300 dark:border-[#3A354C] shadow-sm space-y-1">
+            <div className="text-slate-900 dark:text-slate-300 font-mono font-extrabold text-[11px]">{t('crm.objective', 'Objective')}</div>
+            <div className="text-slate-950 dark:text-white font-extrabold text-sm">{currentLead.objective || 'Investment'}</div>
           </div>
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-            <div className="text-slate-500 font-mono">{t('crm.timeline', 'Timeline')}</div>
-            <div className="text-slate-900 font-semibold">{currentLead.timeline || 'Upcoming months'}</div>
+          <div className="p-3.5 rounded-xl bg-slate-100/90 dark:bg-[#201D34] border border-slate-300 dark:border-[#3A354C] shadow-sm space-y-1">
+            <div className="text-slate-900 dark:text-slate-300 font-mono font-extrabold text-[11px]">{t('crm.timeline', 'Timeline')}</div>
+            <div className="text-slate-950 dark:text-white font-extrabold text-sm">{currentLead.timeline || 'Upcoming months'}</div>
           </div>
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-            <div className="text-slate-500 font-mono">{t('crm.budget', 'Budget')}</div>
-            <div className="text-gold-700 font-bold font-mono">
+          <div className="p-3.5 rounded-xl bg-slate-100/90 dark:bg-[#201D34] border border-slate-300 dark:border-[#3A354C] shadow-sm space-y-1">
+            <div className="text-slate-900 dark:text-slate-300 font-mono font-extrabold text-[11px]">{t('crm.budget', 'Budget')}</div>
+            <div className="text-primary-700 dark:text-primary-300 font-black font-mono text-sm">
               {currentLead.budget_eur ? `${currentLead.budget_eur.toLocaleString()} €` : 'To discuss'}
             </div>
           </div>
@@ -208,8 +208,8 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
 
         {/* Historical Notes */}
         {currentLead.notes && (
-          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 leading-relaxed">
-            <span className="font-bold font-mono uppercase block text-[10px] text-amber-700 mb-1">
+          <div className="p-4 rounded-2xl bg-amber-100/80 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-700 text-xs text-amber-950 dark:text-amber-100 font-bold leading-relaxed shadow-sm">
+            <span className="font-black font-mono uppercase block text-[10px] text-amber-900 dark:text-amber-300 mb-1">
               {t('crm.previousNotes', 'Previous Prospect Notes:')}
             </span>
             {currentLead.notes}
@@ -218,15 +218,15 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
 
         {/* Personalized AI Message Preview & Send Action */}
         <div className="space-y-3 pt-2">
-          <div className="flex items-center justify-between text-xs font-mono text-slate-500">
+          <div className="flex items-center justify-between text-xs font-mono font-extrabold text-slate-900 dark:text-slate-200">
             <span>{t('crm.waMessageLabel', 'Personalized WhatsApp Message:')}</span>
             {currentLead.last_contact_date && (
-              <span className="text-emerald-700 font-semibold">
+              <span className="text-emerald-700 dark:text-emerald-400 font-black">
                 {t('crm.lastContact', 'Last contact:')} {currentLead.last_contact_date}
               </span>
             )}
           </div>
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 leading-relaxed font-sans whitespace-pre-line max-h-48 overflow-y-auto custom-scrollbar">
+          <div className="p-4 rounded-2xl bg-slate-100/90 dark:bg-[#201D34] border border-slate-300 dark:border-[#3A354C] text-xs text-slate-950 dark:text-slate-100 font-bold leading-relaxed font-sans whitespace-pre-line max-h-48 overflow-y-auto custom-scrollbar shadow-inner">
             {currentLead.personalized_message || t('crm.noMessageGen', 'No message generated.')}
           </div>
 
