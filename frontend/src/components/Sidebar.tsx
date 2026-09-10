@@ -174,7 +174,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {navGroups.map((group, gIdx) => (
             <div key={gIdx} className="space-y-1">
               {!isCollapsed && (
-                <div className="px-3 text-[11px] font-bold text-slate-400/80 dark:text-slate-500 uppercase tracking-wider mb-2">
+                <div className="px-3 text-[11px] font-extrabold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">
                   {group.title}
                 </div>
               )}
@@ -185,24 +185,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     key={iIdx}
                     onClick={() => handleNavigate(item.path, item.action)}
                     title={isCollapsed ? item.label : undefined}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 relative group ${
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150 relative group ${
                       isActive
-                        ? 'bg-gradient-to-r from-[#8C57FF] to-[#7E4EE6] text-white shadow-md shadow-[#8C57FF]/25 font-semibold'
-                        : 'text-slate-600 dark:text-slate-300 hover:bg-[#8C57FF]/8 dark:hover:bg-[#8C57FF]/12 hover:text-[#8C57FF] dark:hover:text-[#A277FF]'
+                        ? 'bg-gradient-to-r from-[#8C57FF] to-[#7E4EE6] text-white shadow-md shadow-[#8C57FF]/25 font-bold'
+                        : 'text-slate-800 dark:text-slate-200 hover:bg-[#8C57FF]/10 dark:hover:bg-[#8C57FF]/15 hover:text-[#8C57FF] dark:hover:text-[#A277FF] font-bold'
                     }`}
                   >
-                    <span className={`shrink-0 ${isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-[#8C57FF] dark:group-hover:text-[#A277FF]'}`}>
+                    <span className={`shrink-0 ${isActive ? 'text-white' : 'text-slate-600 dark:text-slate-300 group-hover:text-[#8C57FF] dark:group-hover:text-[#A277FF]'}`}>
                       {item.icon}
                     </span>
 
                     {!isCollapsed && (
-                      <span className="truncate flex-1 text-left">
+                      <span className="truncate flex-1 text-left font-bold">
                         {item.label}
                       </span>
                     )}
 
                     {!isCollapsed && item.badge && (
-                      <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      <span className="shrink-0 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                         {item.badge}
                       </span>
@@ -219,11 +219,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="p-3 border-t border-[rgba(58,53,65,0.08)] dark:border-[rgba(231,227,252,0.08)]">
             <div className="p-3 rounded-xl bg-[#F4F5FA] dark:bg-[#201D34] border border-[rgba(58,53,65,0.06)] dark:border-[rgba(231,227,252,0.06)]">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1">
+                <span className="text-xs font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1">
                   <Sparkles className="w-3.5 h-3.5 text-[#8C57FF]" />
                   Cuota Mensajes IA
                 </span>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#8C57FF]/15 text-[#8C57FF]">
+                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-[#8C57FF]/15 text-[#8C57FF]">
                   {currentUser?.plan?.toUpperCase() || 'FREE'}
                 </span>
               </div>
@@ -232,14 +232,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   className="bg-gradient-to-r from-[#8C57FF] to-[#56CA00] h-full rounded-full transition-all duration-300"
                   style={{
                     width: currentUser?.messagesLimit && currentUser.messagesLimit !== -1 
-                      ? `${Math.min(100, Math.max(5, ((currentUser.messagesUsed || 0) / currentUser.messagesLimit) * 100))}%`
-                      : '20%'
+                    ? `${Math.min(100, Math.max(5, ((currentUser.messagesUsed || 0) / currentUser.messagesLimit) * 100))}%`
+                    : '20%'
                   }}
                 />
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 flex justify-between">
+              <p className="text-[11px] text-slate-600 dark:text-slate-300 font-bold flex justify-between">
                 <span>Restantes:</span>
-                <span className="font-bold text-slate-700 dark:text-slate-200">
+                <span className="font-extrabold text-slate-900 dark:text-white">
                   {currentUser?.messagesLimit && currentUser.messagesLimit !== -1 
                     ? `${Math.max(0, currentUser.messagesLimit - (currentUser.messagesUsed || 0))} / ${currentUser.messagesLimit}`
                     : '500 libres'}

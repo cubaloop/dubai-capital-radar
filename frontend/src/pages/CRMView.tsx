@@ -230,25 +230,25 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-3">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-950 dark:text-white flex items-center gap-3">
             <span>{t('crm.title', 'Investor Pipeline & CRM')}</span>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#8C57FF]/15 text-[#8C57FF] font-bold">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-primary-100 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 font-extrabold">
               {t('common.active', 'Active')}
             </span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-300 mt-1">
             {t('crm.subtitle', 'Track qualified prospects, follow-up cadence, and deal progression in real-time.')}
           </p>
         </div>
 
         {/* View Switcher Buttons (Materio Segmented Control) */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white dark:bg-[#28243D] border border-slate-200/80 dark:border-slate-800 shadow-sm self-start md:self-auto">
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white dark:bg-[#28243D] border border-slate-200 dark:border-[#3A354C] shadow-sm self-start md:self-auto">
           <button
             onClick={() => setViewMode('focus')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all ${
               viewMode === 'focus'
-                ? 'bg-gradient-to-r from-[#8C57FF] to-[#7E4EE6] text-white shadow-md shadow-[#8C57FF]/25'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                ? 'bg-primary-500 text-white shadow-md shadow-primary-500/25'
+                : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -256,10 +256,10 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
           </button>
           <button
             onClick={() => setViewMode('kanban')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all ${
               viewMode === 'kanban'
-                ? 'bg-gradient-to-r from-[#8C57FF] to-[#7E4EE6] text-white shadow-md shadow-[#8C57FF]/25'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                ? 'bg-primary-500 text-white shadow-md shadow-primary-500/25'
+                : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
             }`}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
@@ -271,70 +271,70 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
       {/* Materio KPI Avatar Stats Row */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         {/* Total Leads */}
-        <div className="p-4 rounded-xl bg-white dark:bg-[#28243D] border border-slate-200/80 dark:border-slate-800/80 shadow-sm hover:shadow-md transition flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-[#8C57FF]/12 flex items-center justify-center text-[#8C57FF] shrink-0">
+        <div className="p-4 rounded-xl bg-white dark:bg-[#28243D] border border-slate-200 dark:border-[#3A354C] shadow-sm hover:shadow-md transition flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-primary-500/15 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0 font-extrabold">
             <Users className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{t('campaigns.statsTotal', 'Total Leads')}</div>
-            <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{stats.total}</div>
+            <div className="text-xs text-slate-700 dark:text-slate-300 font-extrabold truncate">{t('campaigns.statsTotal', 'Total Leads')}</div>
+            <div className="text-2xl font-extrabold text-slate-950 dark:text-white">{stats.total}</div>
           </div>
         </div>
 
         {/* Contacted */}
-        <div className="p-4 rounded-xl bg-white dark:bg-[#28243D] border border-slate-200/80 dark:border-slate-800/80 shadow-sm hover:shadow-md transition flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-emerald-500/12 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+        <div className="p-4 rounded-xl bg-white dark:bg-[#28243D] border border-slate-200 dark:border-[#3A354C] shadow-sm hover:shadow-md transition flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shrink-0 font-extrabold">
             <CheckCircle2 className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{t('crm.stageContacted', 'Contacted')}</div>
-            <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{stats.contacted}</div>
+            <div className="text-xs text-slate-700 dark:text-slate-300 font-extrabold truncate">{t('crm.stageContacted', 'Contacted')}</div>
+            <div className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400">{stats.contacted}</div>
           </div>
         </div>
 
         {/* Uncontacted */}
-        <div className="p-4 rounded-xl bg-white dark:bg-[#28243D] border border-slate-200/80 dark:border-slate-800/80 shadow-sm hover:shadow-md transition flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-rose-500/12 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+        <div className="p-4 rounded-xl bg-white dark:bg-[#28243D] border border-slate-200 dark:border-[#3A354C] shadow-sm hover:shadow-md transition flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-rose-500/15 flex items-center justify-center text-rose-700 dark:text-rose-400 shrink-0 font-extrabold">
             <AlertTriangle className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{t('crm.urgentOnly', 'Uncontacted')}</div>
-            <div className="text-xl font-bold text-rose-600 dark:text-rose-400">{stats.uncontacted}</div>
+            <div className="text-xs text-slate-700 dark:text-slate-300 font-extrabold truncate">{t('crm.urgentOnly', 'Uncontacted')}</div>
+            <div className="text-2xl font-extrabold text-rose-700 dark:text-rose-400">{stats.uncontacted}</div>
           </div>
         </div>
 
         {/* Appointments */}
-        <div className="p-4 rounded-xl bg-white dark:bg-[#28243D] border border-slate-200/80 dark:border-slate-800/80 shadow-sm hover:shadow-md transition flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-[#16B1FF]/12 flex items-center justify-center text-[#16B1FF] shrink-0">
+        <div className="p-4 rounded-xl bg-white dark:bg-[#28243D] border border-slate-200 dark:border-[#3A354C] shadow-sm hover:shadow-md transition flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-sky-500/15 flex items-center justify-center text-sky-700 dark:text-sky-400 shrink-0 font-extrabold">
             <Calendar className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{t('crm.stageClosing', 'Appointments')}</div>
-            <div className="text-xl font-bold text-[#16B1FF]">{stats.appointments}</div>
+            <div className="text-xs text-slate-700 dark:text-slate-300 font-extrabold truncate">{t('crm.stageClosing', 'Appointments')}</div>
+            <div className="text-2xl font-extrabold text-sky-700 dark:text-sky-400">{stats.appointments}</div>
           </div>
         </div>
 
         {/* Closed Won */}
-        <div className="p-4 rounded-xl bg-white dark:bg-[#28243D] border border-slate-200/80 dark:border-slate-800/80 shadow-sm hover:shadow-md transition flex items-center gap-3.5 col-span-2 sm:col-span-1">
-          <div className="w-11 h-11 rounded-xl bg-amber-500/12 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+        <div className="p-4 rounded-xl bg-white dark:bg-[#28243D] border border-slate-200 dark:border-[#3A354C] shadow-sm hover:shadow-md transition flex items-center gap-3.5 col-span-2 sm:col-span-1">
+          <div className="w-11 h-11 rounded-xl bg-amber-500/15 flex items-center justify-center text-amber-700 dark:text-amber-400 shrink-0 font-extrabold">
             <TrendingUp className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{t('crm.stageWon', 'Closed Deals')}</div>
-            <div className="text-xl font-bold text-amber-600 dark:text-amber-400">{stats.closed}</div>
+            <div className="text-xs text-slate-700 dark:text-slate-300 font-extrabold truncate">{t('crm.stageWon', 'Closed Deals')}</div>
+            <div className="text-2xl font-extrabold text-amber-700 dark:text-amber-400">{stats.closed}</div>
           </div>
         </div>
       </div>
 
       {/* Notification Toast */}
       {notificationMsg && (
-        <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300 text-xs p-3.5 rounded-xl text-center shadow-lg animate-fade-in font-medium">
+        <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300 text-xs p-3.5 rounded-xl text-center shadow-lg animate-fade-in font-bold">
           {notificationMsg}
         </div>
       )}
 
       {/* Filters Bar */}
-      <div className="flex flex-wrap items-center gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 card-3d backdrop-blur-md">
+      <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-[#28243D] p-3.5 rounded-xl border border-slate-200 dark:border-[#3A354C] materio-card">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
           <input
@@ -342,7 +342,7 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder={t('crm.searchPlaceholder', 'Search by name, phone, notes...')}
-            className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 focus:outline-none focus:border-gold-500 font-mono"
+            className="w-full bg-slate-50 dark:bg-[#201D34] border border-slate-300 dark:border-[#3A354C] rounded-xl pl-9 pr-4 py-2 text-xs font-bold text-slate-950 dark:text-white focus:outline-none focus:border-primary-500 shadow-sm"
           />
         </div>
 
@@ -350,7 +350,7 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
         <select
           value={campaignFilter}
           onChange={(e) => setCampaignFilter(e.target.value)}
-          className="bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-xl px-3 py-2 font-mono focus:outline-none focus:border-gold-500"
+          className="bg-slate-50 dark:bg-[#201D34] border border-slate-300 dark:border-[#3A354C] text-slate-900 dark:text-white text-xs font-bold rounded-xl px-3 py-2 focus:outline-none focus:border-primary-500"
         >
           <option value="all">{t('crm.allCampaigns', 'All Campaigns')}</option>
           {campaignOptions.map((c) => (
@@ -364,7 +364,7 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-xl px-3 py-2 font-mono focus:outline-none focus:border-gold-500"
+          className="bg-slate-50 dark:bg-[#201D34] border border-slate-300 dark:border-[#3A354C] text-slate-900 dark:text-white text-xs font-bold rounded-xl px-3 py-2 focus:outline-none focus:border-primary-500"
         >
           <option value="all">{t('crm.allStages', 'All Stages')}</option>
           <option value="CREATED">{t('crm.stageCreated', 'New Leads')}</option>
@@ -378,10 +378,10 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
         {/* ADHD Alert Filter Button */}
         <button
           onClick={() => setAdhdAlertOnly(!adhdAlertOnly)}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono font-bold transition ${
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition ${
             adhdAlertOnly
-              ? 'bg-rose-600 text-white'
-              : 'bg-slate-50 text-slate-700 border border-slate-300 hover:border-rose-500/50'
+              ? 'bg-rose-600 text-white font-extrabold shadow-sm'
+              : 'bg-slate-50 dark:bg-[#201D34] text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-[#3A354C] hover:border-rose-500/50'
           }`}
         >
           <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
@@ -390,7 +390,7 @@ export const CRMView: React.FC<CRMViewProps> = ({ currentUser }) => {
 
         <button
           onClick={fetchLeads}
-          className="p-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-600 hover:text-slate-900 transition"
+          className="p-2 rounded-xl bg-slate-50 dark:bg-[#201D34] border border-slate-300 dark:border-[#3A354C] text-slate-700 dark:text-slate-300 hover:text-primary-500 transition shadow-sm"
           title="Recargar datos de la base de datos"
         >
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
