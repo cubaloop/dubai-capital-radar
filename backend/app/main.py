@@ -1070,13 +1070,13 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
         # 1. PRIMARY: Groq (con los modelos activos actuales en la plataforma)
         if groq_key:
             import re
-            active_groq_models = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b", "groq/compound"]
+            active_groq_models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192", "mixtral-8x7b-32768"]
             for attempt in range(2):
                 if attempt > 0:
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(1)
                 for model_name in active_groq_models:
                     try:
-                        async with httpx.AsyncClient(timeout=20.0) as client:
+                        async with httpx.AsyncClient(timeout=8.0) as client:
                             payload = {
                                 "model": model_name,
                                 "messages": messages,
@@ -1237,7 +1237,8 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
         print(f"[ADMIN COPILOT] Message from Super-Admin ({sender} | JID: {jid}): '{text}'")
         # Check if sending a developer launch brochure or asking a system question
         if not is_developer_or_launch_message(text, is_group=False):
-            return await handle_admin_copilot(text, sender_jid=jid, sender_phone=sender)
+            asyncio.create_task(handle_admin_copilot(text, sender_jid=jid, sender_phone=sender))
+            return {"status": "copilot_dispatched_async"}
 
         # If Super-Admin sends a new developer launch brochure
         parsed_project = await parse_project_from_text(text)
