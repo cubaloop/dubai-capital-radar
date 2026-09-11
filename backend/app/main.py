@@ -122,29 +122,42 @@ async def send_whatsapp_endpoint(payload: Dict[str, Any]):
 
 @app.get("/api/debug/test-groq")
 async def debug_test_groq():
-    """Tests the Groq API key directly from Render's servers."""
+    """Tests LLM models directly from Render's servers."""
     groq_key = os.getenv("GROQ_API_KEY", "").strip()
-    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
-    if not groq_key:
-        return {"groq": "NO KEY SET", "gemini_key_present": bool(gemini_key)}
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            r = await client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                json={"model": "openai/gpt-oss-120b", "messages": [{"role": "user", "content": "di hola"}], "max_tokens": 10},
-                headers={
-                    "Authorization": f"Bearer {groq_key}",
-                    "Content-Type": "application/json",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                }
-            )
-            if r.status_code == 200:
-                ans = r.json()["choices"][0]["message"]["content"]
-                return {"groq": "OK", "response": ans, "key_prefix": groq_key[:12], "gemini_key_present": bool(gemini_key)}
-            else:
-                return {"groq": f"ERROR {r.status_code}", "body": r.text[:300], "key_prefix": groq_key[:12]}
-    except Exception as e:
-        return {"groq": "EXCEPTION", "error": str(e), "key_prefix": groq_key[:12]}
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
+    results = {"groq_key_prefix": groq_key[:12] if groq_key else None, "gemini_key_prefix": gemini_key[:12] if gemini_key else None}
+    
+    groq_models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
+    groq_results = {}
+    if groq_key:
+        for m in groq_models:
+            try:
+                async with httpx.AsyncClient(timeout=8.0) as client:
+                    r = await client.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        json={"model": m, "messages": [{"role": "user", "content": "Hola"}], "max_tokens": 10},
+                        headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
+                    )
+                    groq_results[m] = {"status": r.status_code, "body": r.json() if r.status_code == 200 else r.text[:200]}
+            except Exception as e:
+                groq_results[m] = {"error": str(e)}
+    results["groq_tests"] = groq_results
+
+    gem_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash"]
+    gem_results = {}
+    if gemini_key:
+        for gm in gem_models:
+            try:
+                async with httpx.AsyncClient(timeout=8.0) as client:
+                    r = await client.post(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{gm}:generateContent?key={gemini_key}",
+                        json={"contents": [{"parts": [{"text": "Hola"}]}]}
+                    )
+                    gem_results[gm] = {"status": r.status_code, "body": r.json() if r.status_code == 200 else r.text[:200]}
+            except Exception as e:
+                gem_results[gm] = {"error": str(e)}
+    results["gemini_tests"] = gem_results
+    return results
 
 @app.post("/api/whatsapp/reset-contact-session")
 async def api_reset_contact_session(payload: Optional[Dict[str, Any]] = None):
@@ -1119,7 +1132,7 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
             hist_text = "\n".join([f"{'Jota' if t['role'] in ['assistant', 'model', 'jota'] else 'David'}: {t['content']}" for t in past_history])
             gem_prompt = f"{system_prompt}\n\nHISTORIAL DE CONVERSACIÓN RECIENTE:\n{hist_text}\n\nMENSAJE ACTUAL DE DAVID:\n{text}\n\nResponde como Jota (ejecutivo, experto, natural, en el idioma solicitado o en el que te escribe David, formato WhatsApp):"
 
-            for gem_model in ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest", "gemini-3.5-flash"]:
+            for gem_model in ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro"]:
                 try:
                     async with httpx.AsyncClient(timeout=15.0) as client:
                         gem_payload = {
