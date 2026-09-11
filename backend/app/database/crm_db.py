@@ -141,7 +141,7 @@ def init_crm_db():
     else:
         # Ensure Spain campaign and its leads are fully seeded
         seed_spain_campaign(conn)
-        cursor.execute("SELECT COUNT(*) FROM campaigns WHERE id = 'miami_vip_event'")
+        cursor.execute("SELECT COUNT(*) FROM campaigns WHERE id = 'campaign_demo_studios'")
         if cursor.fetchone()[0] == 0:
             seed_initial_campaigns(conn)
 
@@ -266,6 +266,78 @@ def seed_initial_campaigns(conn):
             ))
     except Exception as e:
         print("[CRM DB] Notice seeding Miami leads:", e)
+
+    # Seed Demo campaign
+    try:
+        cursor.execute("""
+        INSERT OR IGNORE INTO campaigns (id, name, category, description, attached_flyer, ai_prompt_instructions, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            "campaign_demo_studios",
+            "Demo",
+            "Dubai Studios Off-Plan",
+            "Ofertas de estudios desde 550K AED",
+            "",
+            "Hi, i have new offerts from 550K for Studios",
+            "2026-09-11 12:00:00"
+        ))
+
+        demo_leads = [
+            {
+                "id": "studio_demo_lead_sandeep",
+                "name": "Sandeep",
+                "phone": "+971569588338",
+                "clean_phone": "971569588338",
+                "email": "",
+                "budget_aed": 550000,
+                "objective": "Studios from 550K",
+                "timeline": "Immediate",
+                "notes": "Demo lead - Studios 550K offer",
+                "crm_status": "CREATED",
+                "whatsapp_status": "pending",
+                "personalized_message": "Hi Sandeep, i have new offerts from 550K for Studios"
+            },
+            {
+                "id": "studio_demo_lead_anirban",
+                "name": "Anirban",
+                "phone": "+971502556248",
+                "clean_phone": "971502556248",
+                "email": "",
+                "budget_aed": 550000,
+                "objective": "Studios from 550K",
+                "timeline": "Immediate",
+                "notes": "Demo lead - Studios 550K offer",
+                "crm_status": "CREATED",
+                "whatsapp_status": "pending",
+                "personalized_message": "Hi Anirban, i have new offerts from 550K for Studios"
+            }
+        ]
+
+        for l in demo_leads:
+            cursor.execute("""
+            INSERT OR IGNORE INTO leads (
+                id, campaign_id, name, phone, clean_phone, email,
+                budget_aed, objective, timeline, notes,
+                crm_status, whatsapp_status, personalized_message, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                l["id"],
+                "campaign_demo_studios",
+                l["name"],
+                l["phone"],
+                l["clean_phone"],
+                l["email"],
+                l["budget_aed"],
+                l["objective"],
+                l["timeline"],
+                l["notes"],
+                l["crm_status"],
+                l["whatsapp_status"],
+                l["personalized_message"],
+                "2026-09-11 12:00:00"
+            ))
+    except Exception as e:
+        print("[CRM DB] Notice seeding Demo leads:", e)
 
     conn.commit()
 
@@ -443,7 +515,7 @@ def update_lead_crm_fields(lead_id: str, updates: Dict[str, Any]) -> bool:
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    allowed = ["name", "email", "budget_aed", "budget_eur", "objective", "timeline", "notes", "crm_status", "next_reminder_date"]
+    allowed = ["name", "phone", "clean_phone", "email", "budget_aed", "budget_eur", "objective", "timeline", "notes", "crm_status", "next_reminder_date"]
     set_clauses = []
     values = []
     for k, v in updates.items():
