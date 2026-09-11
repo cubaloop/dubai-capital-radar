@@ -1082,7 +1082,7 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
         # 1. PRIMARY: Groq (con los modelos activos actuales en la plataforma)
         if groq_key:
             import re
-            active_groq_models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192", "mixtral-8x7b-32768"]
+            active_groq_models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b", "groq/compound"]
             for attempt in range(2):
                 if attempt > 0:
                     await asyncio.sleep(1)
@@ -1126,12 +1126,12 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
                 if reply_msg:
                     break
 
-        # 2. FALLBACK: Gemini (respaldo activo si Groq falla)
+        # 2. FALLBACK: Gemini (respaldo activo garantizado con modelos verificados)
         if not reply_msg and gemini_key:
             hist_text = "\n".join([f"{'Jota' if t['role'] in ['assistant', 'model', 'jota'] else 'David'}: {t['content']}" for t in past_history])
             gem_prompt = f"{system_prompt}\n\nHISTORIAL DE CONVERSACIÓN RECIENTE:\n{hist_text}\n\nMENSAJE ACTUAL DE DAVID:\n{text}\n\nResponde como Jota (ejecutivo, experto, natural, en el idioma solicitado o en el que te escribe David, formato WhatsApp):"
 
-            for gem_model in ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro"]:
+            for gem_model in ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-flash-latest", "gemini-3.5-flash"]:
                 try:
                     async with httpx.AsyncClient(timeout=15.0) as client:
                         gem_payload = {
@@ -1585,7 +1585,7 @@ async def copilot_voice_interact(payload: Dict[str, Any]):
         )
         
         if groq_key:
-            for model in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]:
+            for model in ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]:
                 try:
                     async with httpx.AsyncClient(timeout=10.0) as client:
                         res = await client.post(
