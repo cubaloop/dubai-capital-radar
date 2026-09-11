@@ -127,36 +127,35 @@ async def debug_test_groq():
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
     results = {"groq_key_prefix": groq_key[:12] if groq_key else None, "gemini_key_prefix": gemini_key[:12] if gemini_key else None}
     
-    groq_models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
-    groq_results = {}
     if groq_key:
-        for m in groq_models:
-            try:
-                async with httpx.AsyncClient(timeout=8.0) as client:
-                    r = await client.post(
-                        "https://api.groq.com/openai/v1/chat/completions",
-                        json={"model": m, "messages": [{"role": "user", "content": "Hola"}], "max_tokens": 10},
-                        headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
-                    )
-                    groq_results[m] = {"status": r.status_code, "body": r.json() if r.status_code == 200 else r.text[:200]}
-            except Exception as e:
-                groq_results[m] = {"error": str(e)}
-    results["groq_tests"] = groq_results
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                r = await client.get(
+                    "https://api.groq.com/openai/v1/models",
+                    headers={"Authorization": f"Bearer {groq_key}"}
+                )
+                if r.status_code == 200:
+                    models_data = r.json().get("data", [])
+                    results["groq_available_models"] = [m["id"] for m in models_data]
+                else:
+                    results["groq_models_error"] = f"HTTP {r.status_code}: {r.text[:200]}"
+        except Exception as e:
+            results["groq_models_error"] = str(e)
 
-    gem_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash"]
-    gem_results = {}
     if gemini_key:
-        for gm in gem_models:
-            try:
-                async with httpx.AsyncClient(timeout=8.0) as client:
-                    r = await client.post(
-                        f"https://generativelanguage.googleapis.com/v1beta/models/{gm}:generateContent?key={gemini_key}",
-                        json={"contents": [{"parts": [{"text": "Hola"}]}]}
-                    )
-                    gem_results[gm] = {"status": r.status_code, "body": r.json() if r.status_code == 200 else r.text[:200]}
-            except Exception as e:
-                gem_results[gm] = {"error": str(e)}
-    results["gemini_tests"] = gem_results
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                r = await client.get(
+                    f"https://generativelanguage.googleapis.com/v1beta/models?key={gemini_key}"
+                )
+                if r.status_code == 200:
+                    gem_models = r.json().get("models", [])
+                    results["gemini_available_models"] = [m["name"] for m in gem_models if "generateContent" in m.get("supportedGenerationMethods", [])]
+                else:
+                    results["gemini_models_error"] = f"HTTP {r.status_code}: {r.text[:200]}"
+        except Exception as e:
+            results["gemini_models_error"] = str(e)
+            
     return results
 
 @app.post("/api/whatsapp/reset-contact-session")
