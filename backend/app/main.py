@@ -1294,13 +1294,16 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
             INGESTED_PROJECTS_FEED.insert(0, parsed_project)
             print(f"[Auto-Ingestion] New project parsed from Super-Admin: {parsed_project.get('project_name')} by {parsed_project.get('developer')}")
 
+            price_val = parsed_project.get('starting_price_aed')
+            price_display = f"{price_val:,} AED" if isinstance(price_val, (int, float)) and price_val > 0 else "Consultar"
+
             admin_notice = (
                 f"🏗️ *Nuevo Proyecto Ingestado Automáticamente*\n\n"
-                f"• *Proyecto:* {parsed_project.get('project_name')}\n"
-                f"• *Desarrolladora:* {parsed_project.get('developer')}\n"
-                f"• *Precio desde:* {parsed_project.get('starting_price_aed'):,} AED\n"
-                f"• *Plan de Pago:* {parsed_project.get('payment_plan')}\n"
-                f"• *Resumen:* {parsed_project.get('short_summary')}\n\n"
+                f"• *Proyecto:* {parsed_project.get('project_name') or 'Nuevo Desarrollo'}\n"
+                f"• *Desarrolladora:* {parsed_project.get('developer') or 'Líder Dubai'}\n"
+                f"• *Precio desde:* {price_display}\n"
+                f"• *Plan de Pago:* {parsed_project.get('payment_plan') or 'Por confirmar'}\n"
+                f"• *Resumen:* {parsed_project.get('short_summary') or 'Oportunidad de inversión'}\n\n"
                 f"✅ _Indexado en el inventario para tus agentes de IA._"
             )
             await dispatch_whatsapp_direct(to_phone=ADMIN_PHONE_DIGITS, message=admin_notice, bypass_shield=True)
