@@ -1455,22 +1455,29 @@ async def simulate_lead_inquiry(payload: Dict[str, Any]):
     requirements = extract_property_requirements(text)
     matches = find_matching_projects(requirements, INGESTED_PROJECTS_FEED)
     
-    dummy_lead = {"name": lead_name, "phone": phone, "whatsapp_status": "sent"}
-    lead_reply, david_alert = await generate_david_response(
-        incoming_text=text,
-        lead=dummy_lead,
-        prior_notes=[],
-        requirements=requirements,
-        matches=matches
-    )
-    
-    return {
-        "text": text,
-        "requirements": requirements,
-        "matches": matches,
-        "lead_reply": lead_reply,
-        "david_alert": david_alert
-    }
+    try:
+        dummy_lead = {"name": lead_name, "phone": phone, "whatsapp_status": "sent"}
+        mentions_jota = "jota" in text.lower()
+        lead_reply, david_alert = await generate_david_response(
+            incoming_text=text,
+            lead=dummy_lead,
+            prior_notes=[],
+            requirements=requirements,
+            matches=matches,
+            as_jota_assistant=mentions_jota,
+            is_first_jota_mention=mentions_jota
+        )
+        
+        return {
+            "text": text,
+            "requirements": requirements,
+            "matches": matches,
+            "lead_reply": lead_reply,
+            "david_alert": david_alert
+        }
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc()}
 
 @app.get("/api/inventory/ingested-launches")
 def get_ingested_launches():
