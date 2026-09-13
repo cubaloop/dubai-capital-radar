@@ -1112,7 +1112,7 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
         # 1. PRIMARY: Groq (con los modelos activos actuales en la plataforma)
         if groq_key:
             import re
-            active_groq_models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b", "groq/compound"]
+            active_groq_models = ["qwen/qwen3.8-27b", "groq/compound", "openai/gpt-oss-120b", "openai/gpt-oss-20b"]
             for attempt in range(2):
                 if attempt > 0:
                     await asyncio.sleep(1)
@@ -1136,7 +1136,11 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
                                 headers=headers
                             )
                             if r.status_code == 200:
-                                raw_ans = r.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                                choice_msg = r.json().get("choices", [{}])[0].get("message", {})
+                                raw_ans = (choice_msg.get("content") or "").strip()
+                                # Fallback if model placed answer in reasoning/thought field
+                                if not raw_ans and choice_msg.get("reasoning"):
+                                    raw_ans = choice_msg.get("reasoning", "").strip()
                                 # Clean internal thinking tags if model outputs chain-of-thought
                                 clean_ans = re.sub(r"<think>.*?</think>", "", raw_ans, flags=re.DOTALL).strip()
                                 if clean_ans:
@@ -1161,7 +1165,7 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
             hist_text = "\n".join([f"{'Jota' if t['role'] in ['assistant', 'model', 'jota'] else 'David'}: {t['content']}" for t in past_history])
             gem_prompt = f"{system_prompt}\n\nHISTORIAL DE CONVERSACIÓN RECIENTE:\n{hist_text}\n\nMENSAJE ACTUAL DE DAVID:\n{text}\n\nResponde como Jota (ejecutivo, experto, natural, en el idioma solicitado o en el que te escribe David, formato WhatsApp):"
 
-            for gem_model in ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-flash-latest", "gemini-3.5-flash"]:
+            for gem_model in ["gemini-3.6-flash", "gemini-flash-latest"]:
                 try:
                     async with httpx.AsyncClient(timeout=15.0) as client:
                         gem_payload = {
