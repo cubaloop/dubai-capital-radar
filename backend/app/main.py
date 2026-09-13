@@ -155,6 +155,36 @@ async def debug_test_groq():
                     results["gemini_models_error"] = f"HTTP {r.status_code}: {r.text[:200]}"
         except Exception as e:
             results["gemini_models_error"] = str(e)
+    # Test Chat Completion on Groq
+    if groq_key:
+        chat_tests = {}
+        for m in ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b", "groq/compound"]:
+            try:
+                async with httpx.AsyncClient(timeout=8.0) as client:
+                    r = await client.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        json={"model": m, "messages": [{"role": "user", "content": "Hola"}], "max_tokens": 10},
+                        headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
+                    )
+                    chat_tests[m] = {"status": r.status_code, "body": r.json() if r.status_code == 200 else r.text[:300]}
+            except Exception as e:
+                chat_tests[m] = {"exception": str(e)}
+        results["groq_chat_tests"] = chat_tests
+
+    # Test Gemini Generate Content
+    if gemini_key:
+        gem_chat_tests = {}
+        for gm in ["gemini-2.5-flash", "gemini-flash-latest"]:
+            try:
+                async with httpx.AsyncClient(timeout=8.0) as client:
+                    r = await client.post(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{gm}:generateContent?key={gemini_key}",
+                        json={"contents": [{"parts": [{"text": "Hola"}]}]}
+                    )
+                    gem_chat_tests[gm] = {"status": r.status_code, "body": r.json() if r.status_code == 200 else r.text[:300]}
+            except Exception as e:
+                gem_chat_tests[gm] = {"exception": str(e)}
+        results["gemini_chat_tests"] = gem_chat_tests
             
     return results
 
