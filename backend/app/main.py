@@ -1268,14 +1268,13 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     if is_group or "@g.us" in jid or "broadcast" in jid:
         return {"status": "ignored", "reason": "group_or_broadcast_ignored"}
 
-    # 0. SUPER-ADMIN COPILOT MODE (+971508379080, "Jota" wake word, or pushName David)
+    # 0. SUPER-ADMIN COPILOT MODE (Exclusive for David's Admin Phone: +971508379080)
     push_name = (payload.get("push_name") or "").lower()
     is_admin = (
         sender == ADMIN_PHONE_DIGITS or 
         "508379080" in sender or 
         sender.endswith("508379080") or 
         "508379080" in jid or
-        "jota" in text.lower() or
         "david" in push_name
     )
 
@@ -1357,13 +1356,22 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     matches = find_matching_projects(requirements, INGESTED_PROJECTS_FEED)
     prior_notes = get_lead_notes_db(lid)
 
-    # 2. Generate personalized response as David (first person, thread continuity) + David briefing
+    # Check if client mentioned "Jota" in this message or previously
+    mentions_jota = "jota" in text.lower()
+    had_previous_jota_interaction = any("jota" in (n.get("content") or "").lower() for n in prior_notes)
+    
+    as_jota_assistant = mentions_jota or had_previous_jota_interaction
+    is_first_jota_mention = mentions_jota and not had_previous_jota_interaction
+
+    # 2. Generate personalized response (as Jota assistant or David) + David briefing
     lead_reply, david_alert = await generate_david_response(
         incoming_text=text,
         lead=dict(matched_lead),
         prior_notes=prior_notes,
         requirements=requirements,
-        matches=matches
+        matches=matches,
+        as_jota_assistant=as_jota_assistant,
+        is_first_jota_mention=is_first_jota_mention
     )
 
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -1398,14 +1406,15 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     print(f"[CRM Auto-Update] Lead '{lead_name}' (+{sender}) updated: status={new_crm_status}, note='{summary}'")
 
     # 3. Deliver lead reply via WhatsApp (simulate natural typing pause of 4s)
+    author_label = "Jota (Asistente de David)" if as_jota_assistant else "David (IA Autopilot)"
     async def dispatch_client_reply(target_phone: str, reply_msg: str, lead_id: str):
         try:
             await asyncio.sleep(4)  # Natural human pause
             res = await dispatch_whatsapp_direct(to_phone=target_phone, message=reply_msg, bypass_shield=True)
-            print(f"[David Copilot] Delivered reply to client {target_phone}: {res.get('success')}")
-            add_lead_note_db(lead_id, author="David (IA Autopilot)", content=f"🤖 [Respuesta como David]:\n{reply_msg}", note_type="whatsapp")
+            print(f"[Client Reply] Delivered reply to client {target_phone}: {res.get('success')}")
+            add_lead_note_db(lead_id, author=author_label, content=f"🤖 [{author_label}]:\n{reply_msg}", note_type="whatsapp")
         except Exception as e:
-            print(f"[David Copilot] Error delivering reply to {target_phone}: {e}")
+            print(f"[Client Reply] Error delivering reply to {target_phone}: {e}")
 
     asyncio.create_task(dispatch_client_reply(sender, lead_reply, lid))
 

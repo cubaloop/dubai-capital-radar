@@ -191,12 +191,17 @@ async def generate_david_response(
     lead: Dict[str, Any],
     prior_notes: List[Dict[str, Any]],
     requirements: Dict[str, Any],
-    matches: List[Dict[str, Any]]
+    matches: List[Dict[str, Any]],
+    as_jota_assistant: bool = False,
+    is_first_jota_mention: bool = False
 ) -> Tuple[str, str]:
     """
     Generates:
-    1. The first-person WhatsApp response to the lead as David (no re-introduction).
-    2. The private executive briefing message for David's personal WhatsApp.
+    1. WhatsApp response:
+       - If as_jota_assistant and is_first_jota_mention: introduces as Jota, David's AI Assistant at H.O.M.E Properties.
+       - If as_jota_assistant (subsequent): responds as Jota helping and guiding the client on David's behalf.
+       - Otherwise: responds as David directly.
+    2. Executive briefing message for David's personal WhatsApp.
     """
     lead_name = lead.get("name", "Cliente").strip()
     first_name = lead_name.split()[0] if lead_name else "Amigo"
@@ -213,7 +218,31 @@ async def generate_david_response(
         price_eur = round(m.get("starting_price_aed", 0) / 4.05, 0)
         matches_summary += f"{idx}. {m.get('name')} ({m.get('developer')}) en {m.get('location')} - Desde {m.get('starting_price_aed', 0):,} AED (~{price_eur:,.0f} €). Entrega: {m.get('completion_date')}. Plan: {m.get('payment_plan')}.\n"
 
-    system_prompt = f"""Eres David, Broker Senior de Real Estate e Inversiones en H.O.M.E Properties en Dubai.
+    if as_jota_assistant:
+        if is_first_jota_mention:
+            intro_rule = 'Es la primera vez que este cliente se dirige a ti por tu nombre. DEBES presentarte amablemente diciendo: "¡Hola [Nombre]! Soy Jota, el asistente de David en H.O.M.E Properties Dubai." y a continuación orientarlo y responder de inmediato a su consulta.'
+        else:
+            intro_rule = 'El cliente ya te conoce como Jota (asistente de David). NO te vuelvas a presentar formalmente; responde de forma directa, ágil y servicial como Jota guiando al cliente en lo que necesite o en inversiones en Dubai.'
+
+        system_prompt = f"""Eres JOTA, el Asistente Inteligente de David (Broker Senior de H.O.M.E Properties en Dubai).
+Estás atendiendo a un cliente por WhatsApp que ha escrito al chat de David.
+
+REGLAS DE CONVERSACIÓN:
+1. IDENTIDAD:
+   - {intro_rule}
+   - Hablas como el asistente de David: profesional, empático, ágil, altamente capacitado en bienes raíces de Dubai.
+   - Si el cliente hace preguntas sobre el mercado, proyectos, precios o zonas, oriéntalo con precisión técnica y comercial.
+2. CONTINUIDAD Y TRATO:
+   - Trato cordial y ejecutivo en español (o en el idioma en que escriba el cliente).
+   - Menciona que estás a su disposición para coordinar con David cualquier detalle, visita o llamada.
+3. CONSULTA DE PROPIEDADES:
+   - Si el cliente pregunta por opciones (ej. 1 habitación, villas, presupuesto):
+     Oriéntalo con las opciones disponibles (~{requirements.get('budget_aed', 0):,.0f} AED) y dile que David y tú le tienen preparadas las mejores alternativas para revisarlas.
+4. FORMATO:
+   - Máximo 2 párrafos concisos y elegantes para WhatsApp.
+"""
+    else:
+        system_prompt = f"""Eres David, Broker Senior de Real Estate e Inversiones en H.O.M.E Properties en Dubai.
 Estás chateando DIRECTAMENTE con un cliente por WhatsApp. Hablas en PRIMERA PERSONA ("yo", "te busco", "te paso").
 
 REGLAS CRÍTICAS DE CONVERSACIÓN:
@@ -244,13 +273,13 @@ Datos extraídos del pedido:
 - Opciones detectadas en tu inventario:
 {matches_summary if matches_summary else "Inventario general de Dubai disponible."}
 
-Redacta tu respuesta como David para enviársela por WhatsApp al cliente:"""
+Redacta tu respuesta para enviársela por WhatsApp al cliente:"""
 
     lead_reply = ""
 
-    # 1. Generate Lead Reply via Groq
+    # 1. Generate Lead Reply via Groq (fast models first with reasoning fallback)
     if groq_key:
-        for model in ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"]:
+        for model in ["qwen/qwen3.8-27b", "groq/compound", "openai/gpt-oss-120b", "openai/gpt-oss-20b"]:
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
                     res = await client.post(
@@ -262,12 +291,15 @@ Redacta tu respuesta como David para enviársela por WhatsApp al cliente:"""
                                 {"role": "user", "content": user_prompt}
                             ],
                             "temperature": 0.35,
-                            "max_tokens": 300
+                            "max_tokens": 350
                         },
                         headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
                     )
                     if res.status_code == 200:
-                        raw = res.json()["choices"][0]["message"]["content"].strip()
+                        choice_msg = res.json().get("choices", [{}])[0].get("message", {})
+                        raw = (choice_msg.get("content") or "").strip()
+                        if not raw and choice_msg.get("reasoning"):
+                            raw = choice_msg.get("reasoning", "").strip()
                         raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
                         if raw:
                             lead_reply = raw
@@ -277,7 +309,7 @@ Redacta tu respuesta como David para enviársela por WhatsApp al cliente:"""
 
     # 2. Fallback via Gemini
     if not lead_reply and gemini_key:
-        for g_model in ["gemini-2.5-flash", "gemini-flash-latest"]:
+        for g_model in ["gemini-3.6-flash", "gemini-flash-latest"]:
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
                     res = await client.post(
@@ -285,9 +317,13 @@ Redacta tu respuesta como David para enviársela por WhatsApp al cliente:"""
                         json={"contents": [{"parts": [{"text": f"{system_prompt}\n\n{user_prompt}"}]}]}
                     )
                     if res.status_code == 200:
-                        lead_reply = res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-                        if lead_reply:
-                            break
+                        cand = res.json().get("candidates", [])
+                        if cand:
+                            parts = cand[0].get("content", {}).get("parts", [])
+                            if parts and parts[0].get("text"):
+                                lead_reply = parts[0]["text"].strip()
+                                if lead_reply:
+                                    break
             except Exception:
                 continue
 
