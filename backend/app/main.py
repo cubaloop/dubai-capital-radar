@@ -1280,44 +1280,43 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
 
     if is_admin:
         print(f"[ADMIN COPILOT] Message from Super-Admin ({sender} | JID: {jid}): '{text}'")
-        # Check if sending a developer launch brochure or asking a system question
-        if not is_developer_or_launch_message(text, is_group=False):
-            asyncio.create_task(handle_admin_copilot(text, sender_jid=jid, sender_phone=sender))
-            return {"status": "copilot_dispatched_async"}
+        # Check if Super-Admin specifically sent a developer launch brochure (contains PDF or long brochure text)
+        if (payload.get("has_document") or len(text) > 200) and is_developer_or_launch_message(text, is_group=False):
+            try:
+                parsed_project = await parse_project_from_text(text)
+                if parsed_project:
+                    parsed_project["sender"] = sender
+                    parsed_project["is_group"] = False
+                    parsed_project["detected_at"] = payload.get("timestamp")
+                    INGESTED_PROJECTS_FEED.insert(0, parsed_project)
+                    print(f"[Auto-Ingestion] New project parsed from Super-Admin: {parsed_project.get('project_name')} by {parsed_project.get('developer')}")
 
-        # If Super-Admin sends a new developer launch brochure
-        parsed_project = await parse_project_from_text(text)
-        if parsed_project:
-            parsed_project["sender"] = sender
-            parsed_project["is_group"] = False
-            parsed_project["detected_at"] = payload.get("timestamp")
-            INGESTED_PROJECTS_FEED.insert(0, parsed_project)
-            print(f"[Auto-Ingestion] New project parsed from Super-Admin: {parsed_project.get('project_name')} by {parsed_project.get('developer')}")
+                    price_val = parsed_project.get('starting_price_aed')
+                    price_display = f"{price_val:,} AED" if isinstance(price_val, (int, float)) and price_val > 0 else "Consultar"
 
-            price_val = parsed_project.get('starting_price_aed')
-            price_display = f"{price_val:,} AED" if isinstance(price_val, (int, float)) and price_val > 0 else "Consultar"
+                    admin_notice = (
+                        f"🏗️ *Nuevo Proyecto Ingestado Automáticamente*\n\n"
+                        f"• *Proyecto:* {parsed_project.get('project_name') or 'Nuevo Desarrollo'}\n"
+                        f"• *Desarrolladora:* {parsed_project.get('developer') or 'Líder Dubai'}\n"
+                        f"• *Precio desde:* {price_display}\n"
+                        f"• *Plan de Pago:* {parsed_project.get('payment_plan') or 'Por confirmar'}\n"
+                        f"• *Resumen:* {parsed_project.get('short_summary') or 'Oportunidad de inversión'}\n\n"
+                        f"✅ _Indexado en el inventario para tus agentes de IA._"
+                    )
+                    await dispatch_whatsapp_direct(to_phone=ADMIN_PHONE_DIGITS, message=admin_notice, bypass_shield=True)
 
-            admin_notice = (
-                f"🏗️ *Nuevo Proyecto Ingestado Automáticamente*\n\n"
-                f"• *Proyecto:* {parsed_project.get('project_name') or 'Nuevo Desarrollo'}\n"
-                f"• *Desarrolladora:* {parsed_project.get('developer') or 'Líder Dubai'}\n"
-                f"• *Precio desde:* {price_display}\n"
-                f"• *Plan de Pago:* {parsed_project.get('payment_plan') or 'Por confirmar'}\n"
-                f"• *Resumen:* {parsed_project.get('short_summary') or 'Oportunidad de inversión'}\n\n"
-                f"✅ _Indexado en el inventario para tus agentes de IA._"
-            )
-            await dispatch_whatsapp_direct(to_phone=ADMIN_PHONE_DIGITS, message=admin_notice, bypass_shield=True)
+                    return {
+                        "status": "project_ingested",
+                        "project_name": parsed_project.get("project_name"),
+                        "developer": parsed_project.get("developer"),
+                        "starting_price_aed": parsed_project.get("starting_price_aed")
+                    }
+            except Exception as e:
+                print(f"[Auto-Ingestion Error]: {e}")
 
-            return {
-                "status": "project_ingested",
-                "project_name": parsed_project.get("project_name"),
-                "developer": parsed_project.get("developer"),
-                "starting_price_aed": parsed_project.get("starting_price_aed")
-            }
-        else:
-            # Fallback: if message contained developer keywords but was actually a question from David
-            asyncio.create_task(handle_admin_copilot(text, sender_jid=jid, sender_phone=sender))
-            return {"status": "copilot_dispatched_async"}
+        # By default, any conversation or question from Super-Admin goes straight to Jota Copilot
+        asyncio.create_task(handle_admin_copilot(text, sender_jid=jid, sender_phone=sender))
+        return {"status": "copilot_dispatched_async"}
 
     # SENDER IS A CLIENT / PROSPECT (Direct 1-on-1 private WhatsApp message)
     sender_digits = "".join([c for c in sender if c.isdigit()])
