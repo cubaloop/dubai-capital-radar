@@ -218,6 +218,11 @@ async def generate_david_response(
         price_eur = round(m.get("starting_price_aed", 0) / 4.05, 0)
         matches_summary += f"{idx}. {m.get('name')} ({m.get('developer')}) en {m.get('location')} - Desde {m.get('starting_price_aed', 0):,} AED (~{price_eur:,.0f} €). Entrega: {m.get('completion_date')}. Plan: {m.get('payment_plan')}.\n"
 
+    budget_num = requirements.get('budget_aed') or 0.0
+    raw_amount_num = requirements.get('raw_amount') or 0.0
+    budget_aed_str = f"~{budget_num:,.0f} AED" if budget_num else "A definir"
+    raw_amount_str = f"{raw_amount_num:,.0f} {requirements.get('currency', 'EUR')}" if raw_amount_num else "A definir"
+
     if as_jota_assistant:
         if is_first_jota_mention:
             intro_rule = 'Es la primera vez que este cliente se dirige a ti por tu nombre. DEBES presentarte amablemente diciendo: "¡Hola [Nombre]! Soy Jota, el asistente de David en H.O.M.E Properties Dubai." y a continuación orientarlo y responder de inmediato a su consulta.'
@@ -237,7 +242,7 @@ REGLAS DE CONVERSACIÓN:
    - Menciona que estás a su disposición para coordinar con David cualquier detalle, visita o llamada.
 3. CONSULTA DE PROPIEDADES:
    - Si el cliente pregunta por opciones (ej. 1 habitación, villas, presupuesto):
-     Oriéntalo con las opciones disponibles (~{requirements.get('budget_aed', 0):,.0f} AED) y dile que David y tú le tienen preparadas las mejores alternativas para revisarlas.
+     Oriéntalo con las opciones disponibles ({budget_aed_str}) y dile que David y tú le tienen preparadas las mejores alternativas para revisarlas.
 4. FORMATO:
    - Máximo 2 párrafos concisos y elegantes para WhatsApp.
 """
@@ -254,7 +259,7 @@ REGLAS CRÍTICAS DE CONVERSACIÓN:
    - Trato de tú a tú cordial, estilo broker de confianza en Dubai.
 3. CONSULTA DE PROPIEDADES:
    - Si el cliente pide opciones (ej. 1 habitación por 1M € o similar):
-     Confírmale que tienes justo un par de opciones excelentes en mente que encajan con ese presupuesto y zona (~{requirements.get('budget_aed', 0):,.0f} AED), y dile que en unos minutos le envías las fichas/brochures completos por aquí para que los revise con calma.
+     Confírmale que tienes justo un par de opciones excelentes en mente que encajan con ese presupuesto y zona ({budget_aed_str}), y dile que en unos minutos le envías las fichas/brochures completos por aquí para que los revise con calma.
 4. FORMATO:
    - Máximo 2 párrafos cortos (estás en WhatsApp).
    - Usa formato limpio.
@@ -268,8 +273,8 @@ Historial previo con este cliente:
 
 Datos extraídos del pedido:
 - Tipología: {requirements.get('typology')}
-- Presupuesto original: {requirements.get('raw_amount')} {requirements.get('currency')}
-- Equivalente en Dubai: ~{requirements.get('budget_aed', 0):,.0f} AED
+- Presupuesto original: {raw_amount_str}
+- Equivalente en Dubai: {budget_aed_str}
 - Opciones detectadas en tu inventario:
 {matches_summary if matches_summary else "Inventario general de Dubai disponible."}
 
@@ -329,8 +334,10 @@ Redacta tu respuesta para enviársela por WhatsApp al cliente:"""
 
     # Fallback template if LLMs fail
     if not lead_reply:
-        if requirements.get("has_property_request"):
-            lead_reply = f"¡Hola {first_name}! Justo estoy revisando un par de opciones excelentes en {requirements.get('typology', 'propiedades')} que encajan perfecto con ese presupuesto (~{requirements.get('budget_aed', 0):,.0f} AED). Ya te las estoy preparando y en breve te paso las fichas completas por aquí para que las revises con calma."
+        if as_jota_assistant and is_first_jota_mention:
+            lead_reply = f"¡Hola {first_name}! Soy Jota, el asistente de David en H.O.M.E Properties Dubai. Recibí tu consulta con gusto. Ya mismo estoy revisando las mejores alternativas para ti y en breve te pasamos todos los detalles por aquí."
+        elif requirements.get("has_property_request"):
+            lead_reply = f"¡Hola {first_name}! Justo estoy revisando un par de opciones excelentes en {requirements.get('typology', 'propiedades')} que encajan perfecto con ese presupuesto ({budget_aed_str}). Ya te las estoy preparando y en breve te paso las fichas completas por aquí para que las revises con calma."
         else:
             lead_reply = f"¡Hola {first_name}! Recibido perfectamente. Ya lo reviso y en breve te doy respuesta con toda la información."
 
@@ -343,8 +350,8 @@ Redacta tu respuesta para enviársela por WhatsApp al cliente:"""
         david_alert += "🔍 *Parámetros Detectados por Jota:*\n"
         if requirements.get('typology') != 'Unknown':
             david_alert += f"• *Tipología:* {requirements.get('typology')}\n"
-        if requirements.get('raw_amount'):
-            david_alert += f"• *Presupuesto:* {requirements.get('raw_amount'):,.0f} {requirements.get('currency')} (~{requirements.get('budget_aed', 0):,.0f} AED)\n"
+        if raw_amount_num:
+            david_alert += f"• *Presupuesto:* {raw_amount_num:,.0f} {requirements.get('currency')} ({budget_aed_str})\n"
         if requirements.get('locations'):
             david_alert += f"• *Zonas:* {', '.join(requirements.get('locations'))}\n"
 
