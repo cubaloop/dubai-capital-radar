@@ -1326,21 +1326,21 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     )
     matched_lead = cursor.fetchone()
 
-    # If lead not registered yet in CRM, auto-capture from direct private chat!
+    # If lead not registered yet in CRM, auto-capture from direct private chat as a NEW PROSPECT!
     if not matched_lead:
-        push_name_lead = payload.get("push_name") or f"Inbound +{sender}"
+        push_name_lead = payload.get("push_name") or f"Prospecto +{sender}"
         lead_id = f"inbound_{sender_digits[-8:]}_{int(datetime.now().timestamp())}"
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         cursor.execute("""
-        INSERT INTO leads (id, name, phone, clean_phone, crm_status, whatsapp_status, last_contact_date, notes)
-        VALUES (?, ?, ?, ?, 'INTERESTED', 'replied', ?, ?)
-        """, (lead_id, push_name_lead, f"+{sender}", sender_digits, now_str, f"Lead directo WhatsApp: {text}"))
+        INSERT INTO leads (id, name, phone, clean_phone, crm_status, whatsapp_status, last_contact_date, notes, campaign_id)
+        VALUES (?, ?, ?, ?, 'INTERESTED', 'replied', ?, ?, 'inbound_prospects')
+        """, (lead_id, push_name_lead, f"+{sender}", sender_digits, now_str, f"Prospecto directo WhatsApp: {text}"))
         conn.commit()
         
         cursor.execute("SELECT * FROM leads WHERE id = ?", (lead_id,))
         matched_lead = cursor.fetchone()
-        print(f"[Inbound Lead Auto-Created] Created lead '{push_name_lead}' (+{sender}) from direct WhatsApp message.")
+        print(f"[Inbound Prospect Auto-Created] Created lead/prospect '{push_name_lead}' (+{sender}) from non-admin WhatsApp message.")
 
     # SENDER IS A REGISTERED LEAD: Process intent & update CRM records
     lid = matched_lead["id"]
