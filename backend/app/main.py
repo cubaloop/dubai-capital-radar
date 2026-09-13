@@ -1311,6 +1311,10 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
                 "developer": parsed_project.get("developer"),
                 "starting_price_aed": parsed_project.get("starting_price_aed")
             }
+        else:
+            # Fallback: if message contained developer keywords but was actually a question from David
+            asyncio.create_task(handle_admin_copilot(text, sender_jid=jid, sender_phone=sender))
+            return {"status": "copilot_dispatched_async"}
 
     # SENDER IS A CLIENT / PROSPECT (Direct 1-on-1 private WhatsApp message)
     sender_digits = "".join([c for c in sender if c.isdigit()])
@@ -1332,10 +1336,16 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
         lead_id = f"inbound_{sender_digits[-8:]}_{int(datetime.now().timestamp())}"
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
+        # Ensure default inbound campaign exists to avoid any foreign key constraint errors
         cursor.execute("""
-        INSERT INTO leads (id, name, phone, clean_phone, crm_status, whatsapp_status, last_contact_date, notes, campaign_id)
-        VALUES (?, ?, ?, ?, 'INTERESTED', 'replied', ?, ?, 'inbound_prospects')
-        """, (lead_id, push_name_lead, f"+{sender}", sender_digits, now_str, f"Prospecto directo WhatsApp: {text}"))
+        INSERT OR IGNORE INTO campaigns (id, name, category, description, created_at)
+        VALUES ('inbound_prospects', 'Prospectos Inbound WhatsApp', 'whatsapp', 'Captura automática de prospectos entrantes', ?)
+        """, (now_str,))
+
+        cursor.execute("""
+        INSERT INTO leads (id, name, phone, clean_phone, crm_status, whatsapp_status, last_contact_date, notes, campaign_id, created_at)
+        VALUES (?, ?, ?, ?, 'INTERESTED', 'replied', ?, ?, 'inbound_prospects', ?)
+        """, (lead_id, push_name_lead, f"+{sender}", sender_digits, now_str, f"Prospecto directo WhatsApp: {text}", now_str))
         conn.commit()
         
         cursor.execute("SELECT * FROM leads WHERE id = ?", (lead_id,))
@@ -1407,16 +1417,16 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
 
     # 3. Deliver lead reply via WhatsApp (simulate natural typing pause of 4s)
     author_label = "Jota (Asistente de David)" if as_jota_assistant else "David (IA Autopilot)"
-    async def dispatch_client_reply(target_phone: str, reply_msg: str, lead_id: str):
+    async def dispatch_client_reply(target_phone: str, reply_msg: str, lead_id: str, client_jid: str = ""):
         try:
             await asyncio.sleep(4)  # Natural human pause
-            res = await dispatch_whatsapp_direct(to_phone=target_phone, message=reply_msg, bypass_shield=True)
-            print(f"[Client Reply] Delivered reply to client {target_phone}: {res.get('success')}")
+            res = await dispatch_whatsapp_direct(to_phone=target_phone, message=reply_msg, bypass_shield=True, target_jid=client_jid)
+            print(f"[Client Reply] Delivered reply to client {target_phone} ({client_jid}): {res.get('success')}")
             add_lead_note_db(lead_id, author=author_label, content=f"🤖 [{author_label}]:\n{reply_msg}", note_type="whatsapp")
         except Exception as e:
             print(f"[Client Reply] Error delivering reply to {target_phone}: {e}")
 
-    asyncio.create_task(dispatch_client_reply(sender, lead_reply, lid))
+    asyncio.create_task(dispatch_client_reply(sender, lead_reply, lid, client_jid=jid))
 
     # 4. Deliver private executive briefing to David's personal WhatsApp (+971508379080)
     await dispatch_whatsapp_direct(to_phone=ADMIN_PHONE_DIGITS, message=david_alert, bypass_shield=True)
