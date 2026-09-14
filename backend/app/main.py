@@ -1368,23 +1368,36 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     matches = find_matching_projects(requirements, INGESTED_PROJECTS_FEED)
     prior_notes = get_lead_notes_db(lid)
 
-    # Check if client mentioned "Jota" in this message or previously
-    mentions_jota = "jota" in text.lower()
+    # Check if client explicitly mentioned "Jota" in this incoming message
+    # We use regex word boundary to prevent accidental triggers like "tarjeta" or "cuota"
+    mentions_jota = bool(re.search(r'\bjota\b', text, re.IGNORECASE))
     had_previous_jota_interaction = any("jota" in (n.get("content") or "").lower() for n in prior_notes)
     
-    as_jota_assistant = mentions_jota or had_previous_jota_interaction
-    is_first_jota_mention = mentions_jota and not had_previous_jota_interaction
+    # CRITICAL RULE: Jota will ONLY answer external chats if they explicitly address him by name in this message.
+    # If Jota is not mentioned: record note in CRM, notify David privately, but DO NOT dispatch any message to the client.
+    as_jota_assistant = True
+    is_first_jota_mention = not had_previous_jota_interaction
 
-    # 2. Generate personalized response (as Jota assistant or David) + David briefing
-    lead_reply, david_alert = await generate_david_response(
-        incoming_text=text,
-        lead=dict(matched_lead),
-        prior_notes=prior_notes,
-        requirements=requirements,
-        matches=matches,
-        as_jota_assistant=as_jota_assistant,
-        is_first_jota_mention=is_first_jota_mention
-    )
+    lead_reply = ""
+    david_alert = ""
+
+    if mentions_jota:
+        # 2. Generate personalized response as Jota assistant + David briefing
+        lead_reply, david_alert = await generate_david_response(
+            incoming_text=text,
+            lead=dict(matched_lead),
+            prior_notes=prior_notes,
+            requirements=requirements,
+            matches=matches,
+            as_jota_assistant=True,
+            is_first_jota_mention=is_first_jota_mention
+        )
+    else:
+        # If Jota was NOT summoned, create an executive alert for David so David is aware someone wrote
+        david_alert = f"📩 *NUEVO MENSAJE RECIBIDO (Sin invocar a Jota)*\n"
+        david_alert += f"👤 *De:* {lead_name} (+{sender})\n"
+        david_alert += f"💬 *Mensaje:* \"{text}\"\n\n"
+        david_alert += f"ℹ️ _Jota NO respondió este chat porque no fue mencionado su nombre. Puedes responder tú directamente._"
 
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     has_prop_req = requirements.get("has_property_request", False)
@@ -1417,21 +1430,25 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
 
     print(f"[CRM Auto-Update] Lead '{lead_name}' (+{sender}) updated: status={new_crm_status}, note='{summary}'")
 
-    # 3. Deliver lead reply via WhatsApp (simulate natural typing pause of 4s)
-    author_label = "Jota (Asistente de David)" if as_jota_assistant else "David (IA Autopilot)"
-    async def dispatch_client_reply(target_phone: str, reply_msg: str, lead_id: str, client_jid: str = ""):
-        try:
-            await asyncio.sleep(4)  # Natural human pause
-            res = await dispatch_whatsapp_direct(to_phone=target_phone, message=reply_msg, bypass_shield=True, target_jid=client_jid)
-            print(f"[Client Reply] Delivered reply to client {target_phone} ({client_jid}): {res.get('success')}")
-            add_lead_note_db(lead_id, author=author_label, content=f"🤖 [{author_label}]:\n{reply_msg}", note_type="whatsapp")
-        except Exception as e:
-            print(f"[Client Reply] Error delivering reply to {target_phone}: {e}")
+    # 3. Deliver lead reply via WhatsApp ONLY if mentions_jota is True
+    if mentions_jota and lead_reply:
+        author_label = "Jota (Asistente de David)"
+        async def dispatch_client_reply(target_phone: str, reply_msg: str, lead_id: str, client_jid: str = ""):
+            try:
+                await asyncio.sleep(4)  # Natural human pause
+                res = await dispatch_whatsapp_direct(to_phone=target_phone, message=reply_msg, bypass_shield=True, target_jid=client_jid)
+                print(f"[Client Reply] Delivered reply to client {target_phone} ({client_jid}): {res.get('success')}")
+                add_lead_note_db(lead_id, author=author_label, content=f"🤖 [{author_label}]:\n{reply_msg}", note_type="whatsapp")
+            except Exception as e:
+                print(f"[Client Reply] Error delivering reply to {target_phone}: {e}")
 
-    asyncio.create_task(dispatch_client_reply(sender, lead_reply, lid, client_jid=jid))
+        asyncio.create_task(dispatch_client_reply(sender, lead_reply, lid, client_jid=jid))
+    else:
+        print(f"[Client Reply Skipped] Non-admin message from {sender} did not mention 'jota'. No message dispatched to client.")
 
     # 4. Deliver private executive briefing to David's personal WhatsApp (+971508379080)
-    await dispatch_whatsapp_direct(to_phone=ADMIN_PHONE_DIGITS, message=david_alert, bypass_shield=True)
+    if david_alert:
+        await dispatch_whatsapp_direct(to_phone=ADMIN_PHONE_DIGITS, message=david_alert, bypass_shield=True)
 
     # 5. Telegram Alert for high intent or property inquiry
     is_hot = has_prop_req or intent in ["ready_to_buy", "interested", "scheduling", "objection_price", "objection_trust", "objection_spouse"] or urgency in ["high", "medium"]
@@ -1451,7 +1468,9 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
         "crm_updated": True,
         "intent": intent,
         "urgency": urgency,
-        "lead_reply": lead_reply,
+        "mentions_jota": mentions_jota,
+        "lead_reply_dispatched": bool(mentions_jota and lead_reply),
+        "lead_reply": lead_reply if mentions_jota else None,
         "david_alert_sent": True
     }
 
