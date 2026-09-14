@@ -61,9 +61,13 @@ async function uploadAuthToSupabase() {
     const files = fs.readdirSync(AUTH_DIR);
     if (!files.length) return;
 
-    // Bundle all auth files into one JSON payload for atomic persistence
+    // Bundle auth files into one JSON payload for atomic persistence.
+    // CRITICAL: Exclude session-* files. Signal session keys must NOT be synced to persistent cloud storage
+    // because after redeploys or restarts, stale contact session keys cause WhatsApp to display
+    // "Esperando mensaje. Esto puede tomar tiempo" (waiting for message) on the recipient phone.
     const bundle = {};
     for (const file of files) {
+      if (file.startsWith('session-') || file === 'message_store.json') continue;
       const filePath = path.join(AUTH_DIR, file);
       bundle[file] = fs.readFileSync(filePath, 'utf-8');
     }
