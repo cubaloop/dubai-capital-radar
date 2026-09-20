@@ -179,7 +179,74 @@ def init_crm_db():
         if cursor.fetchone()[0] == 0:
             seed_initial_campaigns(conn)
 
+    # Always ensure Surprise Tourism's leads LATAM campaign is seeded
+    seed_latam_campaign(conn)
+
     conn.close()
+
+def seed_latam_campaign(conn):
+    cursor = conn.cursor()
+    cid = "camp_latam_surprise"
+    cname = "leads LATAM"
+    now_str = "2026-09-20 00:00:00"
+
+    cursor.execute("""
+    INSERT OR IGNORE INTO campaigns (id, name, category, description, attached_flyer, ai_prompt_instructions, agency_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        cid,
+        cname,
+        "LATAM",
+        "Inversionistas LATAM interesados en bienes raíces en Dubái - Asesora Carol Serra",
+        "",
+        "Inversionistas LATAM interesados en bienes raíces en Dubái - Asesora Carol Serra",
+        "agency_bd_surprisetourism_com",
+        now_str
+    ))
+
+    # Also ensure any other uploaded LATAM campaigns keep the agency tag
+    cursor.execute("UPDATE campaigns SET agency_id = 'agency_bd_surprisetourism_com' WHERE name LIKE '%leads LATAM%'")
+
+    latam_json_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "outreach", "latam_campaign_leads.json")
+    if os.path.exists(latam_json_path):
+        with open(latam_json_path, "r", encoding="utf-8") as f:
+            leads = json.load(f)
+
+        for idx, l in enumerate(leads):
+            lid = f"latam_lead_{idx + 1}"
+            raw_phone = l.get("phone", "")
+            if not raw_phone.startswith("+"):
+                raw_phone = "+" + raw_phone
+            clean_digits = "".join([c for c in raw_phone if c.isdigit()])
+
+            cursor.execute("""
+            INSERT OR IGNORE INTO leads (
+                id, campaign_id, name, phone, clean_phone, email,
+                objective, timeline, notes, crm_status, whatsapp_status,
+                last_contact_date, last_sent_type, personalized_message,
+                next_reminder_date, agency_id, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                lid,
+                cid,
+                l.get("name", f"Lead #{idx + 1}"),
+                raw_phone,
+                clean_digits,
+                "",
+                "Inversión Dubai",
+                "Inmediato",
+                l.get("notes", "Origen: Meta Ads | Asesora: Carol Serra"),
+                "CREATED",
+                "pending",
+                None,
+                None,
+                f"Hola {l.get('name', '')}, te contacto desde Surprise Tourism Dubai respecto a tu interés en inversiones y propiedades en Dubai.",
+                None,
+                "agency_bd_surprisetourism_com",
+                now_str
+            ))
+
+    conn.commit()
 
 def seed_spain_campaign(conn):
     cursor = conn.cursor()

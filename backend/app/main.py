@@ -1461,6 +1461,13 @@ def get_recent_inbound():
         "messages": RECENT_INBOUND_LOG
     }
 
+@app.get("/api/debug/copilot-history")
+def get_copilot_debug_history(agency_id: str = "agency_bd_surprisetourism_com"):
+    return {
+        "agency_id": agency_id,
+        "history": get_recent_copilot_history_db(limit=20, agency_id=agency_id)
+    }
+
 @app.post("/api/whatsapp/inbound-webhook")
 @app.post("/api/whatsapp/inbound")
 async def handle_whatsapp_inbound(payload: Dict[str, Any]):
