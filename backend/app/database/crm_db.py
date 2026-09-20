@@ -909,26 +909,50 @@ async def regenerate_campaign_lead_messages(campaign_id: str, new_prompt: Option
     leads_to_update = [dict(r) for r in cursor.fetchall()]
     conn.close()
 
-    # Concurrently generate messages for ALL leads in the campaign
-    sem = asyncio.Semaphore(4)
-    async def generate_single(lead_dict):
-        async with sem:
-            try:
-                msg = await compose_lead_message_ai(lead_dict, active_prompt, camp_name)
-            except Exception as e:
-                print(f"[Lead AI Gen Error {lead_dict.get('id')}]: {e}")
-                msg = compose_lead_message_local(lead_dict, active_prompt, camp_name)
-            await asyncio.sleep(0.08)
-            return lead_dict["id"], msg
+    # Progressive Hydration:
+    # 1. Synthesize first batch (up to 8 leads) synchronously so the user gets instant UI update (<3s)
+    # 2. Persist each lead immediately to DB
+    # 3. Process remaining leads in background task with rate-pacing to respect Groq RPM limits
+    sync_batch_size = min(8, len(leads_to_update))
+    immediate_leads = leads_to_update[:sync_batch_size]
+    background_leads = leads_to_update[sync_batch_size:]
 
-    results = await asyncio.gather(*[generate_single(l) for l in leads_to_update])
-    
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    for lead_id, msg in results:
-        cursor.execute("UPDATE leads SET personalized_message = ? WHERE id = ?", (msg, lead_id))
-    conn.commit()
-    conn.close()
+    async def generate_and_save_lead(lead_dict):
+        try:
+            msg = await compose_lead_message_ai(lead_dict, active_prompt, camp_name)
+        except Exception as e:
+            print(f"[Lead AI Gen Error {lead_dict.get('id')}]: {e}")
+            msg = compose_lead_message_local(lead_dict, active_prompt, camp_name)
+        
+        c = get_db_connection()
+        cur = c.cursor()
+        cur.execute("UPDATE leads SET personalized_message = ? WHERE id = ?", (msg, lead_dict["id"]))
+        c.commit()
+        c.close()
+        return lead_dict["id"], msg
+
+    if immediate_leads:
+        await asyncio.gather(*[generate_and_save_lead(l) for l in immediate_leads])
+
+    async def process_remaining_leads_worker(remaining_list, prompt, name):
+        for l in remaining_list:
+            try:
+                msg = await compose_lead_message_ai(l, prompt, name)
+            except Exception as e:
+                print(f"[BG Lead AI Gen Error {l.get('id')}]: {e}")
+                msg = compose_lead_message_local(l, prompt, name)
+            try:
+                c = get_db_connection()
+                cur = c.cursor()
+                cur.execute("UPDATE leads SET personalized_message = ? WHERE id = ?", (msg, l["id"]))
+                c.commit()
+                c.close()
+            except Exception as dbe:
+                print(f"[BG DB Save Error {l.get('id')}]: {dbe}")
+            await asyncio.sleep(0.8)
+
+    if background_leads:
+        asyncio.create_task(process_remaining_leads_worker(background_leads, active_prompt, camp_name))
 
     ai_active = bool(os.getenv("GROQ_API_KEY") or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
 
