@@ -127,7 +127,7 @@ export const AuthScreen: React.FC = () => {
           messagesLimit: agencyData?.quota?.messages_limit ?? 500,
         };
         localStorage.setItem('dcr_user_session', JSON.stringify(user));
-        navigate('/crm');
+        window.location.href = '/crm';
       }
     } catch (err) {
       setError('An error occurred. Please try again.');

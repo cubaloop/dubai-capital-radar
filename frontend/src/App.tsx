@@ -79,6 +79,14 @@ export function App() {
     }
   }, [location.pathname]);
 
+  const activeUser = currentUser || (() => {
+    try {
+      const saved = localStorage.getItem('dcr_user_session');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return null;
+  })();
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
@@ -86,17 +94,17 @@ export function App() {
   const [isAgencyModalOpen, setIsAgencyModalOpen] = useState<boolean>(false);
   const [isLicenseModalOpen, setIsLicenseModalOpen] = useState<boolean>(false);
   const [isJotaModalOpen, setIsJotaModalOpen] = useState<boolean>(false);
-  const [licenseState, setLicenseState] = useState(() => getLicenseState(currentUser?.email));
+  const [licenseState, setLicenseState] = useState(() => getLicenseState(activeUser?.email));
 
   useEffect(() => {
-    setLicenseState(getLicenseState(currentUser?.email));
-  }, [currentUser]);
+    setLicenseState(getLicenseState(activeUser?.email));
+  }, [activeUser]);
 
   const handleLogout = () => {
     localStorage.removeItem('dcr_user_session');
     localStorage.removeItem('outpilot_demo_mode');
     setCurrentUser(null);
-    navigate('/login');
+    window.location.href = '/login';
   };
 
   return (
@@ -115,7 +123,7 @@ export function App() {
           path="/*"
           element={
             <>
-              {currentUser ? (
+              {activeUser ? (
                 <div className="flex min-h-screen w-full">
                   <Sidebar
                     isCollapsed={isSidebarCollapsed}
@@ -125,7 +133,7 @@ export function App() {
                     onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
                     onOpenAgencyModal={() => setIsAgencyModalOpen(true)}
                     onOpenLicenseModal={() => setIsLicenseModalOpen(true)}
-                    currentUser={currentUser}
+                    currentUser={activeUser}
                   />
                   <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarCollapsed ? 'lg:pl-[74px]' : 'lg:pl-64'}`}>
                     <Navbar 
@@ -137,14 +145,14 @@ export function App() {
                       remainingTrialDays={getRemainingTrialDays(licenseState)}
                       isUnlocked={licenseState.isUnlocked}
                       onLogout={handleLogout}
-                      currentUser={currentUser}
+                      currentUser={activeUser}
                     />
                     <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
                       <Routes>
-                        <Route path="/crm" element={<CRMView currentUser={currentUser} />} />
-                        <Route path="/campaigns" element={<CampaignManager currentUser={currentUser} />} />
+                        <Route path="/crm" element={<CRMView currentUser={activeUser} />} />
+                        <Route path="/campaigns" element={<CampaignManager currentUser={activeUser} />} />
                         <Route path="/analytics" element={<AnalyticsDashboard />} />
-                        <Route path="/excels" element={<ExcelCampaignDashboard currentUser={currentUser} />} />
+                        <Route path="/excels" element={<ExcelCampaignDashboard currentUser={activeUser} />} />
                         <Route path="/dossiers/:slug?" element={<DossierView slugOrId="alexander-wright-fintech-demo" onBack={() => navigate('/campaigns')} />} />
                         <Route path="*" element={<Navigate to="/crm" replace />} />
                       </Routes>
@@ -155,8 +163,8 @@ export function App() {
                   <LicenseModal
                     isOpen={isLicenseModalOpen}
                     onClose={() => setIsLicenseModalOpen(false)}
-                    userEmail={currentUser?.email}
-                    onSuccess={() => setLicenseState(getLicenseState(currentUser?.email))}
+                    userEmail={activeUser?.email}
+                    onSuccess={() => setLicenseState(getLicenseState(activeUser?.email))}
                   />
                   <JotaFloatingTrigger onClick={() => setIsJotaModalOpen(true)} />
                   <JotaAvatarModal isOpen={isJotaModalOpen} onClose={() => setIsJotaModalOpen(false)} />
