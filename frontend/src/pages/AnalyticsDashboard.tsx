@@ -5,21 +5,30 @@ export const AnalyticsDashboard: React.FC = () => {
   const [dateRange, setDateRange] = useState('30');
   const [loading, setLoading] = useState(true);
   
-  // Real data with graceful default
+  // Real data with 0 default
   const [analytics, setAnalytics] = useState({
-    total_leads: 117,
-    total_campaigns: 2,
-    total_sent: 89,
-    total_pending: 28,
-    response_rate: 24.5,
-    top_campaigns: [
-      { name: '🇪🇸 Reactivación España - Novotel Madrid', count: 117 },
-      { name: 'Demo Campaign Outpilot', count: 15 }
-    ]
+    total_leads: 0,
+    total_campaigns: 0,
+    total_sent: 0,
+    total_pending: 0,
+    response_rate: 0,
+    top_campaigns: [] as Array<{ name: string; count: number }>
   });
 
   useEffect(() => {
-    fetch('/api/analytics/overview')
+    const agencyId = (() => {
+      try {
+        const s = localStorage.getItem('dcr_user_session');
+        if (s) return JSON.parse(s).agencyId;
+      } catch {}
+      return '';
+    })();
+
+    const url = agencyId 
+      ? `/api/analytics/overview?agency_id=${encodeURIComponent(agencyId)}`
+      : '/api/analytics/overview';
+
+    fetch(url)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data) {

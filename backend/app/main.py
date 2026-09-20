@@ -636,9 +636,9 @@ from .database.crm_db import (
     regenerate_campaign_lead_messages,
     update_campaign_meta,
     delete_campaign_db,
-    delete_lead_db,
     create_or_upsert_lead_db,
-    mount_novotel_madrid_reminder_campaign
+    mount_novotel_madrid_reminder_campaign,
+    is_admin_agency_or_user
 )
 from .crm.batch_dispatcher import batch_manager
 from .crm.excel_parser import parse_spreadsheet_bytes, map_and_structure_leads
@@ -911,6 +911,58 @@ def api_get_campaign_batch_status(campaign_id: str):
 def api_get_all_crm_leads(agency_id: str = None):
     """Returns leads for the CRM view. Filtered by agency_id if provided."""
     return {"leads": get_all_crm_leads(agency_id=agency_id)}
+
+@app.get("/api/analytics/overview")
+def api_get_analytics_overview(agency_id: str = None):
+    """Returns analytics overview filtered by agency_id."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    if agency_id and not is_admin_agency_or_user(agency_id):
+        cursor.execute("SELECT COUNT(*) FROM leads WHERE agency_id = ?", (agency_id,))
+        total_leads = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM campaigns WHERE agency_id = ?", (agency_id,))
+        total_campaigns = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM leads WHERE agency_id = ? AND whatsapp_status = 'sent'", (agency_id,))
+        total_sent = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM leads WHERE agency_id = ? AND (whatsapp_status IS NULL OR whatsapp_status != 'sent')", (agency_id,))
+        total_pending = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM leads WHERE agency_id = ? AND crm_status IN ('APPOINTMENT', 'INTERESTED', 'REPLIED', 'WON', 'CLOSED')", (agency_id,))
+        replied_count = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT c.name, COUNT(l.id) as count FROM campaigns c LEFT JOIN leads l ON c.id = l.campaign_id WHERE c.agency_id = ? GROUP BY c.id ORDER BY count DESC LIMIT 5", (agency_id,))
+        top_campaigns = [{"name": r["name"], "count": r["count"]} for r in cursor.fetchall()]
+    else:
+        # Admin / Master or legacy
+        cursor.execute("SELECT COUNT(*) FROM leads")
+        total_leads = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM campaigns")
+        total_campaigns = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM leads WHERE whatsapp_status = 'sent'")
+        total_sent = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM leads WHERE whatsapp_status IS NULL OR whatsapp_status != 'sent'")
+        total_pending = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM leads WHERE crm_status IN ('APPOINTMENT', 'INTERESTED', 'REPLIED', 'WON', 'CLOSED')")
+        replied_count = cursor.fetchone()[0]
+        cursor.execute("SELECT c.name, COUNT(l.id) as count FROM campaigns c LEFT JOIN leads l ON c.id = l.campaign_id GROUP BY c.id ORDER BY count DESC LIMIT 5")
+        top_campaigns = [{"name": r["name"], "count": r["count"]} for r in cursor.fetchall()]
+        
+    conn.close()
+    
+    response_rate = round((replied_count / max(1, total_sent)) * 100, 1) if total_sent > 0 else 0.0
+    
+    return {
+        "total_leads": total_leads,
+        "total_campaigns": total_campaigns,
+        "total_sent": total_sent,
+        "total_pending": total_pending,
+        "response_rate": response_rate,
+        "top_campaigns": top_campaigns
+    }
 
 @app.post("/api/crm/leads")
 def api_create_or_upsert_lead(payload: Dict[str, Any]):
