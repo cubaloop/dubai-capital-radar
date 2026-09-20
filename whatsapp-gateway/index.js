@@ -496,8 +496,9 @@ async function startWhatsApp() {
     const candidateUrls = [
       `http://127.0.0.1:${BACKEND_PORT}/api/whatsapp/inbound-webhook`,
       `http://localhost:${BACKEND_PORT}/api/whatsapp/inbound-webhook`,
+      `http://127.0.0.1:10000/api/whatsapp/inbound-webhook`,
       `http://127.0.0.1:8000/api/whatsapp/inbound-webhook`,
-      `https://dubai-miami-radar.onrender.com/api/whatsapp/inbound-webhook`
+      `https://dubai-capital-radar.onrender.com/api/whatsapp/inbound-webhook`
     ];
 
     for (const targetUrl of candidateUrls) {
@@ -532,8 +533,6 @@ async function startWhatsApp() {
         saveToMessageStore(msg.key.id, msg.message);
       }
 
-      if (msg.key.fromMe) continue;
-
       const remoteJid = msg.key.remoteJid || '';
       const isGroup = remoteJid.endsWith('@g.us') || remoteJid.includes('@g.us');
       const isBroadcast = remoteJid === 'status@broadcast' || remoteJid.includes('broadcast');
@@ -542,6 +541,10 @@ async function startWhatsApp() {
       if (isGroup || isBroadcast) {
         continue;
       }
+
+      // Allow owner chatting with bot from the same phone (Message yourself)
+      const isChatWithSelf = connectedNumber && (remoteJid.includes(connectedNumber) || remoteJid.startsWith(connectedNumber));
+      if (msg.key.fromMe && !isChatWithSelf) continue;
 
       const senderNumber = extractPhoneNumber(remoteJid, msg.key.participant, msg.key.remoteJidAlt);
       const { text, hasDocument, documentFileName, unwrappedMsg } = extractMessageData(msg);

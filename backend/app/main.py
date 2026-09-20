@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 import uvicorn
 import os
 import uuid
+import re
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -73,6 +74,7 @@ PROSPECTS_STORE: Dict[str, ProspectProfile] = {}
 DOSSIERS_STORE: Dict[str, DossierResponse] = {}
 AUTOPILOT_ENABLED: bool = False
 AUTOPILOT_DISPATCH_COUNT: int = 0
+RECENT_INBOUND_LOG: List[Dict[str, Any]] = []
 
 from .safety.anti_ban import anti_ban_guard
 from .crm.sync_tadh import crm_bridge
@@ -240,7 +242,7 @@ async def autopilot_daemon():
         # Standard cycle if autopilot is idle
         await asyncio.sleep(60)
 
-PUBLIC_APP_URL = os.getenv("PUBLIC_APP_URL", "https://dubai-miami-radar.onrender.com")
+PUBLIC_APP_URL = os.getenv("PUBLIC_APP_URL", "https://dubai-capital-radar.onrender.com")
 
 async def keep_alive_pulse_daemon():
     """
@@ -1227,6 +1229,13 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
             "gemini_key_len": len(gemini_key)
         }
 
+@app.get("/api/debug/recent-inbound")
+def get_recent_inbound():
+    return {
+        "total": len(RECENT_INBOUND_LOG),
+        "messages": RECENT_INBOUND_LOG
+    }
+
 @app.post("/api/whatsapp/inbound-webhook")
 @app.post("/api/whatsapp/inbound")
 async def handle_whatsapp_inbound(payload: Dict[str, Any]):
@@ -1264,18 +1273,32 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     if not text:
         return {"status": "ignored", "reason": "empty_content"}
 
+    RECENT_INBOUND_LOG.insert(0, {
+        "timestamp": datetime.now().isoformat(),
+        "sender": sender,
+        "push_name": payload.get("push_name") or "",
+        "text": text[:200],
+        "jid": jid,
+        "is_group": is_group
+    })
+    if len(RECENT_INBOUND_LOG) > 30:
+        RECENT_INBOUND_LOG.pop()
+
     # STRICT FILTER 1: Completely ignore all WhatsApp group messages and status broadcasts
     if is_group or "@g.us" in jid or "broadcast" in jid:
         return {"status": "ignored", "reason": "group_or_broadcast_ignored"}
 
-    # 0. SUPER-ADMIN COPILOT MODE (Exclusive for David's Admin Phone: +971508379080)
+    # 0. SUPER-ADMIN COPILOT MODE (Exclusive for David's Admin Phone or Chat with Self)
     push_name = (payload.get("push_name") or "").lower()
     is_admin = (
         sender == ADMIN_PHONE_DIGITS or 
         "508379080" in sender or 
         sender.endswith("508379080") or 
         "508379080" in jid or
-        "david" in push_name
+        "david" in push_name or
+        sender == "971501378020" or
+        "501378020" in sender or
+        "501378020" in jid
     )
 
     if is_admin:
