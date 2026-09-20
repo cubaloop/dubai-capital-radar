@@ -92,15 +92,20 @@ def init_crm_db():
     )
     """)
 
-    # 4. Super-Admin Copilot Conversation History table
+    # Super-Admin Copilot Conversation History table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS copilot_chat (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         role TEXT NOT NULL,
         content TEXT NOT NULL,
+        agency_id TEXT DEFAULT 'agency_master',
         created_at TEXT NOT NULL
     )
     """)
+    try:
+        cursor.execute("ALTER TABLE copilot_chat ADD COLUMN agency_id TEXT DEFAULT 'agency_master'")
+    except Exception:
+        pass
 
     # 5. Agencies table
     cursor.execute("""
@@ -138,9 +143,30 @@ def init_crm_db():
     except Exception:
         pass
 
+    # Seed or ensure default system agencies
+    try:
+        cursor.execute("SELECT id FROM agencies WHERE id = 'agency_master' OR email = 'davidhabana98@gmail.com'")
+        if not cursor.fetchone():
+            cursor.execute("""
+            INSERT INTO agencies (id, name, email, plan, messages_limit, messages_used, whatsapp_mode, admin_phone, bot_phone, created_at, is_active)
+            VALUES ('agency_master', 'H.O.M.E Properties / Dubai Capital Radar', 'davidhabana98@gmail.com', 'enterprise', -1, 0, 'baileys', '+971508379080', '+971501378020', '2026-08-01 00:00:00', 1)
+            """)
+        else:
+            cursor.execute("UPDATE agencies SET admin_phone = '+971508379080', bot_phone = '+971501378020' WHERE id = 'agency_master' OR email = 'davidhabana98@gmail.com'")
+
+        cursor.execute("SELECT id FROM agencies WHERE id = 'agency_bd_surprisetourism_com' OR email = 'bd@surprisetourism.com'")
+        if not cursor.fetchone():
+            cursor.execute("""
+            INSERT INTO agencies (id, name, email, plan, messages_limit, messages_used, whatsapp_mode, admin_phone, bot_phone, created_at, is_active)
+            VALUES ('agency_bd_surprisetourism_com', 'Surprise Tourism', 'bd@surprisetourism.com', 'free', 500, 0, 'baileys', '+971564317976', '+971545932205', '2026-09-20 00:00:00', 1)
+            """)
+        else:
+            cursor.execute("UPDATE agencies SET admin_phone = '+971564317976', bot_phone = '+971545932205' WHERE id = 'agency_bd_surprisetourism_com' OR email = 'bd@surprisetourism.com'")
+    except Exception as e:
+        print("[CRM DB] Notice seeding agencies:", e)
+
     conn.commit()
 
-    
     # Auto-seed initial campaigns if empty
     cursor.execute("SELECT COUNT(*) FROM campaigns")
     count = cursor.fetchone()[0]
@@ -890,18 +916,21 @@ def delete_lead_db(lead_id: str) -> bool:
     conn.close()
     return True
 
-def save_copilot_message_db(role: str, content: str):
+def save_copilot_message_db(role: str, content: str, agency_id: str = "agency_master"):
     conn = get_db_connection()
     cursor = conn.cursor()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute("INSERT INTO copilot_chat (role, content, created_at) VALUES (?, ?, ?)", (role, content, now_str))
+    cursor.execute("INSERT INTO copilot_chat (role, content, agency_id, created_at) VALUES (?, ?, ?, ?)", (role, content, agency_id, now_str))
     conn.commit()
     conn.close()
 
-def get_recent_copilot_history_db(limit: int = 14) -> List[Dict[str, str]]:
+def get_recent_copilot_history_db(limit: int = 14, agency_id: str = "agency_master") -> List[Dict[str, str]]:
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT role, content FROM copilot_chat ORDER BY id DESC LIMIT ?", (limit,))
+    if agency_id:
+        cursor.execute("SELECT role, content FROM copilot_chat WHERE agency_id = ? ORDER BY id DESC LIMIT ?", (agency_id, limit))
+    else:
+        cursor.execute("SELECT role, content FROM copilot_chat ORDER BY id DESC LIMIT ?", (limit,))
     rows = cursor.fetchall()
     conn.close()
     return [{"role": r["role"], "content": r["content"]} for r in reversed(rows)]
@@ -1110,6 +1139,27 @@ def get_agency_by_email(email: str) -> Optional[Dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM agencies WHERE email = ?", (email,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def get_agency_by_phone(phone_or_jid: str) -> Optional[Dict[str, Any]]:
+    if not phone_or_jid:
+        return None
+    digits = "".join([c for c in phone_or_jid if c.isdigit()])
+    if len(digits) < 7:
+        return None
+    suffix = digits[-8:]
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    SELECT * FROM agencies 
+    WHERE admin_phone LIKE ? 
+       OR admin_phone LIKE ?
+       OR bot_phone LIKE ?
+       OR bot_phone LIKE ?
+    LIMIT 1
+    """, (f"%{digits}%", f"%{suffix}", f"%{digits}%", f"%{suffix}"))
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None

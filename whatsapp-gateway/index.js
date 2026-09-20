@@ -550,9 +550,9 @@ async function startWhatsApp() {
 
       // Allow owner chatting with bot from the same phone (Message yourself)
       const isChatWithSelf = connectedNumber && (remoteJid.includes(connectedNumber) || remoteJid.startsWith(connectedNumber));
-      // Also allow admin phone messages even if fromMe=true (multi-device sync edge case)
-      const ADMIN_NUMBER = '971508379080';
-      const isFromAdmin = remoteJid.includes(ADMIN_NUMBER) || (msg.key.participant && msg.key.participant.includes(ADMIN_NUMBER));
+      // Allow admin phone messages even if fromMe=true (multi-device sync edge case)
+      const ADMIN_NUMBERS = ['971508379080', '971564317976', '971545932205', '971501378020'];
+      const isFromAdmin = ADMIN_NUMBERS.some(num => remoteJid.includes(num) || (msg.key.participant && msg.key.participant.includes(num)));
       if (msg.key.fromMe && !isChatWithSelf && !isFromAdmin) {
         console.log(`[WA Msg Debug] Skipping fromMe=true message (not self-chat, not admin): ${remoteJid}`);
         continue;
@@ -597,7 +597,8 @@ async function startWhatsApp() {
         has_document: hasDocument,
         document_file_name: documentFileName,
         document_base64: documentBase64,
-        timestamp: msg.messageTimestamp
+        timestamp: msg.messageTimestamp,
+        bot_phone: connectedNumber || ''
       }).catch(err => {
         console.error(`[WhatsApp Inbound] Error in forward webhook handler:`, err.message);
       });
@@ -706,6 +707,32 @@ app.post('/send', async (req, res) => {
 
     } catch (sendErr) {
       console.error(`[WhatsApp] Send error for ${jid}:`, sendErr.message);
+      if (cleanNumber && jid !== `${cleanNumber}@s.whatsapp.net`) {
+        const fallbackJid = `${cleanNumber}@s.whatsapp.net`;
+        console.log(`[WhatsApp] Retrying dispatch to standard JID: ${fallbackJid}...`);
+        try {
+          let retryMsg = null;
+          if (hasValidImage) {
+            const imageBuffer = fs.readFileSync(image_path);
+            retryMsg = await sock.sendMessage(fallbackJid, { image: imageBuffer, caption: message || '' });
+          } else if (image_url) {
+            retryMsg = await sock.sendMessage(fallbackJid, { image: { url: image_url }, caption: message || '' });
+          } else {
+            retryMsg = await sock.sendMessage(fallbackJid, { text: message });
+          }
+          if (retryMsg?.key?.id && retryMsg?.message) {
+            saveToMessageStore(retryMsg.key.id, retryMsg.message);
+          }
+          scheduleAuthBackup();
+          resetDailyCounterIfNeeded();
+          messagesSentToday++;
+          lastActivityAt = Date.now();
+          console.log(`[WhatsApp] Fallback delivered to ${fallbackJid} (ID: ${retryMsg?.key?.id || 'n/a'})`);
+          return res.json({ success: true, delivered_to: cleanNumber, jid: fallbackJid, message_id: retryMsg?.key?.id, exists: true });
+        } catch (retryErr) {
+          console.error(`[WhatsApp] Fallback retry failed for ${fallbackJid}:`, retryErr.message);
+        }
+      }
       return res.status(500).json({ success: false, error: sendErr.message });
     }
 

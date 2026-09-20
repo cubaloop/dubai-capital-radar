@@ -1047,7 +1047,10 @@ from .database.crm_db import (
     get_db_connection, 
     add_lead_note_db, 
     save_copilot_message_db, 
-    get_recent_copilot_history_db
+    get_recent_copilot_history_db,
+    get_agency_by_phone,
+    get_agency_by_id,
+    get_agency_by_email
 )
 from .database.supabase_sync import sync_lead_background
 from datetime import datetime
@@ -1055,44 +1058,197 @@ from datetime import datetime
 INGESTED_PROJECTS_FEED: List[Dict[str, Any]] = []
 ADMIN_PHONE_DIGITS = "971508379080"
 
-def get_jota_system_prompt() -> str:
-    """Generates dynamic, rich system prompt with real-time business and database state."""
+def resolve_agency_for_message(sender: str = "", jid: str = "", bot_phone: str = "") -> Dict[str, Any]:
+    """Determines which agency workspace an inbound WhatsApp message belongs to."""
+    sender_digits = "".join([c for c in (sender or "") if c.isdigit()])
+    jid_digits = "".join([c for c in (jid.split("@")[0] if jid else "") if c.isdigit()])
+    bot_digits = "".join([c for c in (bot_phone or "") if c.isdigit()])
+
+    candidates = [d for d in [sender_digits, jid_digits, bot_digits] if len(d) >= 7]
+
+    # Check known Account 2 (Surprise Tourism: +971564317976 / +971545932205)
+    surprise_tokens = ["564317976", "545932205"]
+    for c in candidates:
+        if any(tok in c for tok in surprise_tokens):
+            agency = get_agency_by_id("agency_bd_surprisetourism_com")
+            if not agency:
+                agency = get_agency_by_email("bd@surprisetourism.com")
+            if agency:
+                return dict(agency)
+            return {
+                "id": "agency_bd_surprisetourism_com",
+                "name": "Surprise Tourism",
+                "email": "bd@surprisetourism.com",
+                "admin_phone": "+971564317976",
+                "bot_phone": "+971545932205"
+            }
+
+    # Check known Account 1 (David / Super-Admin: +971508379080 / +971501378020)
+    master_tokens = ["508379080", "501378020"]
+    for c in candidates:
+        if any(tok in c for tok in master_tokens):
+            agency = get_agency_by_id("agency_master")
+            if not agency:
+                agency = get_agency_by_email("davidhabana98@gmail.com")
+            if agency:
+                return dict(agency)
+            return {
+                "id": "agency_master",
+                "name": "H.O.M.E Properties / Dubai Capital Radar",
+                "email": "davidhabana98@gmail.com",
+                "admin_phone": "+971508379080",
+                "bot_phone": "+971501378020"
+            }
+
+    # Dynamic DB check by registered phones
+    for c in candidates:
+        matched = get_agency_by_phone(c)
+        if matched:
+            return dict(matched)
+
+    # Fallback to agency_master
+    master = get_agency_by_id("agency_master")
+    return dict(master) if master else {
+        "id": "agency_master",
+        "name": "H.O.M.E Properties / Dubai Capital Radar",
+        "email": "davidhabana98@gmail.com",
+        "admin_phone": "+971508379080",
+        "bot_phone": "+971501378020"
+    }
+
+def is_admin_sender(sender: str, jid: str, push_name: str, agency: Dict[str, Any]) -> bool:
+    """Verifies whether the message is sent by the workspace admin or bot itself (self-chat)."""
+    sender_digits = "".join([c for c in (sender or "") if c.isdigit()])
+    jid_digits = "".join([c for c in (jid.split("@")[0] if jid else "") if c.isdigit()])
+
+    admin_phone = "".join([c for c in (agency.get("admin_phone") or "") if c.isdigit()])
+    bot_phone = "".join([c for c in (agency.get("bot_phone") or "") if c.isdigit()])
+
+    admin_suffix = admin_phone[-8:] if len(admin_phone) >= 8 else admin_phone
+    bot_suffix = bot_phone[-8:] if len(bot_phone) >= 8 else bot_phone
+
+    for digits in [sender_digits, jid_digits]:
+        if not digits:
+            continue
+        if admin_suffix and admin_suffix in digits:
+            return True
+        if bot_suffix and bot_suffix in digits:
+            return True
+
+    # Known admin tokens fallback
+    if "508379080" in sender_digits or "508379080" in jid_digits or "david" in (push_name or "").lower():
+        return True
+    if "564317976" in sender_digits or "564317976" in jid_digits:
+        return True
+    if "545932205" in sender_digits or "545932205" in jid_digits:
+        return True
+
+    return False
+
+def get_jota_system_prompt(agency_info: Optional[Dict[str, Any]] = None) -> str:
+    """Generates dynamic, rich system prompt with real-time business and database state tailored to agency."""
+    agency = agency_info or {}
+    agency_id = agency.get("id") or "agency_master"
+    agency_name = agency.get("name") or "H.O.M.E Properties / Dubai Capital Radar"
+    agency_email = agency.get("email") or "davidhabana98@gmail.com"
+    admin_phone = agency.get("admin_phone") or "+971 50 837 9080"
+    bot_phone = agency.get("bot_phone") or "+971 50 137 8020"
+
+    is_surprise = ("surprisetourism" in agency_id.lower() or "surprisetourism" in agency_email.lower() or "surprise" in agency_name.lower())
+
+    camp_lines = []
+    leads_highlights = []
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
-        # 1. Campaigns overview
-        cursor.execute("""
-        SELECT c.name, COUNT(l.id) as total,
-               SUM(CASE WHEN l.whatsapp_status = 'sent' THEN 1 ELSE 0 END) as sent,
-               SUM(CASE WHEN l.crm_status IN ('APPOINTMENT', 'INTERESTED', 'HOT', 'REPLIED') THEN 1 ELSE 0 END) as active
-        FROM campaigns c
-        LEFT JOIN leads l ON c.id = l.campaign_id
-        GROUP BY c.id
-        """)
-        camps = cursor.fetchall()
-        camp_lines = []
-        for c in camps:
-            camp_lines.append(f"• {c['name']}: {c['total']} leads ({c['sent']} contactados, {c['active']} activos/citas)")
 
-        # 2. Confirmed & scheduled Novotel Madrid Expo attendees
-        cursor.execute("""
-        SELECT name, phone, timeline, notes, crm_status
-        FROM leads
-        WHERE campaign_id = 'spain_madrid_expo' AND crm_status IN ('APPOINTMENT', 'FOLLOW_UP')
-        ORDER BY crm_status ASC, id ASC
-        """)
-        expo_leads = cursor.fetchall()
-        expo_lines = []
-        for el in expo_leads:
-            expo_lines.append(f"• {el['name']} ({el['phone']}) -> {el['crm_status']} | Horario: {el['timeline'] or 'Por definir'} | Detalle: {el['notes']}")
+        if is_surprise:
+            cursor.execute("""
+            SELECT c.name, COUNT(l.id) as total,
+                   SUM(CASE WHEN l.whatsapp_status = 'sent' THEN 1 ELSE 0 END) as sent,
+                   SUM(CASE WHEN l.crm_status IN ('APPOINTMENT', 'INTERESTED', 'HOT', 'REPLIED') THEN 1 ELSE 0 END) as active
+            FROM campaigns c
+            LEFT JOIN leads l ON c.id = l.campaign_id
+            WHERE c.agency_id = ? OR c.agency_id = (SELECT id FROM agencies WHERE email = ?)
+            GROUP BY c.id
+            """, (agency_id, agency_email))
+            camps = cursor.fetchall()
+            for c in camps:
+                camp_lines.append(f"• {c['name']}: {c['total']} leads ({c['sent']} contactados, {c['active']} activos/citas)")
+
+            cursor.execute("""
+            SELECT name, phone, objective, timeline, notes, crm_status
+            FROM leads
+            WHERE (agency_id = ? OR campaign_id = 'camp_1789895293')
+            ORDER BY rowid ASC
+            LIMIT 10
+            """, (agency_id,))
+            latam_sample = cursor.fetchall()
+            for l in latam_sample:
+                leads_highlights.append(f"• {l['name']} ({l['phone']}) -> {l['crm_status']} | Interés: {l['objective'] or 'Inversión Dubai'} | Detalle: {l['notes']}")
+        else:
+            cursor.execute("""
+            SELECT c.name, COUNT(l.id) as total,
+                   SUM(CASE WHEN l.whatsapp_status = 'sent' THEN 1 ELSE 0 END) as sent,
+                   SUM(CASE WHEN l.crm_status IN ('APPOINTMENT', 'INTERESTED', 'HOT', 'REPLIED') THEN 1 ELSE 0 END) as active
+            FROM campaigns c
+            LEFT JOIN leads l ON c.id = l.campaign_id
+            WHERE c.agency_id = 'agency_master' OR c.agency_id IS NULL OR c.agency_id = 'master'
+            GROUP BY c.id
+            """)
+            camps = cursor.fetchall()
+            for c in camps:
+                camp_lines.append(f"• {c['name']}: {c['total']} leads ({c['sent']} contactados, {c['active']} activos/citas)")
+
+            cursor.execute("""
+            SELECT name, phone, timeline, notes, crm_status
+            FROM leads
+            WHERE campaign_id = 'spain_madrid_expo' AND crm_status IN ('APPOINTMENT', 'FOLLOW_UP')
+            ORDER BY crm_status ASC, id ASC
+            """)
+            expo_leads = cursor.fetchall()
+            for el in expo_leads:
+                leads_highlights.append(f"• {el['name']} ({el['phone']}) -> {el['crm_status']} | Horario: {el['timeline'] or 'Por definir'} | Detalle: {el['notes']}")
 
         conn.close()
     except Exception as e:
         camp_lines = [f"• Error cargando campañas: {e}"]
-        expo_lines = []
+        leads_highlights = []
 
-    prompt = f"""Eres JOTA, el Asistente Inteligente de IA de David (Super-Admin y Broker Senior de H.O.M.E Properties en Dubai y Dubai Capital Radar).
+    if is_surprise:
+        prompt = f"""Eres JOTA, el Asistente Inteligente de IA y Copiloto Comercial de Surprise Tourism (Dubai).
+Eres el copiloto de máxima confianza del equipo de Surprise Tourism: resolutivo, altamente inteligente, ejecutivo, proactivo, analítico y cercano.
+No eres un bot rígido ni tienes restricciones de palabras clave. Comprendes perfectamente el contexto, la intención y el fondo de cada mensaje.
+
+CONOCIMIENTO OPERATIVO Y BASE DE DATOS EN TIEMPO REAL:
+1. EMPRESA Y ESPACIO PRIVADO:
+   - Empresa: Surprise Tourism LLC (Dubai, UAE).
+   - Administrador WhatsApp: {admin_phone}
+   - Bot WhatsApp de la cuenta: {bot_phone}
+   - Acceso Web CRM: https://dubai-capital-radar.onrender.com
+   - Email de sesión: {agency_email}
+
+2. CAMPAÑAS Y BASE DE DATOS DE LEADS ACTUALES:
+{chr(10).join(camp_lines) if camp_lines else "• Campaña 'leads LATAM' activa (110 leads importados)."}
+
+3. MUESTRA DE PROSPECTOS LATAM REGISTRADOS EN TU CRM:
+{chr(10).join(leads_highlights) if leads_highlights else "• Base de 110 prospectos de América Latina disponible en CRM."}
+
+4. ENFOQUE COMERCIAL DE SURPRISE TOURISM:
+   - Clientes objetivo: Inversionistas, empresarios y turistas de alto patrimonio de Latinoamérica (Colombia, Ecuador, México, etc.).
+   - Propuesta de valor: Turismo corporativo y de lujo en Dubai + Asesoría integral de inversión inmobiliaria off-plan y de alta rentabilidad (Downtown, Dubai Marina, Palm Jumeirah, Dubai Hills Estate) con Golden Visa de 10 años y 0% impuestos.
+   - Desarrolladoras líderes: Emaar, Sobha, Damac, Nakheel, Ellington.
+
+5. TU COMPORTAMIENTO Y FORMA DE TRABAJAR:
+   - Idioma y Adaptabilidad: Responde siempre con naturalidad ejecutiva en español (o en inglés/idioma en que te escriban).
+   - Asesoría comercial: Si el usuario te pregunta por el avance de la campaña, métricas, tácticas de contacto con prospectos de LATAM o redacción de mensajes de WhatsApp persuasivos, dale respuestas ejecutivas, directas y accionables.
+   - Mantén el hilo de la conversación recordando los mensajes anteriores que han intercambiado.
+   - Usa formato WhatsApp limpio (negritas y viñetas) para que se lea perfectamente en el móvil.
+   - IMPORTANTE: Responde SIEMPRE en un único mensaje. Máximo 300 palabras. Sé directo y conciso.
+"""
+    else:
+        # Super-Admin / David
+        prompt = f"""Eres JOTA, el Asistente Inteligente de IA de David (Super-Admin y Broker Senior de H.O.M.E Properties en Dubai y Dubai Capital Radar).
 Eres su copiloto de máxima confianza: resolutivo, altamente inteligente, ejecutivo, proactivo, analítico y cercano. No eres un bot rígido ni tienes restricciones preprogramadas de palabras clave o formato. Comprendes perfectamente el contexto, la intención y el fondo de cada mensaje.
 
 CONOCIMIENTO OPERATIVO Y BASE DE DATOS EN TIEMPO REAL:
@@ -1100,7 +1256,7 @@ CONOCIMIENTO OPERATIVO Y BASE DE DATOS EN TIEMPO REAL:
    - Horario: 10:00 AM a 8:00 PM.
    - Beneficios exclusivos: 15-20% descuento exclusivo, Property Management 100% gratis, Golden Visa de 10 años gratis, planes de pago directos desde 1% mensual sin hipoteca.
    - Asistentes Confirmados y en Seguimiento registrados en tu CRM:
-{chr(10).join(expo_lines) if expo_lines else "• Sincronizando datos de asistentes..."}
+{chr(10).join(leads_highlights) if leads_highlights else "• Sincronizando datos de asistentes..."}
 
 2. CAMPAÑAS Y MÉTRICAS ACTUALES:
 {chr(10).join(camp_lines) if camp_lines else "• Campaña Novotel Madrid Expo activa."}
@@ -1109,7 +1265,8 @@ CONOCIMIENTO OPERATIVO Y BASE DE DATOS EN TIEMPO REAL:
    - Portal Web CRM: https://dubai-miami-radar.onrender.com
    - Empresa: H.O.M.E Properties | Email: home@homeproperties.ae | Pass: Dubai2026!
    - Super-Admin: admin@dubaicapitalradar.com | Pass: Dubai2026!
-   - Bot WhatsApp: +971 50 137 8020
+   - Bot WhatsApp: {bot_phone}
+   - Admin WhatsApp: {admin_phone}
 
 4. INVERSIONES INMOBILIARIAS DUBAI:
    - Zonas top: Downtown Dubai, Palm Jumeirah, Dubai Hills Estate, Business Bay, Dubai Marina, Creek Harbour.
@@ -1131,25 +1288,30 @@ CONOCIMIENTO OPERATIVO Y BASE DE DATOS EN TIEMPO REAL:
 # Mutex: process one Jota message at a time to avoid Groq rate limiting from concurrent requests
 _jota_lock = asyncio.Lock()
 
-async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_phone: str = ""):
+async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_phone: str = "", agency_info: Optional[Dict[str, Any]] = None):
     """
-    Handles inquiries from Super-Admin / Broker with full intelligence,
+    Handles inquiries from Agency Admin / Broker with full intelligence,
     dynamic real-time CRM context, and conversation memory. Zero restrictions.
     """
     text = command_text.strip()
     if not text:
         return {"status": "ignored", "reason": "empty"}
 
+    agency = agency_info or resolve_agency_for_message(sender=sender_phone, jid=sender_jid)
+    agency_id = agency.get("id", "agency_master")
+    agency_name = agency.get("name", "Outpilot Workspace")
+    admin_phone_conf = agency.get("admin_phone") or ADMIN_PHONE_DIGITS
+
     # Queue: wait for any previous Jota call to finish before starting a new one
     async with _jota_lock:
-        # Save incoming user message to persistent conversation history
-        save_copilot_message_db(role="user", content=text)
+        # Save incoming user message to persistent conversation history for this specific agency
+        save_copilot_message_db(role="user", content=text, agency_id=agency_id)
 
-        # Fetch recent conversation history (last 10 messages)
-        history = get_recent_copilot_history_db(limit=10)
+        # Fetch recent conversation history (last 10 messages) for this specific agency
+        history = get_recent_copilot_history_db(limit=10, agency_id=agency_id)
         past_history = history[:-1] if history else []
 
-        system_prompt = get_jota_system_prompt()
+        system_prompt = get_jota_system_prompt(agency_info=agency)
 
         groq_key = os.getenv("GROQ_API_KEY", "").strip()
         gemini_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
@@ -1201,7 +1363,7 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
                                 clean_ans = re.sub(r"<think>.*?</think>", "", raw_ans, flags=re.DOTALL).strip()
                                 if clean_ans:
                                     reply_msg = clean_ans
-                                    print(f"[JOTA] Groq ({model_name}) replied OK (attempt {attempt+1})")
+                                    print(f"[JOTA] Groq ({model_name}) replied OK for agency '{agency_name}' (attempt {attempt+1})")
                                     break
                             elif r.status_code == 429:
                                 print(f"[JOTA] Groq rate limited on {model_name} (attempt {attempt+1}), will retry...")
@@ -1218,8 +1380,9 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
 
         # 2. FALLBACK: Gemini (respaldo activo garantizado con modelos verificados)
         if not reply_msg and gemini_key:
-            hist_text = "\n".join([f"{'Jota' if t['role'] in ['assistant', 'model', 'jota'] else 'David'}: {t['content']}" for t in past_history])
-            gem_prompt = f"{system_prompt}\n\nHISTORIAL DE CONVERSACIÓN RECIENTE:\n{hist_text}\n\nMENSAJE ACTUAL DE DAVID:\n{text}\n\nResponde como Jota (ejecutivo, experto, natural, en el idioma solicitado o en el que te escribe David, formato WhatsApp):"
+            sender_display = "David" if "master" in agency_id else agency_name
+            hist_text = "\n".join([f"{'Jota' if t['role'] in ['assistant', 'model', 'jota'] else sender_display}: {t['content']}" for t in past_history])
+            gem_prompt = f"{system_prompt}\n\nHISTORIAL DE CONVERSACIÓN RECIENTE:\n{hist_text}\n\nMENSAJE ACTUAL DE {sender_display.upper()}:\n{text}\n\nResponde como Jota (ejecutivo, experto, natural, en el idioma solicitado o en el que te escribe, formato WhatsApp):"
 
             for gem_model in ["gemini-3.6-flash", "gemini-flash-latest"]:
                 try:
@@ -1239,7 +1402,7 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
                                 if parts and parts[0].get("text"):
                                     reply_msg = parts[0]["text"].strip()
                                     if reply_msg:
-                                        print(f"[JOTA] Gemini ({gem_model}) replied OK")
+                                        print(f"[JOTA] Gemini ({gem_model}) replied OK for agency '{agency_name}'")
                                         break
                         else:
                             err_text = r.text[:200]
@@ -1254,32 +1417,40 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
             errors_summary = " | ".join(debug_errors) if debug_errors else "Sin detalles"
             print(f"[JOTA FALLBACK] Groq failed. errors: {errors_summary}")
             reply_msg = (
-                f"⚠️ Jota no pudo conectarse con Groq en este momento.\n"
-                f"Groq: {'✅ key OK' if groq_key else '❌ sin key'}\n"
+                f"⚠️ Jota no pudo conectarse con el motor de IA en este momento.\n"
                 f"Intenta de nuevo en unos segundos."
             )
 
+        # Save assistant reply to persistent conversation history for this agency
+        save_copilot_message_db(role="assistant", content=reply_msg, agency_id=agency_id)
 
-        # Save assistant reply to persistent conversation history
-        save_copilot_message_db(role="assistant", content=reply_msg)
+        # Resolve target phone and target JID
+        clean_sender = "".join([c for c in (sender_phone or "") if c.isdigit()])
+        clean_admin = "".join([c for c in (admin_phone_conf or "") if c.isdigit()])
+        if clean_sender and len(clean_sender) >= 8:
+            target_phone = clean_sender
+        elif clean_admin and len(clean_admin) >= 8:
+            target_phone = clean_admin
+        else:
+            target_phone = ADMIN_PHONE_DIGITS
 
-        # Send response back to admin via WhatsApp
+        target_jid = sender_jid if sender_jid else f"{target_phone}@s.whatsapp.net"
+
         try:
-            print(f"[ADMIN COPILOT] Dispatching reply to Super-Admin ({ADMIN_PHONE_DIGITS}):\n{reply_msg[:120]}...")
+            print(f"[ADMIN COPILOT] Dispatching reply for agency '{agency_name}' to {target_phone} (JID: {target_jid}):\n{reply_msg[:120]}...")
         except UnicodeEncodeError:
-            print(f"[ADMIN COPILOT] Dispatching reply to Super-Admin ({ADMIN_PHONE_DIGITS})")
-
-        target_jid = sender_jid if sender_jid else f"{ADMIN_PHONE_DIGITS}@s.whatsapp.net"
-        target_phone = sender_phone if (sender_phone and len(sender_phone) >= 8 and not sender_jid.endswith('@lid')) else ADMIN_PHONE_DIGITS
+            print(f"[ADMIN COPILOT] Dispatching reply for agency '{agency_name}' to {target_phone}")
 
         dispatch_res = await dispatch_whatsapp_direct(to_phone=target_phone, message=reply_msg, bypass_shield=True, target_jid=target_jid)
         return {
             "status": "admin_copilot_replied",
             "message": reply_msg,
             "target_jid": target_jid,
+            "target_phone": target_phone,
+            "agency_id": agency_id,
             "dispatch_res": dispatch_res,
             "debug_errors": debug_errors,
-        "groq_key_len": len(groq_key),
+            "groq_key_len": len(groq_key),
             "gemini_key_len": len(gemini_key)
         }
 
@@ -1295,7 +1466,7 @@ def get_recent_inbound():
 async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     """
     Receives incoming WhatsApp messages in real-time.
-    0. If from Super-Admin (+971508379080) or mentions "Jota" -> Copilot Mode.
+    0. If from Admin (or mentions "Jota") -> Copilot Mode for the detected Agency.
     1. If from developer/launch group -> Groq/Gemini parses project facts and adds to inventory knowledge.
     2. If from prospect -> Groq/Gemini classifies intent, auto-updates CRM notes & triggers hot lead alerts.
     """
@@ -1303,6 +1474,7 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     sender = (payload.get("sender") or "").replace("+", "").replace(" ", "").strip()
     is_group = payload.get("is_group", False)
     jid = payload.get("jid", "")
+    bot_phone = payload.get("bot_phone") or ""
 
     # Extract text from base64 PDF if document is attached
     if payload.get("has_document") and payload.get("document_base64"):
@@ -1342,26 +1514,14 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     if is_group or "@g.us" in jid or "broadcast" in jid:
         return {"status": "ignored", "reason": "group_or_broadcast_ignored"}
 
-    # 0. SUPER-ADMIN COPILOT MODE (Exclusive for David's Admin Phone or Chat with Self)
+    # 0. RESOLVE AGENCY & CHECK ADMIN COPILOT MODE
+    agency_info = resolve_agency_for_message(sender=sender, jid=jid, bot_phone=bot_phone)
     push_name = (payload.get("push_name") or "").lower()
-    is_admin = (
-        sender == ADMIN_PHONE_DIGITS or 
-        "508379080" in sender or 
-        sender.endswith("508379080") or 
-        "508379080" in jid or
-        "david" in push_name or
-        sender == "971501378020" or
-        "501378020" in sender or
-        "501378020" in jid or
-        "564317976" in sender or
-        "564317976" in jid or
-        "545932205" in sender or
-        "545932205" in jid
-    )
+    is_admin = is_admin_sender(sender=sender, jid=jid, push_name=push_name, agency=agency_info)
 
     if is_admin:
-        print(f"[ADMIN COPILOT] Message from Super-Admin ({sender} | JID: {jid}): '{text}'")
-        # Check if Super-Admin specifically sent a developer launch brochure (contains PDF or long brochure text)
+        print(f"[ADMIN COPILOT] Message from Admin ({sender} | JID: {jid} | Agency: {agency_info.get('name')}): '{text}'")
+        # Check if Admin specifically sent a developer launch brochure (contains PDF or long brochure text)
         if (payload.get("has_document") or len(text) > 200) and is_developer_or_launch_message(text, is_group=False):
             try:
                 parsed_project = await parse_project_from_text(text)
@@ -1370,7 +1530,7 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
                     parsed_project["is_group"] = False
                     parsed_project["detected_at"] = payload.get("timestamp")
                     INGESTED_PROJECTS_FEED.insert(0, parsed_project)
-                    print(f"[Auto-Ingestion] New project parsed from Super-Admin: {parsed_project.get('project_name')} by {parsed_project.get('developer')}")
+                    print(f"[Auto-Ingestion] New project parsed from Admin: {parsed_project.get('project_name')} by {parsed_project.get('developer')}")
 
                     price_val = parsed_project.get('starting_price_aed')
                     price_display = f"{price_val:,} AED" if isinstance(price_val, (int, float)) and price_val > 0 else "Consultar"
@@ -1384,7 +1544,8 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
                         f"• *Resumen:* {parsed_project.get('short_summary') or 'Oportunidad de inversión'}\n\n"
                         f"✅ _Indexado en el inventario para tus agentes de IA._"
                     )
-                    await dispatch_whatsapp_direct(to_phone=ADMIN_PHONE_DIGITS, message=admin_notice, bypass_shield=True)
+                    clean_admin_phone = "".join([c for c in (agency_info.get("admin_phone") or ADMIN_PHONE_DIGITS) if c.isdigit()])
+                    await dispatch_whatsapp_direct(to_phone=clean_admin_phone, message=admin_notice, bypass_shield=True)
 
                     return {
                         "status": "project_ingested",
@@ -1395,9 +1556,9 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
             except Exception as e:
                 print(f"[Auto-Ingestion Error]: {e}")
 
-        # By default, any conversation or question from Super-Admin goes straight to Jota Copilot
-        asyncio.create_task(handle_admin_copilot(text, sender_jid=jid, sender_phone=sender))
-        return {"status": "copilot_dispatched_async"}
+        # By default, any conversation or question from Workspace Admin goes straight to Jota Copilot
+        asyncio.create_task(handle_admin_copilot(text, sender_jid=jid, sender_phone=sender, agency_info=agency_info))
+        return {"status": "copilot_dispatched_async", "agency_id": agency_info.get("id")}
 
     # SENDER IS A CLIENT / PROSPECT (Direct 1-on-1 private WhatsApp message)
     sender_digits = "".join([c for c in sender if c.isdigit()])
@@ -1425,15 +1586,16 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
         VALUES ('inbound_prospects', 'Prospectos Inbound WhatsApp', 'whatsapp', 'Captura automática de prospectos entrantes', ?)
         """, (now_str,))
 
+        lead_agency_id = agency_info.get("id", "agency_master")
         cursor.execute("""
-        INSERT INTO leads (id, name, phone, clean_phone, crm_status, whatsapp_status, last_contact_date, notes, campaign_id, created_at)
-        VALUES (?, ?, ?, ?, 'INTERESTED', 'replied', ?, ?, 'inbound_prospects', ?)
-        """, (lead_id, push_name_lead, f"+{sender}", sender_digits, now_str, f"Prospecto directo WhatsApp: {text}", now_str))
+        INSERT INTO leads (id, name, phone, clean_phone, crm_status, whatsapp_status, last_contact_date, notes, campaign_id, agency_id, created_at)
+        VALUES (?, ?, ?, ?, 'INTERESTED', 'replied', ?, ?, 'inbound_prospects', ?, ?)
+        """, (lead_id, push_name_lead, f"+{sender}", sender_digits, now_str, f"Prospecto directo WhatsApp: {text}", lead_agency_id, now_str))
         conn.commit()
         
         cursor.execute("SELECT * FROM leads WHERE id = ?", (lead_id,))
         matched_lead = cursor.fetchone()
-        print(f"[Inbound Prospect Auto-Created] Created lead/prospect '{push_name_lead}' (+{sender}) from non-admin WhatsApp message.")
+        print(f"[Inbound Prospect Auto-Created] Created lead/prospect '{push_name_lead}' (+{sender}) for agency {lead_agency_id} from non-admin WhatsApp message.")
 
     # SENDER IS A REGISTERED LEAD: Process intent & update CRM records
     lid = matched_lead["id"]
@@ -1455,7 +1617,7 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     had_previous_jota_interaction = any("jota" in (n.get("content") or "").lower() for n in prior_notes)
     
     # CRITICAL RULE: Jota will ONLY answer external chats if they explicitly address him by name in this message.
-    # If Jota is not mentioned: record note in CRM, notify David privately, but DO NOT dispatch any message to the client.
+    # If Jota is not mentioned: record note in CRM, notify admin privately, but DO NOT dispatch any message to the client.
     as_jota_assistant = True
     is_first_jota_mention = not had_previous_jota_interaction
 
@@ -1463,7 +1625,7 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     david_alert = ""
 
     if mentions_jota:
-        # 2. Generate personalized response as Jota assistant + David briefing
+        # 2. Generate personalized response as Jota assistant + briefing
         lead_reply, david_alert = await generate_david_response(
             incoming_text=text,
             lead=dict(matched_lead),
@@ -1474,7 +1636,7 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
             is_first_jota_mention=is_first_jota_mention
         )
     else:
-        # If Jota was NOT summoned, create an executive alert for David so David is aware someone wrote
+        # If Jota was NOT summoned, create an executive alert for Admin so they are aware someone wrote
         david_alert = f"📩 *NUEVO MENSAJE RECIBIDO (Sin invocar a Jota)*\n"
         david_alert += f"👤 *De:* {lead_name} (+{sender})\n"
         david_alert += f"💬 *Mensaje:* \"{text}\"\n\n"
@@ -1513,7 +1675,7 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
 
     # 3. Deliver lead reply via WhatsApp ONLY if mentions_jota is True
     if mentions_jota and lead_reply:
-        author_label = "Jota (Asistente de David)"
+        author_label = f"Jota (Asistente de {agency_info.get('name', 'Admin')})"
         async def dispatch_client_reply(target_phone: str, reply_msg: str, lead_id: str, client_jid: str = ""):
             try:
                 await asyncio.sleep(4)  # Natural human pause
@@ -1527,9 +1689,10 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     else:
         print(f"[Client Reply Skipped] Non-admin message from {sender} did not mention 'jota'. No message dispatched to client.")
 
-    # 4. Deliver private executive briefing to David's personal WhatsApp (+971508379080)
+    # 4. Deliver private executive briefing to agency admin's WhatsApp
     if david_alert:
-        await dispatch_whatsapp_direct(to_phone=ADMIN_PHONE_DIGITS, message=david_alert, bypass_shield=True)
+        clean_admin = "".join([c for c in (agency_info.get("admin_phone") or ADMIN_PHONE_DIGITS) if c.isdigit()])
+        await dispatch_whatsapp_direct(to_phone=clean_admin, message=david_alert, bypass_shield=True)
 
     # 5. Telegram Alert for high intent or property inquiry
     is_hot = has_prop_req or intent in ["ready_to_buy", "interested", "scheduling", "objection_price", "objection_trust", "objection_spouse"] or urgency in ["high", "medium"]
