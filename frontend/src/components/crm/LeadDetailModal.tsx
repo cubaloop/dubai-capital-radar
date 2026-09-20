@@ -115,8 +115,8 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
           </div>
           <h2 className="text-2xl font-serif-luxury font-bold text-slate-900">{lead.name}</h2>
           <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 font-mono pt-1">
-            <a href={`tel:${cleanDigits}`} className="hover:text-gold-700 transition flex items-center gap-1 font-semibold">
-              <Phone className="w-3.5 h-3.5 text-gold-600" /> {lead.phone}
+            <a href={`tel:+${cleanDigits}`} className="hover:text-gold-700 transition flex items-center gap-1 font-semibold">
+              <Phone className="w-3.5 h-3.5 text-gold-600" /> {lead.phone?.startsWith('+') ? lead.phone : `+${cleanDigits}`}
             </a>
             {lead.email && <span>• {lead.email}</span>}
           </div>
@@ -176,7 +176,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
             {/* Direct Phone Call */}
             <a
-              href={`tel:${cleanDigits}`}
+              href={`tel:+${cleanDigits}`}
               className="flex-1 h-12 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl flex items-center justify-center shadow-md shadow-blue-600/20 active:scale-95 transition-all"
               title="Llamar directamente al lead"
             >

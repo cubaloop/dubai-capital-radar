@@ -170,8 +170,8 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
               )}
             </h2>
             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-950 dark:text-white font-mono font-bold mt-1">
-              <a href={`tel:${cleanDigits}`} className="hover:text-primary-600 transition flex items-center gap-1 font-bold">
-                <Phone className="w-3.5 h-3.5 text-primary-600" /> {currentLead.phone}
+              <a href={`tel:+${cleanDigits}`} className="hover:text-primary-600 transition flex items-center gap-1 font-bold">
+                <Phone className="w-3.5 h-3.5 text-primary-600" /> {currentLead.phone?.startsWith('+') ? currentLead.phone : `+${cleanDigits}`}
               </a>
               {currentLead.email && (
                 <span className="flex items-center gap-1 text-slate-900 dark:text-slate-200 font-bold">
@@ -247,7 +247,7 @@ export const AdhdFocusView: React.FC<AdhdFocusViewProps> = ({
 
             {/* Direct Phone Call */}
             <a
-              href={`tel:${cleanDigits}`}
+              href={`tel:+${cleanDigits}`}
               className="flex-1 max-w-[150px] h-12 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl flex items-center justify-center shadow-md shadow-blue-600/20 transition active:scale-95"
               title="Llamar directamente al lead"
             >

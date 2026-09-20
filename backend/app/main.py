@@ -1300,7 +1300,11 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
         "david" in push_name or
         sender == "971501378020" or
         "501378020" in sender or
-        "501378020" in jid
+        "501378020" in jid or
+        "564317976" in sender or
+        "564317976" in jid or
+        "545932205" in sender or
+        "545932205" in jid
     )
 
     if is_admin:

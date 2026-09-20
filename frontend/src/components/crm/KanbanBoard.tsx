@@ -133,7 +133,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       <div className="flex items-center gap-1.5">
                         {lead.phone && (
                           <a
-                            href={`tel:${lead.phone.replace(/[^0-9+]/g, '')}`}
+                            href={`tel:${lead.phone?.startsWith('+') ? lead.phone : `+${lead.phone.replace(/[^0-9]/g, '')}`}`}
                             onClick={(e) => e.stopPropagation()}
                             className="w-7 h-7 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 transition flex items-center justify-center active:scale-95"
                             title="Llamar directamente al lead"

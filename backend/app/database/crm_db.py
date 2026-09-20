@@ -124,11 +124,19 @@ def init_crm_db():
     for col, definition in [
         ("messages_limit", "INTEGER DEFAULT 500"),
         ("messages_used", "INTEGER DEFAULT 0"),
+        ("admin_phone", "TEXT"),
+        ("bot_phone", "TEXT"),
     ]:
         try:
             cursor.execute(f"ALTER TABLE agencies ADD COLUMN {col} {definition}")
         except Exception:
             pass
+
+    # Ensure all leads have phone starting with '+'
+    try:
+        cursor.execute("UPDATE leads SET phone = '+' || clean_phone WHERE phone NOT LIKE '+%' AND clean_phone != ''")
+    except Exception:
+        pass
 
     conn.commit()
 

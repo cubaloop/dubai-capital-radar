@@ -920,7 +920,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
                     <div className="flex items-center gap-2 self-end sm:self-center shrink-0 pt-1 sm:pt-0">
                       {lead.phone && (
                         <a
-                          href={`tel:${lead.phone.replace(/[^0-9+]/g, '')}`}
+                          href={`tel:${lead.phone.startsWith('+') ? lead.phone : `+${lead.phone.replace(/[^0-9]/g, '')}`}`}
                           onClick={(e) => e.stopPropagation()}
                           className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 transition shadow-sm flex items-center justify-center active:scale-95"
                           title="Llamar directamente al lead"
@@ -1091,7 +1091,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
 
                     {/* Direct Phone Call Button */}
                     <a
-                      href={`tel:${selectedLeadPreview.phone.replace(/[^0-9+]/g, '')}`}
+                      href={`tel:${selectedLeadPreview.phone.startsWith('+') ? selectedLeadPreview.phone : `+${selectedLeadPreview.phone.replace(/[^0-9]/g, '')}`}`}
                       className="w-12 h-11 bg-blue-600 hover:bg-blue-500 text-white rounded-xl flex items-center justify-center shadow-md shadow-blue-600/20 active:scale-95 transition-all shrink-0"
                       title="Llamar directamente al lead"
                     >
