@@ -249,7 +249,7 @@ export const AuthScreen: React.FC = () => {
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                   <input
-                    type="password" required
+                    type="password" required={isRegister}
                     placeholder="••••••••"
                     value={password} onChange={e => setPassword(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#201D34] border border-slate-200 dark:border-[#3A354C] text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-primary-500 focus:outline-none transition text-sm"
