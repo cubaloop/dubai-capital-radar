@@ -918,6 +918,7 @@ async def regenerate_campaign_lead_messages(campaign_id: str, new_prompt: Option
             except Exception as e:
                 print(f"[Lead AI Gen Error {lead_dict.get('id')}]: {e}")
                 msg = compose_lead_message_local(lead_dict, active_prompt, camp_name)
+            await asyncio.sleep(0.08)
             return lead_dict["id"], msg
 
     results = await asyncio.gather(*[generate_single(l) for l in leads_to_update])
@@ -929,12 +930,14 @@ async def regenerate_campaign_lead_messages(campaign_id: str, new_prompt: Option
     conn.commit()
     conn.close()
 
+    ai_active = bool(os.getenv("GROQ_API_KEY") or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+
     return {
         "success": True,
         "campaign_id": campaign_id,
         "prompt_instructions": active_prompt,
         "updated_count": len(leads_to_update),
-        "ai_used": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+        "ai_used": ai_active
     }
 
 def update_campaign_meta(campaign_id: str, name: Optional[str] = None, category: Optional[str] = None, description: Optional[str] = None) -> bool:

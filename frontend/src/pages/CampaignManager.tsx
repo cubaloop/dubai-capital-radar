@@ -148,9 +148,8 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
       const res = await apiService.getCampaignLeads(cid);
       if (res?.leads) {
         setLeads(res.leads);
-        if (res.gemini_ai_connected !== undefined) {
-          setIsAiConnected(res.gemini_ai_connected);
-        }
+        const isOnline = Boolean(res.groq_ai_connected || res.gemini_ai_connected || res.ai_used);
+        setIsAiConnected(isOnline);
         if (res.leads.length > 0) {
           setSelectedLeadPreview(res.leads[0]);
         } else {
@@ -252,9 +251,8 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
       setIsUpdatingPrompt(true);
       const res = await apiService.updateCampaignAiPrompt(selectedCampaignId, campaignAiPrompt, true);
       if (res?.success) {
-        if (res.gemini_ai_connected !== undefined) {
-          setIsAiConnected(res.gemini_ai_connected);
-        }
+        const isOnline = Boolean(res.groq_ai_connected || res.gemini_ai_connected || res.ai_used);
+        setIsAiConnected(isOnline);
         if (res.leads) {
           setLeads(res.leads);
           if (selectedLeadPreview) {
