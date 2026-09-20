@@ -10,6 +10,18 @@ import {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
+// Helper: read current logged-in agency ID from localStorage session
+function getAgencyId(): string | null {
+  try {
+    const session = localStorage.getItem('dcr_user_session');
+    if (session) {
+      const parsed = JSON.parse(session);
+      return parsed.agencyId || null;
+    }
+  } catch {}
+  return null;
+}
+
 export const apiService = {
   async getHealth() {
     const res = await fetch(`${API_BASE_URL}/health`);
@@ -129,12 +141,21 @@ export const apiService = {
   // ─── UNIFIED CRM & DYNAMIC CAMPAIGNS ──────────────────────────────────────────
 
   async getCrmCampaigns() {
-    const res = await fetch(`${API_BASE_URL}/crm/campaigns`);
+    const agencyId = getAgencyId();
+    const url = agencyId
+      ? `${API_BASE_URL}/crm/campaigns?agency_id=${encodeURIComponent(agencyId)}`
+      : `${API_BASE_URL}/crm/campaigns`;
+    const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to fetch CRM campaigns');
     return res.json();
   },
 
   async uploadExcelCampaign(formData: FormData) {
+    // Inject agency_id so the campaign is tagged to this user's agency
+    const agencyId = getAgencyId();
+    if (agencyId && !formData.has('agency_id')) {
+      formData.append('agency_id', agencyId);
+    }
     const res = await fetch(`${API_BASE_URL}/crm/campaigns/upload-excel`, {
       method: 'POST',
       body: formData
@@ -185,7 +206,11 @@ export const apiService = {
   },
 
   async getAllCrmLeads() {
-    const res = await fetch(`${API_BASE_URL}/crm/all-leads`);
+    const agencyId = getAgencyId();
+    const url = agencyId
+      ? `${API_BASE_URL}/crm/all-leads?agency_id=${encodeURIComponent(agencyId)}`
+      : `${API_BASE_URL}/crm/all-leads`;
+    const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to fetch CRM leads');
     return res.json();
   },

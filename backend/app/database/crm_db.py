@@ -343,18 +343,65 @@ def seed_initial_campaigns(conn):
 
 # --- Public API methods ---
 
-def get_campaigns_list() -> List[Dict[str, Any]]:
+def is_admin_agency_or_user(agency_id_or_email: str) -> bool:
+    if not agency_id_or_email:
+        return False
+    admin_tokens = ["admin", "superadmin", "master", "davidhabana", "dvdaguez", "director@outpilot.ae"]
+    low = str(agency_id_or_email).lower()
+    if any(tok in low for tok in admin_tokens):
+        return True
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT email FROM agencies WHERE id = ?", (agency_id_or_email,))
+        row = cursor.fetchone()
+        conn.close()
+        if row and row["email"]:
+            email_low = row["email"].lower()
+            if any(tok in email_low for tok in admin_tokens):
+                return True
+    except Exception:
+        pass
+    return False
+
+def get_campaigns_list(agency_id: str = None) -> List[Dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-    SELECT c.*,
-           COUNT(l.id) as total_leads,
-           SUM(CASE WHEN l.whatsapp_status = 'sent' THEN 1 ELSE 0 END) as sent_leads
-    FROM campaigns c
-    LEFT JOIN leads l ON c.id = l.campaign_id
-    GROUP BY c.id
-    ORDER BY c.created_at DESC
-    """)
+    if agency_id:
+        if is_admin_agency_or_user(agency_id):
+            cursor.execute("""
+            SELECT c.*,
+                   COUNT(l.id) as total_leads,
+                   SUM(CASE WHEN l.whatsapp_status = 'sent' THEN 1 ELSE 0 END) as sent_leads
+            FROM campaigns c
+            LEFT JOIN leads l ON c.id = l.campaign_id
+            WHERE c.agency_id = ? OR c.agency_id IS NULL
+            GROUP BY c.id
+            ORDER BY c.created_at DESC
+            """, (agency_id,))
+        else:
+            cursor.execute("""
+            SELECT c.*,
+                   COUNT(l.id) as total_leads,
+                   SUM(CASE WHEN l.whatsapp_status = 'sent' THEN 1 ELSE 0 END) as sent_leads
+            FROM campaigns c
+            LEFT JOIN leads l ON c.id = l.campaign_id
+            WHERE c.agency_id = ?
+            GROUP BY c.id
+            ORDER BY c.created_at DESC
+            """, (agency_id,))
+    else:
+        # Default safety: if unauthenticated, return empty list
+        cursor.execute("""
+        SELECT c.*,
+               COUNT(l.id) as total_leads,
+               SUM(CASE WHEN l.whatsapp_status = 'sent' THEN 1 ELSE 0 END) as sent_leads
+        FROM campaigns c
+        LEFT JOIN leads l ON c.id = l.campaign_id
+        WHERE 1 = 0
+        GROUP BY c.id
+        ORDER BY c.created_at DESC
+        """)
     rows = cursor.fetchall()
     campaigns = []
     for r in rows:
@@ -412,25 +459,27 @@ def create_campaign_with_leads(campaign_data: Dict[str, Any], leads_data: List[D
     description = campaign_data.get("description", "")
     attached_flyer = campaign_data.get("attached_flyer", "")
     ai_prompt = campaign_data.get("ai_prompt_instructions", "")
+    agency_id = campaign_data.get("agency_id") or None
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     cursor.execute("""
-    INSERT INTO campaigns (id, name, category, description, attached_flyer, ai_prompt_instructions, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (cid, cname, category, description, attached_flyer, ai_prompt, now_str))
+    INSERT INTO campaigns (id, name, category, description, attached_flyer, ai_prompt_instructions, agency_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (cid, cname, category, description, attached_flyer, ai_prompt, agency_id, now_str))
 
     for idx, l in enumerate(leads_data):
         lid = l.get("id") or f"lead_{cid}_{idx + 1}"
         phone = l.get("phone", "")
         clean_phone = "".join([c for c in phone if c.isdigit()])
+        lead_agency_id = l.get("agency_id") or agency_id or None
         
         cursor.execute("""
         INSERT INTO leads (
             id, campaign_id, name, phone, clean_phone, email,
             budget_aed, budget_eur, objective, timeline, notes,
             crm_status, whatsapp_status, last_contact_date, last_sent_type,
-            personalized_message, next_reminder_date, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            personalized_message, next_reminder_date, agency_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             lid,
             cid,
@@ -449,6 +498,7 @@ def create_campaign_with_leads(campaign_data: Dict[str, Any], leads_data: List[D
             l.get("last_sent_type"),
             l.get("personalized_message", ""),
             l.get("next_reminder_date"),
+            lead_agency_id,
             now_str
         ))
 
@@ -657,15 +707,34 @@ def create_or_upsert_lead_db(lead_data: Dict[str, Any]) -> Dict[str, Any]:
     sync_lead_background(result)
     return result
 
-def get_all_crm_leads() -> List[Dict[str, Any]]:
+def get_all_crm_leads(agency_id: str = None) -> List[Dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-    SELECT l.*, c.name as campaign_name, c.category as campaign_category
-    FROM leads l
-    LEFT JOIN campaigns c ON l.campaign_id = c.id
-    ORDER BY l.last_contact_date DESC NULLS LAST, l.created_at DESC
-    """)
+    if agency_id:
+        if is_admin_agency_or_user(agency_id):
+            cursor.execute("""
+            SELECT l.*, c.name as campaign_name, c.category as campaign_category
+            FROM leads l
+            LEFT JOIN campaigns c ON l.campaign_id = c.id
+            WHERE l.agency_id = ? OR c.agency_id = ? OR (l.agency_id IS NULL AND (c.agency_id IS NULL OR c.agency_id = ?))
+            ORDER BY l.last_contact_date DESC NULLS LAST, l.created_at DESC
+            """, (agency_id, agency_id, agency_id))
+        else:
+            cursor.execute("""
+            SELECT l.*, c.name as campaign_name, c.category as campaign_category
+            FROM leads l
+            LEFT JOIN campaigns c ON l.campaign_id = c.id
+            WHERE l.agency_id = ? OR c.agency_id = ?
+            ORDER BY l.last_contact_date DESC NULLS LAST, l.created_at DESC
+            """, (agency_id, agency_id))
+    else:
+        # Default safety: unauthenticated queries return empty list
+        cursor.execute("""
+        SELECT l.*, c.name as campaign_name, c.category as campaign_category
+        FROM leads l
+        LEFT JOIN campaigns c ON l.campaign_id = c.id
+        WHERE 1 = 0
+        """)
     leads = [dict(r) for r in cursor.fetchall()]
     conn.close()
     return leads

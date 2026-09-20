@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { CRMView } from './pages/CRMView';
 import { CampaignManager } from './pages/CampaignManager';
@@ -32,6 +32,7 @@ function DemoLauncher() {
       plan: 'free',
       messagesUsed: 18,
       messagesLimit: 500,
+      agencyId: 'agency_demo_outpilot'
     };
     localStorage.setItem('dcr_user_session', JSON.stringify(demoUser));
     // Trigger seed in background
@@ -52,6 +53,8 @@ function DemoLauncher() {
 export function App() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [currentUser, setCurrentUser] = useState<any>(() => {
     try {
       const saved = localStorage.getItem('dcr_user_session');
@@ -59,13 +62,22 @@ export function App() {
     } catch {
       // ignore
     }
-    return {
-      name: 'Advisory Director',
-      email: 'director@outpilot.ae',
-      agencyName: 'Outpilot Agency',
-      plan: 'professional'
-    };
+    return null;
   });
+
+  // Keep currentUser state in sync with localStorage on any navigation
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('dcr_user_session');
+      if (saved) {
+        setCurrentUser(JSON.parse(saved));
+      } else {
+        setCurrentUser(null);
+      }
+    } catch {
+      setCurrentUser(null);
+    }
+  }, [location.pathname]);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);

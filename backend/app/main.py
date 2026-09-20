@@ -644,9 +644,9 @@ from .crm.batch_dispatcher import batch_manager
 from .crm.excel_parser import parse_spreadsheet_bytes, map_and_structure_leads
 
 @app.get("/api/crm/campaigns")
-def api_get_campaigns():
-    """Returns list of all campaigns with real-time lead counts and sent stats."""
-    return {"campaigns": get_campaigns_list()}
+def api_get_campaigns(agency_id: str = None):
+    """Returns list of campaigns. Filtered by agency_id if provided."""
+    return {"campaigns": get_campaigns_list(agency_id=agency_id)}
 
 @app.post("/api/crm/campaigns/upload-excel")
 async def api_upload_excel_campaign(
@@ -654,6 +654,7 @@ async def api_upload_excel_campaign(
     campaign_name: str = Form(...),
     category: str = Form("General"),
     campaign_context: str = Form(""),
+    agency_id: str = Form(""),
     flyer: Optional[UploadFile] = File(None)
 ):
     """
@@ -687,9 +688,10 @@ async def api_upload_excel_campaign(
             "category": category,
             "description": campaign_context or f"Campaña importada ({len(structured_leads)} leads)",
             "attached_flyer": flyer_path,
-            "ai_prompt_instructions": campaign_context
+            "ai_prompt_instructions": campaign_context,
+            "agency_id": agency_id or None
         },
-        leads_data=structured_leads
+        leads_data=[{**lead, "agency_id": agency_id or None} for lead in structured_leads]
     )
 
     return {
@@ -906,9 +908,9 @@ def api_get_campaign_batch_status(campaign_id: str):
     return batch_manager.get_status(campaign_id)
 
 @app.get("/api/crm/all-leads")
-def api_get_all_crm_leads():
-    """Returns all leads for the ADHD CRM Kanban and Focus view."""
-    return {"leads": get_all_crm_leads()}
+def api_get_all_crm_leads(agency_id: str = None):
+    """Returns leads for the CRM view. Filtered by agency_id if provided."""
+    return {"leads": get_all_crm_leads(agency_id=agency_id)}
 
 @app.post("/api/crm/leads")
 def api_create_or_upsert_lead(payload: Dict[str, Any]):
@@ -1602,7 +1604,7 @@ async def copilot_voice_interact(payload: Dict[str, Any]):
     
     # Fetch real live metrics from CRM
     try:
-        all_leads = get_all_crm_leads()
+        all_leads = get_all_crm_leads(agency_id="master")
     except Exception:
         all_leads = []
         
