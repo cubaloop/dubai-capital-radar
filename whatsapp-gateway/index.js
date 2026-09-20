@@ -523,7 +523,10 @@ async function startWhatsApp() {
 
   // Listen to incoming messages for Super-Admin copilot & Prospect AI replies
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify') return;
+    // Log all message types for debugging - 'notify' = new real-time msg, 'append' = history sync
+    console.log(`[WA Event] messages.upsert type=${type} count=${messages.length}`);
+    // Accept both 'notify' (new messages) and 'append' (synced/pending messages from existing chats)
+    if (type !== 'notify' && type !== 'append') return;
 
     for (const msg of messages) {
       if (!msg.message) continue;
@@ -537,6 +540,9 @@ async function startWhatsApp() {
       const isGroup = remoteJid.endsWith('@g.us') || remoteJid.includes('@g.us');
       const isBroadcast = remoteJid === 'status@broadcast' || remoteJid.includes('broadcast');
 
+      // Debug: log every individual message details before filtering
+      console.log(`[WA Msg Debug] remoteJid=${remoteJid} fromMe=${msg.key.fromMe} isGroup=${isGroup} isBroadcast=${isBroadcast} pushName=${msg.pushName || ''}`);
+
       // STRICT FILTER: completely ignore all WhatsApp groups and status broadcasts
       if (isGroup || isBroadcast) {
         continue;
@@ -544,7 +550,14 @@ async function startWhatsApp() {
 
       // Allow owner chatting with bot from the same phone (Message yourself)
       const isChatWithSelf = connectedNumber && (remoteJid.includes(connectedNumber) || remoteJid.startsWith(connectedNumber));
-      if (msg.key.fromMe && !isChatWithSelf) continue;
+      // Also allow admin phone messages even if fromMe=true (multi-device sync edge case)
+      const ADMIN_NUMBER = '971508379080';
+      const isFromAdmin = remoteJid.includes(ADMIN_NUMBER) || (msg.key.participant && msg.key.participant.includes(ADMIN_NUMBER));
+      if (msg.key.fromMe && !isChatWithSelf && !isFromAdmin) {
+        console.log(`[WA Msg Debug] Skipping fromMe=true message (not self-chat, not admin): ${remoteJid}`);
+        continue;
+      }
+
 
       const senderNumber = extractPhoneNumber(remoteJid, msg.key.participant, msg.key.remoteJidAlt);
       const { text, hasDocument, documentFileName, unwrappedMsg } = extractMessageData(msg);
