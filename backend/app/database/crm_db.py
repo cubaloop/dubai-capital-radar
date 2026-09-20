@@ -395,9 +395,15 @@ def get_campaigns_list(agency_id: str = None) -> List[Dict[str, Any]]:
             FROM campaigns c
             LEFT JOIN leads l ON c.id = l.campaign_id
             WHERE c.agency_id = ?
+               OR c.agency_id = (SELECT id FROM agencies WHERE email = ? LIMIT 1)
+               OR c.agency_id IN (
+                   SELECT a2.id FROM agencies a1
+                   JOIN agencies a2 ON a1.email = a2.email
+                   WHERE a1.id = ? OR a1.email = ?
+               )
             GROUP BY c.id
             ORDER BY c.created_at DESC
-            """, (agency_id,))
+            """, (agency_id, agency_id, agency_id, agency_id))
     else:
         # Default safety: if unauthenticated, return empty list
         cursor.execute("""
@@ -732,9 +738,23 @@ def get_all_crm_leads(agency_id: str = None) -> List[Dict[str, Any]]:
             SELECT l.*, c.name as campaign_name, c.category as campaign_category
             FROM leads l
             LEFT JOIN campaigns c ON l.campaign_id = c.id
-            WHERE l.agency_id = ? OR c.agency_id = ?
+            WHERE (
+                l.agency_id = ? OR c.agency_id = ?
+                OR l.agency_id = (SELECT id FROM agencies WHERE email = ? LIMIT 1)
+                OR c.agency_id = (SELECT id FROM agencies WHERE email = ? LIMIT 1)
+                OR l.agency_id IN (
+                    SELECT a2.id FROM agencies a1
+                    JOIN agencies a2 ON a1.email = a2.email
+                    WHERE a1.id = ? OR a1.email = ?
+                )
+                OR c.agency_id IN (
+                    SELECT a2.id FROM agencies a1
+                    JOIN agencies a2 ON a1.email = a2.email
+                    WHERE a1.id = ? OR a1.email = ?
+                )
+            )
             ORDER BY l.last_contact_date DESC NULLS LAST, l.created_at DESC
-            """, (agency_id, agency_id))
+            """, (agency_id, agency_id, agency_id, agency_id, agency_id, agency_id, agency_id, agency_id))
     else:
         # Default safety: unauthenticated queries return empty list
         cursor.execute("""
@@ -988,7 +1008,9 @@ PLAN_LIMITS = {
 def create_agency(agency_data: Dict[str, Any]) -> Dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
-    aid = agency_data.get("id") or f"agency_{int(datetime.now().timestamp())}"
+    email = (agency_data.get("email") or "").lower().strip()
+    clean_email_slug = "".join([c if c.isalnum() else "_" for c in email])
+    aid = agency_data.get("id") or (f"agency_{clean_email_slug}" if clean_email_slug else f"agency_{int(datetime.now().timestamp())}")
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     plan = agency_data.get("plan", "free")
     messages_limit = agency_data.get("messages_limit", PLAN_LIMITS.get(plan, 500))

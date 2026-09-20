@@ -16,7 +16,7 @@ function getAgencyId(): string | null {
     const session = localStorage.getItem('dcr_user_session');
     if (session) {
       const parsed = JSON.parse(session);
-      return parsed.agencyId || null;
+      return parsed.agencyId || parsed.email || null;
     }
   } catch {}
   return null;
