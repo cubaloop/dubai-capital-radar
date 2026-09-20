@@ -212,6 +212,17 @@ const messageStore = new Map();
 const MESSAGE_STORE_FILE = path.join(AUTH_DIR, 'message_store.json');
 let messageStoreDirty = false;
 
+// Outbound message ID registry to prevent echo loops
+const programmaticSentIds = new Set();
+function recordProgrammaticSend(msgId) {
+  if (!msgId) return;
+  programmaticSentIds.add(msgId);
+  if (programmaticSentIds.size > 500) {
+    const oldest = programmaticSentIds.values().next().value;
+    programmaticSentIds.delete(oldest);
+  }
+}
+
 async function restoreMessageStoreFromSupabase() {
   if (!AUTH_BACKUP_ENABLED) return;
   try {
@@ -548,13 +559,17 @@ async function startWhatsApp() {
         continue;
       }
 
+      // Skip if this message was sent programmatically by this gateway
+      if (msg.key?.id && programmaticSentIds.has(msg.key.id)) {
+        console.log(`[WA Msg Debug] Skipping bot programmatically sent message ID: ${msg.key.id}`);
+        continue;
+      }
+
       // Allow owner chatting with bot from the same phone (Message yourself)
       const isChatWithSelf = connectedNumber && (remoteJid.includes(connectedNumber) || remoteJid.startsWith(connectedNumber));
-      // Allow admin phone messages even if fromMe=true (multi-device sync edge case)
-      const ADMIN_NUMBERS = ['971508379080', '971564317976', '971545932205', '971501378020'];
-      const isFromAdmin = ADMIN_NUMBERS.some(num => remoteJid.includes(num) || (msg.key.participant && msg.key.participant.includes(num)));
-      if (msg.key.fromMe && !isChatWithSelf && !isFromAdmin) {
-        console.log(`[WA Msg Debug] Skipping fromMe=true message (not self-chat, not admin): ${remoteJid}`);
+      // Outbound messages from this session to other numbers must NEVER be forwarded to backend webhook
+      if (msg.key.fromMe && !isChatWithSelf) {
+        console.log(`[WA Msg Debug] Skipping outbound fromMe=true message to: ${remoteJid}`);
         continue;
       }
 
@@ -695,6 +710,7 @@ app.post('/send', async (req, res) => {
       // Store in memory for Baileys retry handlers so recipients never get stuck on "Waiting for this message"
       if (sentMsg?.key?.id && sentMsg?.message) {
         saveToMessageStore(sentMsg.key.id, sentMsg.message);
+        recordProgrammaticSend(sentMsg.key.id);
       }
       // Persist auth ratchet state
       scheduleAuthBackup();
@@ -722,6 +738,7 @@ app.post('/send', async (req, res) => {
           }
           if (retryMsg?.key?.id && retryMsg?.message) {
             saveToMessageStore(retryMsg.key.id, retryMsg.message);
+            recordProgrammaticSend(retryMsg.key.id);
           }
           scheduleAuthBackup();
           resetDailyCounterIfNeeded();

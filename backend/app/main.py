@@ -1514,6 +1514,10 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     if is_group or "@g.us" in jid or "broadcast" in jid:
         return {"status": "ignored", "reason": "group_or_broadcast_ignored"}
 
+    # STRICT FILTER 2: Ignore bot self-notifications or system prefixes to prevent loops
+    if text.startswith("🏗️ *Nuevo Proyecto") or text.startswith("¡Hola!") or text.startswith("📩 *NUEVO MENSAJE") or text.startswith("🤖 [") or text.startswith("⚠️ Jota"):
+        return {"status": "ignored", "reason": "system_outbound_echo_ignored"}
+
     # 0. RESOLVE AGENCY & CHECK ADMIN COPILOT MODE
     agency_info = resolve_agency_for_message(sender=sender, jid=jid, bot_phone=bot_phone)
     push_name = (payload.get("push_name") or "").lower()
