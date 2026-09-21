@@ -9,9 +9,10 @@ Guarantees 100% persistent state of:
 import sqlite3
 import os
 import json
+import urllib.request
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-from .supabase_sync import sync_lead_background
+from .supabase_sync import sync_lead_background, SUPABASE_URL, SUPABASE_KEY
 
 DB_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 os.makedirs(DB_DIR, exist_ok=True)
@@ -182,7 +183,50 @@ def init_crm_db():
     # Always ensure Surprise Tourism's leads LATAM campaign is seeded
     seed_latam_campaign(conn)
 
+    # Hydrate sent/failed lead statuses from Supabase so redeploys never repeat leads
+    hydrate_leads_from_supabase(conn)
+
     conn.close()
+
+def hydrate_leads_from_supabase(conn):
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/leads?id=like.latam_lead_%25&select=id,comments"
+        req = urllib.request.Request(url, headers={
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}"
+        })
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            rows = json.loads(resp.read().decode("utf-8"))
+            cursor = conn.cursor()
+            updated = 0
+            for r in rows:
+                lid = r.get("id")
+                raw_comments = r.get("comments")
+                if not lid or not raw_comments:
+                    continue
+                try:
+                    meta = json.loads(raw_comments) if isinstance(raw_comments, str) else raw_comments
+                    ws = meta.get("whatsapp_status")
+                    lcd = meta.get("last_contact_date")
+                    lst = meta.get("last_sent_type")
+                    if ws in ("sent", "failed"):
+                        cursor.execute("""
+                        UPDATE leads
+                        SET whatsapp_status = ?,
+                            last_contact_date = COALESCE(?, last_contact_date),
+                            last_sent_type = COALESCE(?, last_sent_type)
+                        WHERE id = ?
+                        """, (ws, lcd, lst, lid))
+                        updated += cursor.rowcount
+                except Exception:
+                    pass
+            conn.commit()
+            if updated > 0:
+                print(f"[Supabase Hydration] Restored sent/failed status for {updated} leads from cloud database")
+    except Exception as e:
+        print("[Supabase Hydration] Warning:", e)
 
 def seed_latam_campaign(conn):
     cursor = conn.cursor()
