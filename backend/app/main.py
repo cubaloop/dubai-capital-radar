@@ -506,6 +506,15 @@ async def force_clear_restart_whatsapp():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.post("/api/whatsapp/restore-session")
+async def restore_whatsapp_session():
+    try:
+        async with httpx.AsyncClient(timeout=25.0) as client:
+            res = await client.post(f"{WHATSAPP_GATEWAY_URL}/restore-session")
+            return res.json()
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @app.post("/api/whatsapp/verify-numbers")
 async def verify_whatsapp_numbers(payload: Dict[str, Any]):
     try:

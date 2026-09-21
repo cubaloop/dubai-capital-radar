@@ -58,13 +58,27 @@ async function clearAuthFromSupabase() {
 async function uploadAuthToSupabase() {
   if (!AUTH_BACKUP_ENABLED) return;
   try {
+    // SAFETY GUARD: Never overwrite a valid saved session with an unauthenticated session
+    const credsPath = path.join(AUTH_DIR, 'creds.json');
+    if (!fs.existsSync(credsPath)) {
+      console.log('[Session Backup] Skipping backup: creds.json does not exist locally');
+      return;
+    }
+    try {
+      const creds = JSON.parse(fs.readFileSync(credsPath, 'utf-8'));
+      if (!creds.me || !creds.me.id) {
+        console.log('[Session Backup] Skipping backup: local session is not authenticated yet');
+        return;
+      }
+    } catch (parseErr) {
+      console.warn('[Session Backup] Skipping backup: unparseable creds.json');
+      return;
+    }
+
     const files = fs.readdirSync(AUTH_DIR);
     if (!files.length) return;
 
     // Bundle auth files into one JSON payload for atomic persistence.
-    // CRITICAL: Exclude session-* files. Signal session keys must NOT be synced to persistent cloud storage
-    // because after redeploys or restarts, stale contact session keys cause WhatsApp to display
-    // "Esperando mensaje. Esto puede tomar tiempo" (waiting for message) on the recipient phone.
     const bundle = {};
     for (const file of files) {
       if (file.startsWith('session-') || file === 'message_store.json') continue;
@@ -72,7 +86,6 @@ async function uploadAuthToSupabase() {
       bundle[file] = fs.readFileSync(filePath, 'utf-8');
     }
 
-    // Save into Supabase leads table under the dedicated system record 'whatsapp_auth_session'
     const res = await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
       method: 'POST',
       headers: {
@@ -84,16 +97,16 @@ async function uploadAuthToSupabase() {
       body: JSON.stringify({
         id: 'whatsapp_auth_session',
         full_name: 'WhatsApp Auth Session',
-        phone: connectedNumber || '971501378020',
+        phone: connectedNumber || '971545932205',
         lead_status: 'SYSTEM',
         campaign_name: 'system_auth',
         comments: JSON.stringify(bundle)
       }),
-      signal: AbortSignal.timeout(5000)
+      signal: AbortSignal.timeout(15000)
     });
 
     if (res.ok) {
-      console.log(`[Session Backup] ✅ Auth session bundle backed up to Supabase (${files.length} keys)`);
+      console.log(`[Session Backup] ✅ Auth session bundle backed up to Supabase (${Object.keys(bundle).length} keys)`);
     } else {
       console.log(`[Session Backup] Supabase backup status: ${res.status}`);
     }
@@ -107,71 +120,81 @@ async function restoreAuthFromSupabase() {
     console.log('[Session Restore] Supabase not configured - using local auth');
     return false;
   }
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/leads?id=eq.whatsapp_auth_session&select=*`, {
-      headers: {
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'apikey': SUPABASE_KEY
-      },
-      signal: AbortSignal.timeout(5000)
-    });
 
-    if (!res.ok) {
-      console.log('[Session Restore] Failed to query Supabase for auth session');
-      return false;
-    }
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      console.log(`[Session Restore] Attempting restore from Supabase (attempt ${attempt}/3)...`);
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/leads?id=eq.whatsapp_auth_session&select=*`, {
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'apikey': SUPABASE_KEY
+        },
+        signal: AbortSignal.timeout(20000)
+      });
 
-    const rows = await res.json();
-    if (!rows || !rows.length || !rows[0].comments) {
-      console.log('[Session Restore] No previous session bundle found in Supabase');
-      return false;
-    }
-
-    const bundle = JSON.parse(rows[0].comments);
-    const fileKeys = Object.keys(bundle);
-    let restoredCount = 0;
-    let skippedCount = 0;
-
-    for (const file of fileKeys) {
-      // CRITICAL FIX: Never restore session-*.json files (Signal ratchet states for contacts).
-      // These become stale across redeploys and cause "Esperando mensaje" on recipient devices
-      // because the ratchet is out of sync with what the contact's phone expects.
-      // Only restore the bot's own identity (creds.json) and app-state sync files.
-      if (file.startsWith('session-') || file === 'message_store.json') {
-        skippedCount++;
-        continue;
+      if (!res.ok) {
+        console.log(`[Session Restore] Failed to query Supabase for auth session: HTTP ${res.status}`);
+        if (attempt < 3) {
+          await new Promise(r => setTimeout(r, 2000));
+          continue;
+        }
+        return false;
       }
-      let content = bundle[file];
-      if (file === 'creds.json') {
-        try {
-          const parsedCreds = JSON.parse(content);
-          if (parsedCreds.me && !parsedCreds.registered) {
-            console.log('[Session Restore] Sanitizing creds.registered to true (phone is already linked as ' + (parsedCreds.me.id || '') + ')');
-            parsedCreds.registered = true;
-            content = JSON.stringify(parsedCreds, null, 2);
+
+      const rows = await res.json();
+      if (!rows || !rows.length || !rows[0].comments) {
+        console.log('[Session Restore] No previous session bundle found in Supabase');
+        return false;
+      }
+
+      const bundle = JSON.parse(rows[0].comments);
+      const fileKeys = Object.keys(bundle);
+      if (!bundle['creds.json']) {
+        console.log('[Session Restore] Supabase bundle has no creds.json');
+        return false;
+      }
+
+      let restoredCount = 0;
+      let skippedCount = 0;
+
+      for (const file of fileKeys) {
+        if (file.startsWith('session-') || file === 'message_store.json') {
+          skippedCount++;
+          continue;
+        }
+        let content = bundle[file];
+        if (file === 'creds.json') {
+          try {
+            const parsedCreds = JSON.parse(content);
+            if (parsedCreds.me && !parsedCreds.registered) {
+              console.log('[Session Restore] Sanitizing creds.registered to true (phone is already linked as ' + (parsedCreds.me.id || '') + ')');
+              parsedCreds.registered = true;
+              content = JSON.stringify(parsedCreds, null, 2);
+            }
+          } catch (_) {}
+        }
+        fs.writeFileSync(path.join(AUTH_DIR, file), content, 'utf-8');
+        restoredCount++;
+      }
+
+      // Purge any stale contact session files already on disk
+      let purgedCount = 0;
+      if (fs.existsSync(AUTH_DIR)) {
+        for (const f of fs.readdirSync(AUTH_DIR)) {
+          if (f.startsWith('session-')) {
+            try { fs.unlinkSync(path.join(AUTH_DIR, f)); purgedCount++; } catch (_) {}
           }
-        } catch (_) {}
-      }
-      fs.writeFileSync(path.join(AUTH_DIR, file), content, 'utf-8');
-      restoredCount++;
-    }
-
-    // Also purge any stale session files already on disk (from previous deploys)
-    let purgedCount = 0;
-    if (fs.existsSync(AUTH_DIR)) {
-      for (const f of fs.readdirSync(AUTH_DIR)) {
-        if (f.startsWith('session-')) {
-          try { fs.unlinkSync(path.join(AUTH_DIR, f)); purgedCount++; } catch (_) {}
         }
       }
-    }
 
-    console.log(`[Session Restore] Restored ${restoredCount} identity files | Skipped ${skippedCount} stale session files | Purged ${purgedCount} disk session files`);
-    console.log('[Session Restore] Fresh Signal sessions will be negotiated with each contact on first message (prevents Esperando mensaje)');
-    return true;
-  } catch (err) {
-    console.error('[Session Restore] Restore failed:', err.message);
-    return false;
+      console.log(`[Session Restore] ✅ Restored ${restoredCount} identity files from Supabase | Skipped ${skippedCount} stale session files | Purged ${purgedCount} disk session files`);
+      return restoredCount > 0;
+    } catch (err) {
+      console.error(`[Session Restore] Attempt ${attempt} failed:`, err.message);
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 2500));
+      }
+    }
   }
 }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -846,6 +869,26 @@ app.post('/pairing-code', async (req, res) => {
     });
   } catch (err) {
     console.error('[WhatsApp] Pairing code error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/restore-session', async (req, res) => {
+  try {
+    if (sock) {
+      try { sock.end(undefined); } catch (_) {}
+    }
+    const success = await restoreAuthFromSupabase();
+    if (success) {
+      isConnected = false;
+      connectedNumber = null;
+      currentQR = null;
+      setTimeout(startWhatsApp, 1500);
+      return res.json({ success: true, message: 'Sesión restaurada desde Supabase. Reconectando WhatsApp...' });
+    } else {
+      return res.status(500).json({ success: false, error: 'No se pudo restaurar la sesión desde Supabase' });
+    }
+  } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
 });
