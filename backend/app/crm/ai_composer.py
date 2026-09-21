@@ -105,8 +105,18 @@ def compose_lead_message_local(lead: Dict[str, Any], prompt_instructions: str = 
         return f"{salutation}\n\n{body}".strip()
 
     # Default fallback only if NO instructions were provided at all
-    body = f"""Te contacto porque tenemos novedades exclusivas y proyectos con condiciones especiales en Dubai:
-• Planes de pago flexibles y alta rentabilidad
+    notes = (lead.get("notes") or "").strip()
+    is_tourism = any(w in (campaign_name + " " + objective + " " + notes).lower() for w in ["turismo", "viaje", "tour", "surprise", "latam"])
+    if is_tourism:
+        body = f"""Te contacto desde Surprise Tourism Dubai porque tenemos experiencias turísticas exclusivas y paquetes vacacionales VIP diseñados para que conozcas Dubai al más alto nivel:
+• Safaris exclusivos en el desierto con buggies y cena VIP
+• Alquiler y paseos en yates privados por Dubai Marina y Palm Jumeirah
+• Tours guiados a Abu Dhabi y accesos VIP a atracciones icónicas
+
+¿Te gustaría que te comparta nuestro catálogo digital e itinerarios por aquí? Solo respóndeme con un 'Sí' y te lo comparto con gusto."""
+    else:
+        body = f"""Te contacto porque tenemos novedades y oportunidades exclusivas en Dubai diseñadas a tu medida:
+• Opciones seleccionadas con condiciones especiales
 • Asesoría integral personalizada sin compromiso
 
 ¿Te gustaría que te comparta los detalles y el dossier informativo? Solo respóndeme por aquí y te lo envío."""
@@ -128,6 +138,7 @@ async def compose_lead_message_ai(lead: Dict[str, Any], prompt_instructions: str
     name = lead.get("name", "")
     first_name = format_lead_first_name(name)
     objective = (lead.get("objective") or "").strip()
+    notes = (lead.get("notes") or "").strip()
     budget = lead.get("budget_eur") or lead.get("budget_aed") or ""
 
     instructions_clean = (prompt_instructions or "").strip()
@@ -138,8 +149,13 @@ async def compose_lead_message_ai(lead: Dict[str, Any], prompt_instructions: str
 
 Tu misión es redactar el mensaje de WhatsApp para el cliente adaptando fielmente estas directrices."""
     else:
-        campaign_directive = f"""DIRECTRICES DE LA CAMPAÑA:
-Presenta las oportunidades exclusivas de la campaña "{campaign_name or 'Dubai Opportunities'}", destacando alta rentabilidad, seguridad y facilidades."""
+        is_tourism = any(w in (campaign_name + " " + objective + " " + notes).lower() for w in ["turismo", "viaje", "tour", "surprise", "latam"])
+        if is_tourism:
+            campaign_directive = f"""DIRECTRICES DE LA CAMPAÑA (SURPRISE TOURISM DUBAI):
+Preséntate como Carol Serra de Surprise Tourism Dubai. Te escribo para presentarte experiencias turísticas exclusivas y paquetes vacacionales VIP para conocer Dubai (safaris en el desierto, yates privados, hoteles 5 estrellas y tours en Abu Dhabi). Pregúntale si desea que le compartamos el catálogo e itinerarios por WhatsApp. (NOTA: Somos 100% empresa de turismo, NO real estate ni inmuebles)."""
+        else:
+            campaign_directive = f"""DIRECTRICES DE LA CAMPAÑA:
+Presenta los servicios exclusivos de la campaña "{campaign_name or 'Dubai Opportunities'}", destacando excelencia y atención personalizada."""
 
     lead_context = f"""DATOS DEL CLIENTE:
 - Nombre completo: {name}

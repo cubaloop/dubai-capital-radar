@@ -196,16 +196,23 @@ def seed_latam_campaign(conn):
     """, (
         cid,
         cname,
-        "LATAM",
-        "Inversionistas LATAM interesados en bienes raíces en Dubái - Asesora Carol Serra",
+        "Turismo Dubai",
+        "Viajeros y turistas LATAM interesados en paquetes turísticos y experiencias VIP en Dubái - Asesora Carol Serra",
         "",
-        "Inversionistas LATAM interesados en bienes raíces en Dubái - Asesora Carol Serra",
+        "Preséntate como Carol Serra de Surprise Tourism Dubai. Te contacto para presentarte experiencias turísticas exclusivas y paquetes VIP para conocer Dubai (safaris en el desierto, yates privados, hoteles 5 estrellas y tours en Abu Dhabi). Pregúntale cordialmente si desea que le enviemos el catálogo digital e itinerarios por WhatsApp.",
         "agency_bd_surprisetourism_com",
         now_str
     ))
 
-    # Also ensure any other uploaded LATAM campaigns keep the agency tag
-    cursor.execute("UPDATE campaigns SET agency_id = 'agency_bd_surprisetourism_com' WHERE name LIKE '%leads LATAM%'")
+    # Also ensure any other uploaded LATAM campaigns keep the agency tag and tourism prompt
+    cursor.execute("""
+    UPDATE campaigns 
+    SET agency_id = 'agency_bd_surprisetourism_com',
+        category = 'Turismo Dubai',
+        description = 'Viajeros y turistas LATAM interesados en paquetes turísticos y experiencias VIP en Dubái - Asesora Carol Serra',
+        ai_prompt_instructions = 'Preséntate como Carol Serra de Surprise Tourism Dubai. Te contacto para presentarte experiencias turísticas exclusivas y paquetes VIP para conocer Dubai (safaris en el desierto, yates privados, hoteles 5 estrellas y tours en Abu Dhabi). Pregúntale cordialmente si desea que le enviemos el catálogo digital e itinerarios por WhatsApp.'
+    WHERE id = ? OR name LIKE '%leads LATAM%'
+    """, (cid,))
 
     latam_json_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "outreach", "latam_campaign_leads.json")
     if os.path.exists(latam_json_path):
@@ -233,18 +240,24 @@ def seed_latam_campaign(conn):
                 raw_phone,
                 clean_digits,
                 "",
-                "Inversión Dubai",
+                "Turismo y Experiencias VIP Dubai",
                 "Inmediato",
-                l.get("notes", "Origen: Meta Ads | Asesora: Carol Serra"),
+                l.get("notes", "Origen: Meta Ads | Agencia: Surprise Tourism | Asesora: Carol Serra"),
                 "CREATED",
                 "pending",
                 None,
                 None,
-                f"Hola {l.get('name', '')}, te contacto desde Surprise Tourism Dubai respecto a tu interés en inversiones y propiedades en Dubai.",
+                f"Hola {l.get('name', '')}, te contacto desde Surprise Tourism Dubai para presentarte nuestras experiencias y paquetes turísticos exclusivos para conocer Dubai. ¿Te gustaría recibir nuestro catálogo digital e itinerario?",
                 None,
                 "agency_bd_surprisetourism_com",
                 now_str
             ))
+
+    cursor.execute("""
+    UPDATE leads 
+    SET objective = 'Turismo y Experiencias VIP Dubai' 
+    WHERE campaign_id = ? AND (objective LIKE '%Inversión%' OR objective LIKE '%inversion%')
+    """, (cid,))
 
     conn.commit()
 
@@ -661,6 +674,37 @@ def mark_lead_whatsapp_sent(lead_id: str, sent_type: str = "manual") -> bool:
     
     conn.commit()
     # Fetch updated lead and sync to Supabase
+    cursor.execute("SELECT * FROM leads WHERE id = ?", (lead_id,))
+    updated_lead = cursor.fetchone()
+    conn.close()
+    if updated_lead:
+        sync_lead_background(dict(updated_lead))
+    return True
+
+def mark_lead_whatsapp_failed(lead_id: str, reason: str = "failed") -> bool:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+    UPDATE leads
+    SET whatsapp_status = 'failed',
+        notes = CASE WHEN notes IS NULL OR notes = '' THEN ? ELSE notes || ' | ' || ? END
+    WHERE id = ?
+    """, (f"WhatsApp Error: {reason}", f"WhatsApp Error: {reason}", lead_id))
+    
+    note_id = f"note_{int(datetime.now().timestamp() * 1000)}"
+    cursor.execute("""
+    INSERT INTO lead_notes (id, lead_id, author, content, type, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        note_id,
+        lead_id,
+        "Sistema WhatsApp",
+        f"Envío fallido: {reason}",
+        "whatsapp",
+        now_str
+    ))
+    conn.commit()
     cursor.execute("SELECT * FROM leads WHERE id = ?", (lead_id,))
     updated_lead = cursor.fetchone()
     conn.close()

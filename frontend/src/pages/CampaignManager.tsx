@@ -208,41 +208,70 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
     }
   }, [selectedLeadPreview?.id]);
 
-  const PROMPT_PRESETS = language === 'en' ? [
-    {
-      label: '🗓️ Webinar Invitation',
-      text: 'Recall their previous interest and invite them to our upcoming live webinar. Request confirmation to save their spot.'
-    },
-    {
-      label: '📱 New Feature Release',
-      text: 'Highlight our new product features that save 20 hours a week. Ask which day/time works best this week for a brief online demo.'
-    },
-    {
-      label: '📈 ROI & Case Study',
-      text: 'Emphasize the 300% ROI seen by similar clients. Mention our current promotional offer and suggest a 1-on-1 strategy call.'
-    },
-    {
-      label: '🎯 Cold Outreach',
-      text: 'Introduce the value proposition briefly, focusing on cost reduction and efficiency. End with a low-friction question.'
-    }
-  ] : [
-    {
-      label: '🗓️ Invitación a Webinar',
-      text: 'Recordar su interés previo e invitarles a nuestro próximo webinar en vivo. Pedir confirmación para guardar su plaza.'
-    },
-    {
-      label: '📱 Nuevas Funciones',
-      text: 'Destacar nuestras nuevas funciones que ahorran 20 horas a la semana. Preguntar qué día y hora le viene bien para una demo rápida.'
-    },
-    {
-      label: '📈 Caso de Éxito',
-      text: 'Enfatizar el ROI del 300% de clientes similares. Mencionar la promoción actual y proponer una llamada de estrategia.'
-    },
-    {
-      label: '🎯 Contacto en Frío',
-      text: 'Introducir la propuesta de valor brevemente, enfocándose en reducción de costes. Terminar con una pregunta sencilla.'
-    }
-  ];
+  const currentSelectedCamp = campaigns.find((c) => c.id === selectedCampaignId);
+  const isSurpriseTourism = Boolean(
+    currentUser?.agencyName?.toLowerCase().includes('surprise') ||
+    currentUser?.email?.toLowerCase().includes('surprise') ||
+    currentSelectedCamp?.category?.toLowerCase().includes('turismo') ||
+    currentSelectedCamp?.name?.toLowerCase().includes('latam')
+  );
+
+  const PROMPT_PRESETS = isSurpriseTourism
+    ? [
+        {
+          label: '🌴 Paquetes Turísticos VIP',
+          text: 'Preséntate como Carol Serra de Surprise Tourism Dubai. Te escribo para presentarte experiencias turísticas exclusivas y paquetes vacacionales VIP para conocer Dubai. Pregúntale si desea que le compartamos el catálogo digital e itinerarios por WhatsApp.'
+        },
+        {
+          label: '🏜️ Safaris & Aventuras Desierto',
+          text: 'Preséntate como Carol Serra de Surprise Tourism Dubai. Ofrecemos safaris de lujo en el desierto con buggies, campamentos VIP y cenas privadas bajo las estrellas. Pregúntale si desea conocer nuestras opciones y tarifas para su viaje a Dubai.'
+        },
+        {
+          label: '🛥️ Yates & Cruceros Privados',
+          text: 'Preséntate como Carol Serra de Surprise Tourism Dubai. Destaca nuestros paseos y alquiler de yates privados por Dubai Marina y Palm Jumeirah con atención en español. Pregúntale si le gustaría agendar una experiencia náutica exclusiva.'
+        },
+        {
+          label: '🏛️ Tour Abu Dhabi & Atracciones',
+          text: 'Preséntate como Carol Serra de Surprise Tourism Dubai. Diseñamos tours completos a Abu Dhabi (Gran Mezquita Sheikh Zayed, Louvre, Ferrari World) y entradas VIP a Burj Khalifa y Museo del Futuro. Pregúntale si le gustaría recibir la propuesta detallada.'
+        }
+      ]
+    : language === 'en'
+    ? [
+        {
+          label: '🗓️ Webinar Invitation',
+          text: 'Recall their previous interest and invite them to our upcoming live webinar. Request confirmation to save their spot.'
+        },
+        {
+          label: '📱 New Feature Release',
+          text: 'Highlight our new product features that save 20 hours a week. Ask which day/time works best this week for a brief online demo.'
+        },
+        {
+          label: '📈 ROI & Case Study',
+          text: 'Emphasize the 300% ROI seen by similar clients. Mention our current promotional offer and suggest a 1-on-1 strategy call.'
+        },
+        {
+          label: '🎯 Cold Outreach',
+          text: 'Introduce the value proposition briefly, focusing on cost reduction and efficiency. End with a low-friction question.'
+        }
+      ]
+    : [
+        {
+          label: '🗓️ Invitación a Webinar',
+          text: 'Recordar su interés previo e invitarles a nuestro próximo webinar en vivo. Pedir confirmación para guardar su plaza.'
+        },
+        {
+          label: '📱 Nuevas Funciones',
+          text: 'Destacar nuestras nuevas funciones que ahorran 20 horas a la semana. Preguntar qué día y hora le viene bien para una demo rápida.'
+        },
+        {
+          label: '📈 Caso de Éxito',
+          text: 'Enfatizar el ROI del 300% de clientes similares. Mencionar la promoción actual y proponer una llamada de estrategia.'
+        },
+        {
+          label: '🎯 Contacto en Frío',
+          text: 'Introducir la propuesta de valor brevemente, enfocándose en reducción de costes. Terminar con una pregunta sencilla.'
+        }
+      ];
 
   // Handler: Update Campaign AI Prompt & Regenerate pending leads
   const handleUpdateAiPrompt = async () => {

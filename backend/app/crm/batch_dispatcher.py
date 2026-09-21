@@ -7,7 +7,7 @@ import asyncio
 import os
 import httpx
 from typing import Dict, Any, Optional
-from ..database.crm_db import get_leads_by_campaign, mark_lead_whatsapp_sent, get_campaigns_list
+from ..database.crm_db import get_leads_by_campaign, mark_lead_whatsapp_sent, mark_lead_whatsapp_failed, get_campaigns_list
 
 GATEWAY_URL = os.getenv("WHATSAPP_GATEWAY_URL", "http://127.0.0.1:3001")
 
@@ -49,18 +49,18 @@ class CampaignBatchManager:
         self.stop_flags[campaign_id] = False
 
         leads = get_leads_by_campaign(campaign_id)
-        # Filter only pending leads
-        pending_leads = [l for l in leads if l.get("whatsapp_status") != "sent"]
-        already_sent = len(leads) - len(pending_leads)
+        # Filter only pending leads (skip sent and failed)
+        pending_leads = [l for l in leads if l.get("whatsapp_status") not in ("sent", "failed")]
+        already_processed = len(leads) - len(pending_leads)
 
         self.state[campaign_id] = {
             "campaign_id": campaign_id,
             "status": "running",
             "total": len(leads),
-            "sent": already_sent,
-            "failed": 0,
+            "sent": sum(1 for l in leads if l.get("whatsapp_status") == "sent"),
+            "failed": sum(1 for l in leads if l.get("whatsapp_status") == "failed"),
             "pending": len(pending_leads),
-            "current_index": already_sent,
+            "current_index": already_processed,
             "current_lead_name": "",
             "current_lead_phone": "",
             "delay_seconds": max(3, delay_seconds),
@@ -73,6 +73,8 @@ class CampaignBatchManager:
 
     async def _run_loop(self, campaign_id: str, pending_leads: list, image_path: Optional[str], delay_seconds: int):
         print(f"[Batch Dispatcher] Starting batch for {campaign_id}: {len(pending_leads)} leads to send...")
+
+        is_tourism = any(k in campaign_id.lower() for k in ("turismo", "latam", "surprise"))
 
         async with httpx.AsyncClient(timeout=25.0) as client:
             for idx, lead in enumerate(pending_leads):
@@ -91,9 +93,15 @@ class CampaignBatchManager:
                     print(f"[Batch Dispatcher] Campaign {campaign_id} resumed.")
 
                 lead_id = lead["id"]
-                name = lead.get("name", "Inversor")
+                name = lead.get("name") or ("Viajero" if is_tourism else "Inversor")
                 phone = lead.get("phone", "")
-                message = lead.get("personalized_message") or "Hola, te contacto desde nuestro equipo de inversiones en Dubai."
+
+                if is_tourism:
+                    default_msg = f"Hola {name}, te contacto desde Surprise Tourism Dubai para presentarte nuestras experiencias y paquetes turísticos exclusivos para conocer Dubai. ¿Te gustaría recibir nuestro catálogo digital e itinerario?"
+                else:
+                    default_msg = f"Hola {name}, te contacto desde nuestro equipo de inversiones en Dubai."
+
+                message = lead.get("personalized_message") or default_msg
 
                 # Update live state
                 self.state[campaign_id]["current_index"] += 1
@@ -126,12 +134,18 @@ class CampaignBatchManager:
                         self.state[campaign_id]["pending"] = max(0, self.state[campaign_id]["pending"] - 1)
                         print(f"[Batch Dispatcher] ✅ [{idx+1}/{len(pending_leads)}] Sent to {name} ({phone})")
                     else:
+                        err_msg = data.get("error", "Gateway error")
+                        mark_lead_whatsapp_failed(lead_id, err_msg)
                         self.state[campaign_id]["failed"] += 1
-                        self.state[campaign_id]["error"] = data.get("error", "Gateway error")
-                        print(f"[Batch Dispatcher] ⚠️ [{idx+1}/{len(pending_leads)}] Failed for {name}: {data.get('error')}")
+                        self.state[campaign_id]["pending"] = max(0, self.state[campaign_id]["pending"] - 1)
+                        self.state[campaign_id]["error"] = err_msg
+                        print(f"[Batch Dispatcher] ⚠️ [{idx+1}/{len(pending_leads)}] Failed for {name}: {err_msg}")
                 except Exception as e:
+                    err_msg = str(e)
+                    mark_lead_whatsapp_failed(lead_id, err_msg)
                     self.state[campaign_id]["failed"] += 1
-                    self.state[campaign_id]["error"] = str(e)
+                    self.state[campaign_id]["pending"] = max(0, self.state[campaign_id]["pending"] - 1)
+                    self.state[campaign_id]["error"] = err_msg
                     print(f"[Batch Dispatcher] ❌ Network error for {name}: {e}")
 
                 # Delay before next lead

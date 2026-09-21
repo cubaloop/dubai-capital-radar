@@ -687,6 +687,9 @@ app.post('/send', async (req, res) => {
         const onWa = Array.isArray(checkResults) ? checkResults[0] : checkResults;
         if (onWa && onWa.exists && onWa.jid) {
           jid = onWa.jid;
+        } else if (onWa && onWa.exists === false) {
+          console.log(`[WhatsApp] Number ${cleanNumber} does NOT exist on WhatsApp. Skipping send.`);
+          return res.status(404).json({ success: false, error: 'El número no tiene cuenta de WhatsApp registrada', exists: false, phone: cleanNumber });
         }
       } catch (onWaErr) {
         console.warn(`[WhatsApp] onWhatsApp check warning for ${cleanNumber}:`, onWaErr.message);
