@@ -241,7 +241,7 @@ class AgencySession {
 
     // Try primary key for this agency, or fallback for Surprise Tourism legacy single session
     const candidateKeys = [`whatsapp_auth_${this.agencyId}`];
-    if (this.agencyId === 'agency_bd_surprisetourism_com' || this.agencyId === 'agency_master') {
+    if (this.agencyId === 'agency_bd_surprisetourism_com') {
       candidateKeys.push('whatsapp_auth_session');
     }
 
