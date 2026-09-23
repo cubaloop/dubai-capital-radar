@@ -710,13 +710,31 @@ app.post('/send', async (req, res) => {
       jid = `${cleanNumber}@s.whatsapp.net`;
 
       try {
-        const checkResults = await s.sock.onWhatsApp(cleanNumber);
-        const onWa = Array.isArray(checkResults) ? checkResults[0] : checkResults;
+        let onWa = null;
+        let checkResults = await s.sock.onWhatsApp(cleanNumber);
+        if (Array.isArray(checkResults) && checkResults.length > 0) {
+          onWa = checkResults[0];
+        }
+
+        // Special handling for Mexico numbers (+52 without 1): try fallback with 1
+        if ((!onWa || !onWa.exists) && cleanNumber.startsWith('52') && !cleanNumber.startsWith('521') && cleanNumber.length === 12) {
+          const mexNumWith1 = '521' + cleanNumber.slice(2);
+          const mexCheck = await s.sock.onWhatsApp(mexNumWith1);
+          if (Array.isArray(mexCheck) && mexCheck.length > 0 && mexCheck[0].exists) {
+            onWa = mexCheck[0];
+          }
+        }
+
         if (onWa && onWa.exists && onWa.jid) {
           jid = onWa.jid;
-        } else if (onWa && onWa.exists === false) {
+        } else {
           console.log(`[WhatsApp - ${s.agencyId}] Number ${cleanNumber} does NOT exist on WhatsApp. Skipping send.`);
-          return res.status(404).json({ success: false, error: 'El número no tiene cuenta de WhatsApp registrada', exists: false, phone: cleanNumber });
+          return res.status(404).json({
+            success: false,
+            error: 'El número no tiene cuenta de WhatsApp registrada (o la línea telefónica está inactiva/apagada)',
+            exists: false,
+            phone: cleanNumber
+          });
         }
       } catch (onWaErr) {
         console.warn(`[WhatsApp - ${s.agencyId}] onWhatsApp check warning for ${cleanNumber}:`, onWaErr.message);
@@ -778,9 +796,19 @@ app.post('/verify-numbers', async (req, res) => {
     for (const num of numbers) {
       const clean = num.replace(/[^0-9]/g, '');
       try {
-        const checkResults = await s.sock.onWhatsApp(clean);
-        const onWa = Array.isArray(checkResults) ? checkResults[0] : checkResults;
-        results.push({ phone: num, clean, exists: !!onWa?.exists, jid: onWa?.jid || null });
+        let checkResults = await s.sock.onWhatsApp(clean);
+        let onWa = Array.isArray(checkResults) && checkResults.length > 0 ? checkResults[0] : null;
+
+        // Try Mexico 521 fallback if needed
+        if ((!onWa || !onWa.exists) && clean.startsWith('52') && !clean.startsWith('521') && clean.length === 12) {
+          const mexNumWith1 = '521' + clean.slice(2);
+          const mexCheck = await s.sock.onWhatsApp(mexNumWith1);
+          if (Array.isArray(mexCheck) && mexCheck.length > 0 && mexCheck[0].exists) {
+            onWa = mexCheck[0];
+          }
+        }
+
+        results.push({ phone: num, clean, exists: !!(onWa && onWa.exists), jid: onWa?.jid || null });
       } catch (e) {
         results.push({ phone: num, clean, exists: false, error: e.message });
       }

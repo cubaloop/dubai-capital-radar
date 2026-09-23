@@ -390,7 +390,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
       setStatusMsg(`❌ Error: ${err.message}`);
     } finally {
       setSendingLeadId(null);
-      setTimeout(() => setStatusMsg(null), 4000);
+      setTimeout(() => setStatusMsg(null), 8000);
     }
   };
 
@@ -415,6 +415,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ currentUser })
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          agency_id: (currentUser as any)?.agencyId || (currentUser?.email === 'davidhabana98@gmail.com' ? 'agency_master' : undefined),
           to: testPhoneNumber,
           message: msgToSend
         })

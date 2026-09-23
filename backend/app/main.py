@@ -926,12 +926,16 @@ async def api_send_lead_whatsapp(lead_id: str, payload: Optional[Dict[str, Any]]
                     "last_sent_type": "manual"
                 }
             else:
+                err_msg = data.get("error", "Error de entrega en pasarela")
+                mark_lead_whatsapp_failed(lead_id, err_msg)
                 return {
                     "success": False,
-                    "error": data.get("error", "Error de entrega en pasarela")
+                    "error": err_msg
                 }
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        err_msg = str(e)
+        mark_lead_whatsapp_failed(lead_id, err_msg)
+        return {"success": False, "error": err_msg}
 
 @app.post("/api/crm/campaigns/{campaign_id}/batch/start", dependencies=[Depends(rate_limiter(max_requests=10, window_seconds=60))])
 async def api_start_campaign_batch(
