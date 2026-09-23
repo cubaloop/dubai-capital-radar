@@ -495,6 +495,15 @@ async function startSession(agencyId) {
         session.connectedNumber = rawId.split(':')[0] || rawId.split('@')[0];
         console.log(`🎉 [WhatsApp - ${session.agencyId}] Connected successfully as +${session.connectedNumber}`);
         session.scheduleBackup(1000);
+
+        // Auto-sync connected WhatsApp number to agency profile
+        try {
+          fetch(`http://127.0.0.1:${BACKEND_PORT}/api/agencies/${session.agencyId}/sync-bot-phone`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bot_phone: `+${session.connectedNumber}` })
+          }).catch(() => {});
+        } catch (_) {}
       }
     });
 

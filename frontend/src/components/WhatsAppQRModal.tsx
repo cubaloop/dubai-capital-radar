@@ -29,6 +29,8 @@ export const WhatsAppQRModal: React.FC<WhatsAppQRModalProps> = ({ isOpen, onClos
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [phone, setPhone] = useState<string | null>(null);
+  const [adminPhone, setAdminPhone] = useState<string>('');
+  const [botPhone, setBotPhone] = useState<string>('');
   const [isManualRefreshing, setIsManualRefreshing] = useState<boolean>(false);
   const [testNumber, setTestNumber] = useState<string>('971501378020');
   const [testStatus, setTestStatus] = useState<string | null>(null);
@@ -39,6 +41,18 @@ export const WhatsAppQRModal: React.FC<WhatsAppQRModalProps> = ({ isOpen, onClos
   const [isPairingLoading, setIsPairingLoading] = useState<boolean>(false);
   const [pairingError, setPairingError] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
+
+  // Fetch agency config (admin_phone & bot_phone)
+  const fetchAgencyConfig = async () => {
+    try {
+      const res = await fetch(`/api/agencies/${encodeURIComponent(activeAgencyId)}`);
+      const data = await res.json();
+      if (data.success && data.agency) {
+        if (data.agency.admin_phone) setAdminPhone(data.agency.admin_phone);
+        if (data.agency.bot_phone) setBotPhone(data.agency.bot_phone);
+      }
+    } catch (_) {}
+  };
 
   // Silent background fetch to prevent DOM/image flickering
   const fetchStatus = async (isManual = false) => {
@@ -60,6 +74,7 @@ export const WhatsAppQRModal: React.FC<WhatsAppQRModalProps> = ({ isOpen, onClos
 
   useEffect(() => {
     if (isOpen) {
+      fetchAgencyConfig();
       fetchStatus(false);
       const interval = setInterval(() => fetchStatus(false), 3000);
       return () => clearInterval(interval);
@@ -171,6 +186,20 @@ export const WhatsAppQRModal: React.FC<WhatsAppQRModalProps> = ({ isOpen, onClos
             <p className="text-xs text-slate-300 mt-1">
               {t('modals.qrSubtitle', 'Link your official business or advisor WhatsApp phone to enable autonomous outreach.')}
             </p>
+          </div>
+        </div>
+
+        {/* Multi-Tenant Phone Overview Card */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px] p-3 rounded-2xl bg-slate-900/90 border border-slate-800">
+          <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <span className="text-slate-400 block font-semibold mb-0.5">👑 Admin WhatsApp (Tú):</span>
+            <span className="text-blue-300 font-mono font-bold text-xs">{adminPhone || 'No asignado (Configurable)'}</span>
+            <span className="text-[10px] text-slate-500 block mt-0.5">Recibe reportes y da órdenes a Jota</span>
+          </div>
+          <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <span className="text-slate-400 block font-semibold mb-0.5">🤖 Jota WhatsApp (Bot):</span>
+            <span className="text-emerald-300 font-mono font-bold text-xs">{phone ? `+${phone}` : (botPhone || 'Pendiente de escaneo')}</span>
+            <span className="text-[10px] text-slate-500 block mt-0.5">{phone ? 'Conectado y enviando' : 'Escanea el QR para activar'}</span>
           </div>
         </div>
 

@@ -164,7 +164,13 @@ export function App() {
                     agencyId={activeUser?.agencyId}
                     agencyName={activeUser?.agencyName}
                   />
-                  <AgencySettingsModal isOpen={isAgencyModalOpen} onClose={() => setIsAgencyModalOpen(false)} />
+                  <AgencySettingsModal
+                    isOpen={isAgencyModalOpen}
+                    onClose={() => setIsAgencyModalOpen(false)}
+                    agencyId={activeUser?.agencyId}
+                    agencyName={activeUser?.agencyName}
+                    userEmail={activeUser?.email}
+                  />
                   <LicenseModal
                     isOpen={isLicenseModalOpen}
                     onClose={() => setIsLicenseModalOpen(false)}

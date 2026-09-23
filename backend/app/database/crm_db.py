@@ -132,6 +132,9 @@ def init_crm_db():
         ("messages_used", "INTEGER DEFAULT 0"),
         ("admin_phone", "TEXT"),
         ("bot_phone", "TEXT"),
+        ("business_niche", "TEXT"),
+        ("ai_instructions", "TEXT"),
+        ("bot_name", "TEXT DEFAULT 'Jota'"),
     ]:
         try:
             cursor.execute(f"ALTER TABLE agencies ADD COLUMN {col} {definition}")
@@ -187,6 +190,9 @@ def init_crm_db():
     hydrate_leads_from_supabase(conn)
 
     conn.close()
+
+    # Hydrate agency configs (admin_phone, bot_phone, etc.) from Supabase
+    hydrate_agencies_from_supabase()
 
 def hydrate_leads_from_supabase(conn):
     if not SUPABASE_URL or not SUPABASE_KEY:
@@ -1366,40 +1372,169 @@ def list_agencies() -> List[Dict[str, Any]]:
     conn.close()
     return [dict(r) for r in rows]
 
+def backup_agency_to_supabase(agency_data: Dict[str, Any]):
+    """Persists agency configuration to Supabase leads table so it survives Render dyno restarts."""
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return
+    try:
+        aid = agency_data.get("id")
+        if not aid:
+            return
+        payload = {
+            "id": f"agency_config_{aid}",
+            "full_name": agency_data.get("name") or aid,
+            "phone": agency_data.get("admin_phone") or agency_data.get("bot_phone") or "system",
+            "lead_status": "SYSTEM_AGENCY",
+            "campaign_name": "agency_configs",
+            "comments": json.dumps(agency_data)
+        }
+        req = urllib.request.Request(
+            f"{SUPABASE_URL}/rest/v1/leads",
+            headers={
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "apikey": SUPABASE_KEY,
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates"
+            },
+            data=json.dumps(payload).encode("utf-8")
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            pass
+    except Exception as e:
+        print(f"[Supabase Agency Backup] Warning for {agency_data.get('id')}: {e}")
+
+def hydrate_agencies_from_supabase():
+    """Restores all agency configurations from Supabase on system startup."""
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return
+    try:
+        req = urllib.request.Request(
+            f"{SUPABASE_URL}/rest/v1/leads?id=like.agency_config_%&select=id,comments",
+            headers={
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "apikey": SUPABASE_KEY
+            }
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            rows = json.loads(resp.read().decode("utf-8"))
+            if not rows:
+                return
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            for r in rows:
+                comments_raw = r.get("comments")
+                if not comments_raw:
+                    continue
+                try:
+                    cfg = json.loads(comments_raw)
+                    aid = cfg.get("id")
+                    if not aid:
+                        continue
+                    cursor.execute("SELECT id FROM agencies WHERE id = ?", (aid,))
+                    if cursor.fetchone():
+                        cursor.execute("""
+                        UPDATE agencies
+                        SET name = COALESCE(?, name),
+                            email = COALESCE(?, email),
+                            admin_phone = COALESCE(?, admin_phone),
+                            bot_phone = COALESCE(?, bot_phone),
+                            business_niche = COALESCE(?, business_niche),
+                            ai_instructions = COALESCE(?, ai_instructions),
+                            bot_name = COALESCE(?, bot_name)
+                        WHERE id = ?
+                        """, (
+                            cfg.get("name"), cfg.get("email"), cfg.get("admin_phone"),
+                            cfg.get("bot_phone"), cfg.get("business_niche"),
+                            cfg.get("ai_instructions"), cfg.get("bot_name"), aid
+                        ))
+                    else:
+                        cursor.execute("""
+                        INSERT INTO agencies (id, name, email, plan, messages_limit, messages_used, whatsapp_mode, admin_phone, bot_phone, business_niche, ai_instructions, bot_name, created_at, is_active)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            aid, cfg.get("name", "New Agency"), cfg.get("email", ""),
+                            cfg.get("plan", "free"), cfg.get("messages_limit", 500),
+                            cfg.get("messages_used", 0), cfg.get("whatsapp_mode", "baileys"),
+                            cfg.get("admin_phone", ""), cfg.get("bot_phone", ""),
+                            cfg.get("business_niche", ""), cfg.get("ai_instructions", ""),
+                            cfg.get("bot_name", "Jota"), cfg.get("created_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S")), 1
+                        ))
+                except Exception:
+                    continue
+            conn.commit()
+            conn.close()
+            print(f"[Supabase Hydration] Restored/verified {len(rows)} agency configurations from cloud.")
+    except Exception as e:
+        print(f"[Supabase Hydration] Warning during agency restore: {e}")
+
 def create_or_update_agency_db(payload: Dict[str, Any]) -> Dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     raw_email = (payload.get("email") or "").strip().lower()
-    raw_id = payload.get("id") or f"agency_{raw_email.replace('@', '_').replace('.', '_')}"
-    agency_id = "".join([c if c.isalnum() or c in ('_', '-') else '_' for c in raw_id])
-    name = payload.get("name") or "Nueva Empresa"
-    plan = payload.get("plan") or "free"
-    messages_limit = payload.get("messages_limit", 500)
-    admin_phone = payload.get("admin_phone") or ""
-    bot_phone = payload.get("bot_phone") or ""
-    whatsapp_mode = payload.get("whatsapp_mode") or "baileys"
+    raw_id = payload.get("id") or (f"agency_{raw_email.replace('@', '_').replace('.', '_')}" if raw_email else "")
+    agency_id = "".join([c if c.isalnum() or c in ('_', '-') else '_' for c in raw_id]) if raw_id else ""
+    
+    existing = None
+    if agency_id:
+        cursor.execute("SELECT * FROM agencies WHERE id = ?", (agency_id,))
+        existing = cursor.fetchone()
+    if not existing and raw_email:
+        cursor.execute("SELECT * FROM agencies WHERE email = ?", (raw_email,))
+        existing = cursor.fetchone()
+
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    cursor.execute("SELECT id FROM agencies WHERE id = ? OR email = ?", (agency_id, raw_email))
-    existing = cursor.fetchone()
     if existing:
+        e = dict(existing)
+        agency_id = e["id"]
+        name = payload["name"] if "name" in payload and payload["name"] is not None else e.get("name")
+        email = payload["email"] if "email" in payload and payload["email"] is not None else e.get("email")
+        plan = payload["plan"] if "plan" in payload and payload["plan"] is not None else e.get("plan", "free")
+        messages_limit = payload["messages_limit"] if "messages_limit" in payload and payload["messages_limit"] is not None else e.get("messages_limit", 500)
+        admin_phone = payload["admin_phone"] if "admin_phone" in payload and payload["admin_phone"] is not None else e.get("admin_phone")
+        bot_phone = payload["bot_phone"] if "bot_phone" in payload and payload["bot_phone"] is not None else e.get("bot_phone")
+        whatsapp_mode = payload["whatsapp_mode"] if "whatsapp_mode" in payload and payload["whatsapp_mode"] is not None else e.get("whatsapp_mode", "baileys")
+        business_niche = payload["business_niche"] if "business_niche" in payload and payload["business_niche"] is not None else e.get("business_niche")
+        ai_instructions = payload["ai_instructions"] if "ai_instructions" in payload and payload["ai_instructions"] is not None else e.get("ai_instructions")
+        bot_name = payload["bot_name"] if "bot_name" in payload and payload["bot_name"] is not None else e.get("bot_name", "Jota")
+
         cursor.execute("""
         UPDATE agencies
-        SET name = ?, email = ?, plan = ?, messages_limit = ?, admin_phone = ?, bot_phone = ?, whatsapp_mode = ?
+        SET name = ?, email = ?, plan = ?, messages_limit = ?, admin_phone = ?, bot_phone = ?,
+            whatsapp_mode = ?, business_niche = ?, ai_instructions = ?, bot_name = ?
         WHERE id = ?
-        """, (name, raw_email, plan, messages_limit, admin_phone, bot_phone, whatsapp_mode, existing["id"]))
-        agency_id = existing["id"]
+        """, (name, email, plan, messages_limit, admin_phone, bot_phone, whatsapp_mode, business_niche, ai_instructions, bot_name, agency_id))
     else:
+        if not agency_id:
+            agency_id = f"agency_{int(datetime.now().timestamp())}"
+        name = payload.get("name") or "Nueva Empresa"
+        email = raw_email
+        plan = payload.get("plan") or "free"
+        messages_limit = payload.get("messages_limit", 500)
+        admin_phone = payload.get("admin_phone") or ""
+        bot_phone = payload.get("bot_phone") or ""
+        whatsapp_mode = payload.get("whatsapp_mode") or "baileys"
+        business_niche = payload.get("business_niche") or ""
+        ai_instructions = payload.get("ai_instructions") or ""
+        bot_name = payload.get("bot_name") or "Jota"
+
         cursor.execute("""
-        INSERT INTO agencies (id, name, email, plan, messages_limit, messages_used, whatsapp_mode, admin_phone, bot_phone, created_at, is_active)
-        VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, 1)
-        """, (agency_id, name, raw_email, plan, messages_limit, whatsapp_mode, admin_phone, bot_phone, now_str))
+        INSERT INTO agencies (
+            id, name, email, plan, messages_limit, messages_used,
+            whatsapp_mode, admin_phone, bot_phone, business_niche, ai_instructions, bot_name, created_at, is_active
+        )
+        VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, 1)
+        """, (agency_id, name, email, plan, messages_limit, whatsapp_mode, admin_phone, bot_phone, business_niche, ai_instructions, bot_name, now_str))
 
     conn.commit()
     cursor.execute("SELECT * FROM agencies WHERE id = ?", (agency_id,))
     row = cursor.fetchone()
     conn.close()
-    return dict(row) if row else {}
+    
+    agency_res = dict(row) if row else {}
+    if agency_res:
+        backup_agency_to_supabase(agency_res)
+    return agency_res
 
 # Initialize on import
 init_crm_db()

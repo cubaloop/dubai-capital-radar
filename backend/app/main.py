@@ -553,6 +553,23 @@ def api_get_agency(agency_id: str):
         return {"success": False, "error": "Agencia no encontrada"}
     return {"success": True, "agency": agency}
 
+@app.post("/api/agencies/{agency_id}/config")
+@app.put("/api/agencies/{agency_id}/config")
+def api_update_agency_config(agency_id: str, payload: Dict[str, Any]):
+    from .database.crm_db import create_or_update_agency_db
+    payload["id"] = agency_id
+    agency = create_or_update_agency_db(payload)
+    return {"success": True, "agency": agency}
+
+@app.post("/api/agencies/{agency_id}/sync-bot-phone")
+def api_sync_agency_bot_phone(agency_id: str, payload: Dict[str, Any]):
+    from .database.crm_db import create_or_update_agency_db
+    bot_phone = payload.get("bot_phone") or ""
+    if not bot_phone:
+        return {"success": False, "error": "Missing bot_phone"}
+    agency = create_or_update_agency_db({"id": agency_id, "bot_phone": bot_phone})
+    return {"success": True, "agency": agency}
+
 @app.post("/api/whatsapp/verify-numbers")
 async def verify_whatsapp_numbers(payload: Dict[str, Any]):
     try:
@@ -1165,12 +1182,26 @@ def resolve_agency_for_message(sender: str = "", jid: str = "", bot_phone: str =
     }
 
 def is_admin_sender(sender: str, jid: str, push_name: str, agency: Dict[str, Any]) -> bool:
-    """Verifies whether the message is sent by the workspace admin or bot itself (self-chat)."""
+    """Verifies whether the message is sent by the workspace admin or bot itself (self-chat), strictly for this agency."""
     sender_digits = "".join([c for c in (sender or "") if c.isdigit()])
     jid_digits = "".join([c for c in (jid.split("@")[0] if jid else "") if c.isdigit()])
 
+    agency_id = (agency.get("id") or "").lower()
     admin_phone = "".join([c for c in (agency.get("admin_phone") or "") if c.isdigit()])
     bot_phone = "".join([c for c in (agency.get("bot_phone") or "") if c.isdigit()])
+
+    # Fallbacks for pre-seeded agencies if not yet written to DB
+    if not admin_phone:
+        if "surprise" in agency_id:
+            admin_phone = "971564317976"
+        elif "master" in agency_id or "david" in (agency.get("email") or ""):
+            admin_phone = "971508379080"
+
+    if not bot_phone:
+        if "surprise" in agency_id:
+            bot_phone = "971545932205"
+        elif "master" in agency_id or "david" in (agency.get("email") or ""):
+            bot_phone = "971501378020"
 
     admin_suffix = admin_phone[-8:] if len(admin_phone) >= 8 else admin_phone
     bot_suffix = bot_phone[-8:] if len(bot_phone) >= 8 else bot_phone
@@ -1183,14 +1214,6 @@ def is_admin_sender(sender: str, jid: str, push_name: str, agency: Dict[str, Any
         if bot_suffix and bot_suffix in digits:
             return True
 
-    # Known admin tokens fallback
-    if "508379080" in sender_digits or "508379080" in jid_digits or "david" in (push_name or "").lower():
-        return True
-    if "564317976" in sender_digits or "564317976" in jid_digits:
-        return True
-    if "545932205" in sender_digits or "545932205" in jid_digits:
-        return True
-
     return False
 
 def get_jota_system_prompt(agency_info: Optional[Dict[str, Any]] = None) -> str:
@@ -1201,6 +1224,9 @@ def get_jota_system_prompt(agency_info: Optional[Dict[str, Any]] = None) -> str:
     agency_email = agency.get("email") or "davidhabana98@gmail.com"
     admin_phone = agency.get("admin_phone") or "+971 50 837 9080"
     bot_phone = agency.get("bot_phone") or "+971 50 137 8020"
+    bot_name = agency.get("bot_name") or "Jota"
+    business_niche = agency.get("business_niche") or ""
+    ai_instructions = agency.get("ai_instructions") or ""
 
     is_surprise = ("surprisetourism" in agency_id.lower() or "surprisetourism" in agency_email.lower() or "surprise" in agency_name.lower())
 
@@ -1234,6 +1260,30 @@ def get_jota_system_prompt(agency_info: Optional[Dict[str, Any]] = None) -> str:
             latam_sample = cursor.fetchall()
             for l in latam_sample:
                 leads_highlights.append(f"• {l['name']} ({l['phone']}) -> {l['crm_status']} | Interés: {l['objective'] or 'Inversión Dubai'} | Detalle: {l['notes']}")
+        elif business_niche or ai_instructions:
+            cursor.execute("""
+            SELECT c.name, COUNT(l.id) as total,
+                   SUM(CASE WHEN l.whatsapp_status = 'sent' THEN 1 ELSE 0 END) as sent,
+                   SUM(CASE WHEN l.crm_status IN ('APPOINTMENT', 'INTERESTED', 'HOT', 'REPLIED') THEN 1 ELSE 0 END) as active
+            FROM campaigns c
+            LEFT JOIN leads l ON c.id = l.campaign_id
+            WHERE c.agency_id = ?
+            GROUP BY c.id
+            """, (agency_id,))
+            camps = cursor.fetchall()
+            for c in camps:
+                camp_lines.append(f"• {c['name']}: {c['total']} leads ({c['sent']} contactados, {c['active']} activos/citas)")
+
+            cursor.execute("""
+            SELECT name, phone, objective, timeline, notes, crm_status
+            FROM leads
+            WHERE agency_id = ?
+            ORDER BY rowid ASC
+            LIMIT 10
+            """, (agency_id,))
+            custom_sample = cursor.fetchall()
+            for l in custom_sample:
+                leads_highlights.append(f"• {l['name']} ({l['phone']}) -> {l['crm_status']} | Detalle: {l['notes'] or l['objective']}")
         else:
             cursor.execute("""
             SELECT c.name, COUNT(l.id) as total,
@@ -1264,7 +1314,7 @@ def get_jota_system_prompt(agency_info: Optional[Dict[str, Any]] = None) -> str:
         leads_highlights = []
 
     if is_surprise:
-        prompt = f"""Eres JOTA, el Asistente Inteligente de IA y Copiloto Comercial de Surprise Tourism (Dubai).
+        prompt = f"""Eres {bot_name.upper()}, el Asistente Inteligente de IA y Copiloto Comercial de Surprise Tourism (Dubai).
 Eres el copiloto de máxima confianza del equipo de Surprise Tourism: resolutivo, altamente inteligente, ejecutivo, proactivo, analítico y cercano.
 No eres un bot rígido ni tienes restricciones de palabras clave. Comprendes perfectamente el contexto, la intención y el fondo de cada mensaje.
 
@@ -1301,6 +1351,41 @@ CONOCIMIENTO OPERATIVO Y BASE DE DATOS EN TIEMPO REAL:
    - Asesoría comercial: Si el usuario te pregunta por el avance de la campaña, métricas, tácticas de contacto con prospectos de LATAM o redacción de mensajes de WhatsApp persuasivos para vender tours y experiencias turísticas, dale respuestas ejecutivas, directas y de alto impacto comercial.
    - Mantén el hilo de la conversación recordando los mensajes anteriores que han intercambiado.
    - Usa formato WhatsApp limpio (negritas y viñetas) para que se lea perfectamente en el móvil.
+   - IMPORTANTE: Responde SIEMPRE en un único mensaje. Máximo 300 palabras. Sé directo y conciso.
+"""
+    elif business_niche or ai_instructions:
+        inst_lines = ["     • " + line.strip() for line in ai_instructions.splitlines() if line.strip()]
+        instructions_block = (
+            "   - Instrucciones específicas:\n" + "\n".join(inst_lines)
+            if inst_lines else f"   - Atender y asesorar a prospectos sobre {business_niche or 'sus requerimientos'} con alto nivel profesional."
+        )
+        prompt = f"""Eres {bot_name.upper()}, el Asistente Inteligente de IA y Copiloto Comercial de {agency_name}.
+Eres el copiloto de máxima confianza del equipo directivo de {agency_name}: resolutivo, altamente inteligente, ejecutivo, proactivo, analítico y cercano.
+No eres un bot rígido ni tienes restricciones preprogramadas de formato. Comprendes perfectamente el contexto, la intención y el fondo de cada mensaje.
+
+CONOCIMIENTO OPERATIVO Y BASE DE DATOS EN TIEMPO REAL:
+1. EMPRESA Y ESPACIO PRIVADO:
+   - Empresa: {agency_name}
+   - Nicho / Especialidad: {business_niche or 'Servicios Profesionales'}
+   - Administrador WhatsApp: {admin_phone}
+   - Bot WhatsApp de la cuenta: {bot_phone}
+   - Email de sesión: {agency_email}
+
+2. CAMPAÑAS Y BASE DE DATOS DE LEADS ACTUALES:
+{chr(10).join(camp_lines) if camp_lines else "• Campañas registradas en tu CRM."}
+
+3. MUESTRA DE PROSPECTOS REGISTRADOS EN TU CRM:
+{chr(10).join(leads_highlights) if leads_highlights else "• Base de datos de prospectos disponible en CRM."}
+
+4. ENFOQUE COMERCIAL Y REGLAS DE {agency_name.upper()}:
+   - Nicho de negocio: {business_niche or 'Servicios y Consultoría'}
+{instructions_block}
+
+5. TU COMPORTAMIENTO Y FORMA DE TRABAJAR:
+   - Idioma y Adaptabilidad: Responde con naturalidad ejecutiva en el idioma en que te escriban.
+   - Asesoría comercial: Brinda respuestas ejecutivas, directas y de alto impacto comercial para cerrar oportunidades o dar briefings.
+   - Mantén el hilo de la conversación recordando los mensajes anteriores que han intercambiado.
+   - Usa formato WhatsApp limpio (negritas y viñetas).
    - IMPORTANTE: Responde SIEMPRE en un único mensaje. Máximo 300 palabras. Sé directo y conciso.
 """
     else:
@@ -2196,10 +2281,6 @@ def api_update_agency_wa_config(agency_id: str, payload: Dict[str, Any]):
     if not success:
         raise HTTPException(status_code=400, detail="Failed to update config")
     return {"success": True, "agency": get_agency_by_id(agency_id)}
-
-@app.get("/api/agencies")
-def api_list_agencies():
-    return list_agencies()
 
 # --- Auth & 500 Free AI Messages Quota Endpoints ---
 @app.get("/api/agency/quota")
