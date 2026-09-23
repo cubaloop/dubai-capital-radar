@@ -86,7 +86,7 @@ from .crm.david_copilot import (
 
 WHATSAPP_GATEWAY_URL = os.getenv("WHATSAPP_GATEWAY_URL", "http://127.0.0.1:3001")
 
-async def dispatch_whatsapp_direct(to_phone: str, message: str, bypass_shield: bool = False, target_jid: Optional[str] = None):
+async def dispatch_whatsapp_direct(to_phone: str, message: str, bypass_shield: bool = False, target_jid: Optional[str] = None, agency_id: Optional[str] = None):
     """
     Delivers message via WhatsApp Web Gateway while respecting the Anti-Ban Safety Protocol.
     """
@@ -98,6 +98,8 @@ async def dispatch_whatsapp_direct(to_phone: str, message: str, bypass_shield: b
 
     try:
         payload = {"to": to_phone, "message": message}
+        if agency_id:
+            payload["agency_id"] = agency_id
         if target_jid:
             payload["jid"] = target_jid
 
@@ -106,7 +108,7 @@ async def dispatch_whatsapp_direct(to_phone: str, message: str, bypass_shield: b
             data = res.json()
             if data.get("success"):
                 anti_ban_guard.record_send()
-                print(f"[ANTI-BAN SHIELD] Message safely delivered to {to_phone} ({anti_ban_guard.daily_sent_count}/{anti_ban_guard.max_daily_limit} today)")
+                print(f"[ANTI-BAN SHIELD] Message safely delivered to {to_phone} ({anti_ban_guard.daily_sent_count}/{anti_ban_guard.max_daily_limit} today) [Agency: {agency_id or 'default'}]")
             else:
                 print(f"[dispatch_whatsapp_direct] Gateway returned error: {data.get('error')}")
             return data
@@ -120,7 +122,8 @@ async def send_whatsapp_endpoint(payload: Dict[str, Any]):
     to_phone = payload.get("to") or ADMIN_PHONE_DIGITS
     message = payload.get("message") or "Test from Dubai Capital Radar"
     target_jid = payload.get("jid")
-    return await dispatch_whatsapp_direct(to_phone=to_phone, message=message, bypass_shield=True, target_jid=target_jid)
+    agency_id = payload.get("agency_id")
+    return await dispatch_whatsapp_direct(to_phone=to_phone, message=message, bypass_shield=True, target_jid=target_jid, agency_id=agency_id)
 
 @app.get("/api/debug/test-groq")
 async def debug_test_groq():
@@ -440,39 +443,48 @@ import httpx
 WHATSAPP_GATEWAY_URL = os.getenv("WHATSAPP_GATEWAY_URL", "http://127.0.0.1:3001")
 
 @app.get("/api/whatsapp/status")
-async def get_whatsapp_gateway_status():
+async def get_whatsapp_gateway_status(agency_id: Optional[str] = None):
     try:
+        params = {}
+        if agency_id:
+            params["agency_id"] = agency_id
         async with httpx.AsyncClient(timeout=5.0) as client:
-            res = await client.get(f"{WHATSAPP_GATEWAY_URL}/status")
+            res = await client.get(f"{WHATSAPP_GATEWAY_URL}/status", params=params)
             data = res.json()
             data["gateway_online"] = True
             return data
     except Exception as e:
-        return {"connected": False, "phone": None, "has_qr": False, "gateway_online": False, "error": str(e)}
+        return {"connected": False, "phone": None, "has_qr": False, "gateway_online": False, "agency_id": agency_id, "error": str(e)}
 
 @app.get("/api/whatsapp/qr")
-async def get_whatsapp_qr():
+async def get_whatsapp_qr(agency_id: Optional[str] = None):
     try:
-        async with httpx.AsyncClient(timeout=2.0) as client:
-            res = await client.get(f"{WHATSAPP_GATEWAY_URL}/qr")
+        params = {}
+        if agency_id:
+            params["agency_id"] = agency_id
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            res = await client.get(f"{WHATSAPP_GATEWAY_URL}/qr", params=params)
             return res.json()
     except Exception:
-        return {"connected": False, "qr": None, "gateway_online": False}
+        return {"connected": False, "qr": None, "gateway_online": False, "agency_id": agency_id}
 
 @app.post("/api/whatsapp/send")
-async def send_whatsapp_message(payload: Dict[str, str]):
+async def send_whatsapp_message(payload: Dict[str, Any]):
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             res = await client.post(f"{WHATSAPP_GATEWAY_URL}/send", json=payload)
             return res.json()
     except Exception as e:
         return {"success": False, "error": str(e), "simulated": True}
 
 @app.post("/api/whatsapp/logout")
-async def logout_whatsapp():
+async def logout_whatsapp(payload: Optional[Dict[str, Any]] = None, agency_id: Optional[str] = None):
     try:
+        body = payload or {}
+        if agency_id and "agency_id" not in body:
+            body["agency_id"] = agency_id
         async with httpx.AsyncClient(timeout=5.0) as client:
-            res = await client.post(f"{WHATSAPP_GATEWAY_URL}/logout")
+            res = await client.post(f"{WHATSAPP_GATEWAY_URL}/logout", json=body)
             return res.json()
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -488,32 +500,58 @@ async def request_whatsapp_pairing_code(payload: Dict[str, Any]):
         return {"success": False, "error": str(e)}
 
 @app.post("/api/whatsapp/restart")
-async def restart_whatsapp_gateway():
-    """Forces gateway socket restart to generate a fresh QR immediately."""
+async def restart_whatsapp_gateway(payload: Optional[Dict[str, Any]] = None):
+    """Forces gateway socket restart for an agency."""
     try:
+        body = payload or {}
         async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.post(f"{WHATSAPP_GATEWAY_URL}/restart")
+            res = await client.post(f"{WHATSAPP_GATEWAY_URL}/restart", json=body)
             return res.json()
     except Exception as e:
         return {"success": False, "error": str(e)}
 
 @app.post("/api/whatsapp/force-clear-restart")
-async def force_clear_restart_whatsapp():
+async def force_clear_restart_whatsapp(payload: Optional[Dict[str, Any]] = None, agency_id: Optional[str] = None):
     try:
+        body = payload or {}
+        if agency_id and "agency_id" not in body:
+            body["agency_id"] = agency_id
         async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.post(f"{WHATSAPP_GATEWAY_URL}/force-clear-restart")
+            res = await client.post(f"{WHATSAPP_GATEWAY_URL}/force-clear-restart", json=body)
             return res.json()
     except Exception as e:
         return {"success": False, "error": str(e)}
 
 @app.post("/api/whatsapp/restore-session")
-async def restore_whatsapp_session():
+async def restore_whatsapp_session(payload: Optional[Dict[str, Any]] = None, agency_id: Optional[str] = None):
     try:
+        body = payload or {}
+        if agency_id and "agency_id" not in body:
+            body["agency_id"] = agency_id
         async with httpx.AsyncClient(timeout=25.0) as client:
-            res = await client.post(f"{WHATSAPP_GATEWAY_URL}/restore-session")
+            res = await client.post(f"{WHATSAPP_GATEWAY_URL}/restore-session", json=body)
             return res.json()
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+@app.get("/api/agencies")
+def api_list_agencies():
+    from .database.crm_db import list_agencies
+    return {"agencies": list_agencies()}
+
+@app.post("/api/agencies")
+def api_create_or_update_agency(payload: Dict[str, Any]):
+    from .database.crm_db import create_or_update_agency_db
+    agency = create_or_update_agency_db(payload)
+    return {"success": True, "agency": agency}
+
+@app.get("/api/agencies/{agency_id}")
+def api_get_agency(agency_id: str):
+    from .database.crm_db import get_agency_by_id
+    agency = get_agency_by_id(agency_id)
+    if not agency:
+        return {"success": False, "error": "Agencia no encontrada"}
+    return {"success": True, "agency": agency}
 
 @app.post("/api/whatsapp/verify-numbers")
 async def verify_whatsapp_numbers(payload: Dict[str, Any]):
@@ -851,6 +889,7 @@ async def api_send_lead_whatsapp(lead_id: str, payload: Optional[Dict[str, Any]]
                 valid_image = madrid_flyer
 
     gateway_payload = {
+        "agency_id": agency_id,
         "to": phone,
         "message": message,
         "image_path": valid_image
@@ -1459,7 +1498,7 @@ async def handle_admin_copilot(command_text: str, sender_jid: str = "", sender_p
         except UnicodeEncodeError:
             print(f"[ADMIN COPILOT] Dispatching reply for agency '{agency_name}' to {target_phone}")
 
-        dispatch_res = await dispatch_whatsapp_direct(to_phone=target_phone, message=reply_msg, bypass_shield=True, target_jid=target_jid)
+        dispatch_res = await dispatch_whatsapp_direct(to_phone=target_phone, message=reply_msg, bypass_shield=True, target_jid=target_jid, agency_id=agency_id)
         return {
             "status": "admin_copilot_replied",
             "message": reply_msg,
@@ -1544,7 +1583,12 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
         return {"status": "ignored", "reason": "system_outbound_echo_ignored"}
 
     # 0. RESOLVE AGENCY & CHECK ADMIN COPILOT MODE
-    agency_info = resolve_agency_for_message(sender=sender, jid=jid, bot_phone=bot_phone)
+    agency_payload_id = payload.get("agency_id")
+    if agency_payload_id:
+        from .database.crm_db import get_agency_by_id
+        agency_info = get_agency_by_id(agency_payload_id) or resolve_agency_for_message(sender=sender, jid=jid, bot_phone=bot_phone)
+    else:
+        agency_info = resolve_agency_for_message(sender=sender, jid=jid, bot_phone=bot_phone)
     push_name = (payload.get("push_name") or "").lower()
     is_admin = is_admin_sender(sender=sender, jid=jid, push_name=push_name, agency=agency_info)
 
@@ -1574,7 +1618,7 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
                         f"✅ _Indexado en el inventario para tus agentes de IA._"
                     )
                     clean_admin_phone = "".join([c for c in (agency_info.get("admin_phone") or ADMIN_PHONE_DIGITS) if c.isdigit()])
-                    await dispatch_whatsapp_direct(to_phone=clean_admin_phone, message=admin_notice, bypass_shield=True)
+                    await dispatch_whatsapp_direct(to_phone=clean_admin_phone, message=admin_notice, bypass_shield=True, agency_id=agency_info.get("id"))
 
                     return {
                         "status": "project_ingested",
@@ -1708,7 +1752,7 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
         async def dispatch_client_reply(target_phone: str, reply_msg: str, lead_id: str, client_jid: str = ""):
             try:
                 await asyncio.sleep(4)  # Natural human pause
-                res = await dispatch_whatsapp_direct(to_phone=target_phone, message=reply_msg, bypass_shield=True, target_jid=client_jid)
+                res = await dispatch_whatsapp_direct(to_phone=target_phone, message=reply_msg, bypass_shield=True, target_jid=client_jid, agency_id=agency_info.get("id"))
                 print(f"[Client Reply] Delivered reply to client {target_phone} ({client_jid}): {res.get('success')}")
                 add_lead_note_db(lead_id, author=author_label, content=f"🤖 [{author_label}]:\n{reply_msg}", note_type="whatsapp")
             except Exception as e:
@@ -1721,7 +1765,7 @@ async def handle_whatsapp_inbound(payload: Dict[str, Any]):
     # 4. Deliver private executive briefing to agency admin's WhatsApp
     if david_alert:
         clean_admin = "".join([c for c in (agency_info.get("admin_phone") or ADMIN_PHONE_DIGITS) if c.isdigit()])
-        await dispatch_whatsapp_direct(to_phone=clean_admin, message=david_alert, bypass_shield=True)
+        await dispatch_whatsapp_direct(to_phone=clean_admin, message=david_alert, bypass_shield=True, agency_id=agency_info.get("id"))
 
     # 5. Telegram Alert for high intent or property inquiry
     is_hot = has_prop_req or intent in ["ready_to_buy", "interested", "scheduling", "objection_price", "objection_trust", "objection_spouse"] or urgency in ["high", "medium"]

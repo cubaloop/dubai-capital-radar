@@ -18,10 +18,13 @@ import { useLanguage } from '../i18n/LanguageContext';
 interface WhatsAppQRModalProps {
   isOpen: boolean;
   onClose: () => void;
+  agencyId?: string;
+  agencyName?: string;
 }
 
-export const WhatsAppQRModal: React.FC<WhatsAppQRModalProps> = ({ isOpen, onClose }) => {
+export const WhatsAppQRModal: React.FC<WhatsAppQRModalProps> = ({ isOpen, onClose, agencyId, agencyName }) => {
   const { t } = useLanguage();
+  const activeAgencyId = agencyId || localStorage.getItem('agency_id') || 'agency_master';
   const [activeTab, setActiveTab] = useState<'qr' | 'pairing'>('qr');
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -41,7 +44,7 @@ export const WhatsAppQRModal: React.FC<WhatsAppQRModalProps> = ({ isOpen, onClos
   const fetchStatus = async (isManual = false) => {
     try {
       if (isManual) setIsManualRefreshing(true);
-      const res = await fetch('/api/whatsapp/qr');
+      const res = await fetch(`/api/whatsapp/qr?agency_id=${encodeURIComponent(activeAgencyId)}`);
       const data = await res.json();
       setIsConnected(data.connected);
       if (data.qr && data.qr !== qrCode) {
@@ -61,14 +64,18 @@ export const WhatsAppQRModal: React.FC<WhatsAppQRModalProps> = ({ isOpen, onClos
       const interval = setInterval(() => fetchStatus(false), 3000);
       return () => clearInterval(interval);
     }
-  }, [isOpen]);
+  }, [isOpen, activeAgencyId]);
 
   const handleLogout = async () => {
     try {
       setIsManualRefreshing(true);
       setQrCode(null);
       setPairingCode(null);
-      await fetch('/api/whatsapp/logout', { method: 'POST' });
+      await fetch('/api/whatsapp/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agency_id: activeAgencyId })
+      });
       setTimeout(() => fetchStatus(false), 2000);
     } catch (e) {
       console.error(e);
@@ -89,7 +96,7 @@ export const WhatsAppQRModal: React.FC<WhatsAppQRModalProps> = ({ isOpen, onClos
       const res = await fetch('/api/whatsapp/pairing-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: pairingPhone.trim() })
+        body: JSON.stringify({ phone: pairingPhone.trim(), agency_id: activeAgencyId })
       });
       const data = await res.json();
       if (data.success && data.code) {
@@ -119,7 +126,8 @@ export const WhatsAppQRModal: React.FC<WhatsAppQRModalProps> = ({ isOpen, onClos
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: testNumber,
-          message: '🏰 [Dubai Capital Radar] Mensaje de prueba: Conexión automática por WhatsApp Gateway exitosa.'
+          agency_id: activeAgencyId,
+          message: `🏰 [Dubai Capital Radar] Mensaje de prueba: Conexión exitosa para ${agencyName || activeAgencyId}.`
         })
       });
       const data = await res.json();
@@ -155,7 +163,12 @@ export const WhatsAppQRModal: React.FC<WhatsAppQRModalProps> = ({ isOpen, onClos
             <h2 className="font-serif-luxury font-bold text-lg text-white">
               {t('modals.qrTitle', 'WhatsApp Device Gateway Connection')}
             </h2>
-            <p className="text-xs text-slate-300">
+            <div className="flex items-center gap-2 mt-1">
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                🏢 {agencyName || activeAgencyId}
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-1">
               {t('modals.qrSubtitle', 'Link your official business or advisor WhatsApp phone to enable autonomous outreach.')}
             </p>
           </div>

@@ -1366,5 +1366,40 @@ def list_agencies() -> List[Dict[str, Any]]:
     conn.close()
     return [dict(r) for r in rows]
 
+def create_or_update_agency_db(payload: Dict[str, Any]) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    raw_email = (payload.get("email") or "").strip().lower()
+    raw_id = payload.get("id") or f"agency_{raw_email.replace('@', '_').replace('.', '_')}"
+    agency_id = "".join([c if c.isalnum() or c in ('_', '-') else '_' for c in raw_id])
+    name = payload.get("name") or "Nueva Empresa"
+    plan = payload.get("plan") or "free"
+    messages_limit = payload.get("messages_limit", 500)
+    admin_phone = payload.get("admin_phone") or ""
+    bot_phone = payload.get("bot_phone") or ""
+    whatsapp_mode = payload.get("whatsapp_mode") or "baileys"
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    cursor.execute("SELECT id FROM agencies WHERE id = ? OR email = ?", (agency_id, raw_email))
+    existing = cursor.fetchone()
+    if existing:
+        cursor.execute("""
+        UPDATE agencies
+        SET name = ?, email = ?, plan = ?, messages_limit = ?, admin_phone = ?, bot_phone = ?, whatsapp_mode = ?
+        WHERE id = ?
+        """, (name, raw_email, plan, messages_limit, admin_phone, bot_phone, whatsapp_mode, existing["id"]))
+        agency_id = existing["id"]
+    else:
+        cursor.execute("""
+        INSERT INTO agencies (id, name, email, plan, messages_limit, messages_used, whatsapp_mode, admin_phone, bot_phone, created_at, is_active)
+        VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, 1)
+        """, (agency_id, name, raw_email, plan, messages_limit, whatsapp_mode, admin_phone, bot_phone, now_str))
+
+    conn.commit()
+    cursor.execute("SELECT * FROM agencies WHERE id = ?", (agency_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else {}
+
 # Initialize on import
 init_crm_db()

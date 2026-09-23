@@ -158,7 +158,12 @@ export function App() {
                       </Routes>
                     </main>
                   </div>
-                  <WhatsAppQRModal isOpen={isWhatsAppModalOpen} onClose={() => setIsWhatsAppModalOpen(false)} />
+                  <WhatsAppQRModal
+                    isOpen={isWhatsAppModalOpen}
+                    onClose={() => setIsWhatsAppModalOpen(false)}
+                    agencyId={activeUser?.agencyId}
+                    agencyName={activeUser?.agencyName}
+                  />
                   <AgencySettingsModal isOpen={isAgencyModalOpen} onClose={() => setIsAgencyModalOpen(false)} />
                   <LicenseModal
                     isOpen={isLicenseModalOpen}

@@ -27,212 +27,25 @@ app.use(express.json());
 
 const GATEWAY_PORT = process.env.WHATSAPP_PORT || 3001;
 const BACKEND_PORT = process.env.BACKEND_PORT || process.env.PORT || 8000;
-const AUTH_DIR = path.join(process.cwd(), 'whatsapp_auth');
+const AUTH_BASE_DIR = path.join(process.cwd(), 'whatsapp_auth');
+
+if (!fs.existsSync(AUTH_BASE_DIR)) {
+  fs.mkdirSync(AUTH_BASE_DIR, { recursive: true });
+}
 
 // ─── Supabase Session Persistence ────────────────────────────────────────────
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://jyrqzjctkmzdvmraqrcv.supabase.co";
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5cnF6amN0a216ZHZtcmFxcmN2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjI4MTU3NCwiZXhwIjoyMTAxODU3NTc0fQ.jpzy38i_JqhKiLZwNFXESJo62kk4vWvwCVPLpFIyLjc";
 const AUTH_BACKUP_ENABLED = !!(SUPABASE_URL && SUPABASE_KEY);
 
-if (!fs.existsSync(AUTH_DIR)) {
-  fs.mkdirSync(AUTH_DIR, { recursive: true });
+function sanitizeAgencyId(agencyId) {
+  if (!agencyId) return 'agency_master';
+  return String(agencyId).replace(/[^a-zA-Z0-9_-]/g, '_');
 }
 
-async function clearAuthFromSupabase() {
-  if (!AUTH_BACKUP_ENABLED) return;
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/leads?id=eq.whatsapp_auth_session`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'apikey': SUPABASE_KEY
-      },
-      signal: AbortSignal.timeout(5000)
-    });
-    console.log(`[Session Backup] Deleted whatsapp_auth_session from Supabase (status: ${res.status})`);
-  } catch (err) {
-    console.error('[Session Backup] Error deleting Supabase session:', err.message);
-  }
-}
-
-async function uploadAuthToSupabase() {
-  if (!AUTH_BACKUP_ENABLED) return;
-  try {
-    // SAFETY GUARD: Never overwrite a valid saved session with an unauthenticated session
-    const credsPath = path.join(AUTH_DIR, 'creds.json');
-    if (!fs.existsSync(credsPath)) {
-      console.log('[Session Backup] Skipping backup: creds.json does not exist locally');
-      return;
-    }
-    try {
-      const creds = JSON.parse(fs.readFileSync(credsPath, 'utf-8'));
-      if (!creds.me || !creds.me.id) {
-        console.log('[Session Backup] Skipping backup: local session is not authenticated yet');
-        return;
-      }
-    } catch (parseErr) {
-      console.warn('[Session Backup] Skipping backup: unparseable creds.json');
-      return;
-    }
-
-    const files = fs.readdirSync(AUTH_DIR);
-    if (!files.length) return;
-
-    // Bundle auth files into one JSON payload for atomic persistence.
-    const bundle = {};
-    for (const file of files) {
-      if (file.startsWith('session-') || file === 'message_store.json') continue;
-      const filePath = path.join(AUTH_DIR, file);
-      bundle[file] = fs.readFileSync(filePath, 'utf-8');
-    }
-
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'apikey': SUPABASE_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates'
-      },
-      body: JSON.stringify({
-        id: 'whatsapp_auth_session',
-        full_name: 'WhatsApp Auth Session',
-        phone: connectedNumber || '971545932205',
-        lead_status: 'SYSTEM',
-        campaign_name: 'system_auth',
-        comments: JSON.stringify(bundle)
-      }),
-      signal: AbortSignal.timeout(15000)
-    });
-
-    if (res.ok) {
-      console.log(`[Session Backup] ✅ Auth session bundle backed up to Supabase (${Object.keys(bundle).length} keys)`);
-    } else {
-      console.log(`[Session Backup] Supabase backup status: ${res.status}`);
-    }
-  } catch (err) {
-    console.error('[Session Backup] Backup error:', err.message);
-  }
-}
-
-async function restoreAuthFromSupabase() {
-  if (!AUTH_BACKUP_ENABLED) {
-    console.log('[Session Restore] Supabase not configured - using local auth');
-    return false;
-  }
-
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      console.log(`[Session Restore] Attempting restore from Supabase (attempt ${attempt}/3)...`);
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/leads?id=eq.whatsapp_auth_session&select=*`, {
-        headers: {
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'apikey': SUPABASE_KEY
-        },
-        signal: AbortSignal.timeout(20000)
-      });
-
-      if (!res.ok) {
-        console.log(`[Session Restore] Failed to query Supabase for auth session: HTTP ${res.status}`);
-        if (attempt < 3) {
-          await new Promise(r => setTimeout(r, 2000));
-          continue;
-        }
-        return false;
-      }
-
-      const rows = await res.json();
-      if (!rows || !rows.length || !rows[0].comments) {
-        console.log('[Session Restore] No previous session bundle found in Supabase');
-        return false;
-      }
-
-      const bundle = JSON.parse(rows[0].comments);
-      const fileKeys = Object.keys(bundle);
-      if (!bundle['creds.json']) {
-        console.log('[Session Restore] Supabase bundle has no creds.json');
-        return false;
-      }
-
-      let restoredCount = 0;
-      let skippedCount = 0;
-
-      for (const file of fileKeys) {
-        if (file.startsWith('session-') || file === 'message_store.json') {
-          skippedCount++;
-          continue;
-        }
-        let content = bundle[file];
-        if (file === 'creds.json') {
-          try {
-            const parsedCreds = JSON.parse(content);
-            if (parsedCreds.me && !parsedCreds.registered) {
-              console.log('[Session Restore] Sanitizing creds.registered to true (phone is already linked as ' + (parsedCreds.me.id || '') + ')');
-              parsedCreds.registered = true;
-              content = JSON.stringify(parsedCreds, null, 2);
-            }
-          } catch (_) {}
-        }
-        fs.writeFileSync(path.join(AUTH_DIR, file), content, 'utf-8');
-        restoredCount++;
-      }
-
-      // Purge any stale contact session files already on disk
-      let purgedCount = 0;
-      if (fs.existsSync(AUTH_DIR)) {
-        for (const f of fs.readdirSync(AUTH_DIR)) {
-          if (f.startsWith('session-')) {
-            try { fs.unlinkSync(path.join(AUTH_DIR, f)); purgedCount++; } catch (_) {}
-          }
-        }
-      }
-
-      console.log(`[Session Restore] ✅ Restored ${restoredCount} identity files from Supabase | Skipped ${skippedCount} stale session files | Purged ${purgedCount} disk session files`);
-      return restoredCount > 0;
-    } catch (err) {
-      console.error(`[Session Restore] Attempt ${attempt} failed:`, err.message);
-      if (attempt < 3) {
-        await new Promise(r => setTimeout(r, 2500));
-      }
-    }
-  }
-}
-// ─────────────────────────────────────────────────────────────────────────────
-
-let sock = null;
-let currentQR = null;
-let isConnected = false;
-let connectedNumber = null;
-let lastActivityAt = Date.now();
-let messagesSentToday = 0;
-let lastResetDate = new Date().toDateString();
-
-function resetDailyCounterIfNeeded() {
-  const today = new Date().toDateString();
-  if (today !== lastResetDate) {
-    messagesSentToday = 0;
-    lastResetDate = today;
-  }
-}
-
-// ─── Self Keep-Alive Pulse ────────────────────────────────────────────────────
-const SELF_URL = process.env.SELF_URL || "https://dubai-miami-radar.onrender.com";
-if (SELF_URL) {
-  setInterval(async () => {
-    try {
-      const pingUrl = `${SELF_URL}/api/whatsapp/qr`;
-      await fetch(pingUrl, { headers: { 'User-Agent': 'WhatsApp-Gateway-Pulse/1.0' } });
-      console.log(`[Keep-Alive] Gateway pulse delivered to ${pingUrl} (Preventing Sleep)`);
-    } catch (e) {
-      // Non-blocking log
-    }
-  }, 3 * 60 * 1000); // Every 3 minutes
-}
-
-// Persistent message store for Baileys retry resolution (resolves "Esperando mensaje / Waiting for message")
-// This store is backed up to Supabase so it survives Render redeploys
+// ─── Persistent message store for Baileys retry resolution ───────────────────
 const messageStore = new Map();
-const MESSAGE_STORE_FILE = path.join(AUTH_DIR, 'message_store.json');
+const MESSAGE_STORE_FILE = path.join(AUTH_BASE_DIR, 'message_store.json');
 let messageStoreDirty = false;
 
 // Outbound message ID registry to prevent echo loops
@@ -240,7 +53,7 @@ const programmaticSentIds = new Set();
 function recordProgrammaticSend(msgId) {
   if (!msgId) return;
   programmaticSentIds.add(msgId);
-  if (programmaticSentIds.size > 500) {
+  if (programmaticSentIds.size > 1000) {
     const oldest = programmaticSentIds.values().next().value;
     programmaticSentIds.delete(oldest);
   }
@@ -277,7 +90,6 @@ async function flushMessageStoreToSupabase() {
   if (!AUTH_BACKUP_ENABLED || !messageStoreDirty) return;
   messageStoreDirty = false;
   try {
-    // Keep only the last 500 messages in Supabase to stay within payload limits
     const entries = [...messageStore.entries()];
     const trimmed = Object.fromEntries(entries.slice(-500));
     const res = await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
@@ -301,11 +113,10 @@ async function flushMessageStoreToSupabase() {
     if (res.ok) console.log(`[Message Store] ✅ Flushed ${Object.keys(trimmed).length} messages to Supabase`);
   } catch (e) {
     console.warn('[Message Store] Supabase flush warning:', e.message);
-    messageStoreDirty = true; // Retry next cycle
+    messageStoreDirty = true;
   }
 }
 
-// Load from local disk first (fast), then hydrate from Supabase (persistent across redeploys)
 try {
   if (fs.existsSync(MESSAGE_STORE_FILE)) {
     const raw = JSON.parse(fs.readFileSync(MESSAGE_STORE_FILE, 'utf-8'));
@@ -314,11 +125,8 @@ try {
     }
     console.log(`[Message Store] Loaded ${messageStore.size} cached messages from disk`);
   }
-} catch (e) {
-  // Non-blocking
-}
+} catch (e) {}
 
-// Flush message store to Supabase every 60 seconds if there are new messages
 setInterval(flushMessageStoreToSupabase, 60 * 1000);
 
 function saveToMessageStore(id, message) {
@@ -329,374 +137,562 @@ function saveToMessageStore(id, message) {
   }
   messageStore.set(id, message);
   messageStoreDirty = true;
-
-  // Write to disk immediately (fast, non-blocking)
   try {
     const obj = Object.fromEntries(messageStore);
     fs.writeFileSync(MESSAGE_STORE_FILE, JSON.stringify(obj), 'utf-8');
-  } catch (e) {
-    // Non-blocking
-  }
+  } catch (e) {}
 }
 
-// Debounced auth backup to avoid hammering Supabase while continuously persisting session keys
-let authBackupTimeout = null;
-function scheduleAuthBackup(delayMs = 15000) {
-  if (!AUTH_BACKUP_ENABLED) return;
-  if (authBackupTimeout) clearTimeout(authBackupTimeout);
-  authBackupTimeout = setTimeout(async () => {
-    try {
-      await uploadAuthToSupabase();
-    } catch (e) {
-      console.warn('[Session Backup] Debounced backup warning:', e.message);
-    }
-  }, delayMs);
-}
+// ─── Multi-Session Manager ────────────────────────────────────────────────────
+// Map of agencyId -> Session
+const sessions = new Map();
 
-// Periodic auth backup every 5 minutes when connected to safeguard Signal session ratchet files
-setInterval(async () => {
-  if (isConnected && AUTH_BACKUP_ENABLED) {
-    try {
-      await uploadAuthToSupabase();
-    } catch (e) {
-      // Non-blocking
+class AgencySession {
+  constructor(agencyId) {
+    this.agencyId = agencyId;
+    this.authDir = path.join(AUTH_BASE_DIR, agencyId);
+    this.sock = null;
+    this.isConnected = false;
+    this.connectedNumber = null;
+    this.currentQR = null;
+    this.lastActivityAt = Date.now();
+    this.messagesSentToday = 0;
+    this.lastResetDate = new Date().toDateString();
+    this.isStarting = false;
+    this.backupTimeout = null;
+
+    if (!fs.existsSync(this.authDir)) {
+      fs.mkdirSync(this.authDir, { recursive: true });
     }
   }
-}, 5 * 60 * 1000);
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-let isInitialStartup = true;
-
-async function startWhatsApp() {
-  // Only restore from Supabase on fresh container start if no creds.json exists locally
-  if (isInitialStartup) {
-    isInitialStartup = false;
-    const credsExistLocally = fs.existsSync(path.join(AUTH_DIR, 'creds.json'));
-    if (!credsExistLocally) {
-      console.log('[Startup] No local creds.json found. Restoring from Supabase...');
-      await restoreAuthFromSupabase();
-    } else {
-      console.log('[Startup] Existing local creds.json found on disk. Preserving local session.');
+  resetDailyCounterIfNeeded() {
+    const today = new Date().toDateString();
+    if (today !== this.lastResetDate) {
+      this.messagesSentToday = 0;
+      this.lastResetDate = today;
     }
-    await restoreMessageStoreFromSupabase();
   }
 
-  const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-  const { version } = await fetchLatestBaileysVersion();
-
-  sock = makeWASocket({
-    version,
-    logger: pino({ level: 'silent' }),
-    auth: state,
-    browser: Browsers.ubuntu('Chrome'),
-    syncFullHistory: false,
-    generateHighQualityLinkPreview: false,
-    markOnlineOnConnect: true,
-    connectTimeoutMs: 60000,
-    defaultQueryTimeoutMs: 60000,
-    keepAliveIntervalMs: 25000,
-    retryRequestDelayMs: 2000,
-    maxMsgRetryCount: 5,
-    getMessage: async (key) => {
-      if (!key?.id) return undefined;
-      // 1. Check in-memory store first (fastest)
-      if (messageStore.has(key.id)) {
-        const msg = messageStore.get(key.id);
-        console.log(`[getMessage] ✅ Resolved retry for msg ${key.id} from in-memory store`);
-        return msg;
-      }
-      // 2. Fallback: re-hydrate from Supabase and try again
-      console.log(`[getMessage] ⚠️ Msg ${key.id} not in memory - fetching from Supabase...`);
-      await restoreMessageStoreFromSupabase();
-      if (messageStore.has(key.id)) {
-        const msg = messageStore.get(key.id);
-        console.log(`[getMessage] ✅ Resolved retry for msg ${key.id} from Supabase fallback`);
-        return msg;
-      }
-      console.log(`[getMessage] ❌ Msg ${key.id} not found - phone may show "Esperando mensaje"`);
-      return undefined;
-    }
-  });
-
-  sock.ev.on('creds.update', async () => {
-    try {
-      await saveCreds();
-      scheduleAuthBackup(2000);
-    } catch (e) {
-      console.error('[creds.update] Error saving credentials:', e.message);
-    }
-  });
-
-  sock.ev.on('connection.update', async (update) => {
-    const { connection, lastDisconnect, qr } = update;
-
-    if (qr) {
-      currentQR = await QRCode.toDataURL(qr, {
-        width: 360,
-        margin: 4,
-        errorCorrectionLevel: 'M',
-        color: {
-          dark: '#000000',
-          light: '#ffffff'
-        }
-      });
-      console.log('[WhatsApp] New QR code generated (360x360, margin 4, level M). Ready for scanning.');
-    }
-
-    if (connection === 'close') {
-      isConnected = false;
-      connectedNumber = null;
-      const code = lastDisconnect?.error?.output?.statusCode;
-      const shouldReconnect = code !== DisconnectReason.loggedOut;
-      console.log(`[WhatsApp] Connection closed (code: ${code}). Reconnecting: ${shouldReconnect}`);
-      if (shouldReconnect) {
-        const delay = code === 428 ? 10000 : 3000; // Back off on stream error
-        setTimeout(startWhatsApp, delay);
-      } else {
-        // Logged out - clear Supabase backup & local auth
-        console.log('[WhatsApp] Logged out - clearing session backup');
-        await clearAuthFromSupabase();
-        if (fs.existsSync(AUTH_DIR)) {
-          fs.rmSync(AUTH_DIR, { recursive: true, force: true });
-          fs.mkdirSync(AUTH_DIR, { recursive: true });
-        }
-        setTimeout(startWhatsApp, 2000);
-      }
-    } else if (connection === 'open') {
-      isConnected = true;
-      currentQR = null;
-      connectedNumber = sock.user?.id?.split(':')[0] || 'Linked Phone';
-      lastActivityAt = Date.now();
-      console.log(`✅ [WhatsApp Gateway] Connected successfully as +${connectedNumber}`);
-      // Backup immediately after connecting
-      await uploadAuthToSupabase();
-    }
-  });
-
-  // Helper: Extract clean phone number without device suffixes (:0, :1) or LID noise
-  function extractPhoneNumber(jid, participant, remoteJidAlt) {
-    const raw = participant || remoteJidAlt || jid || '';
-    const userPart = raw.split('@')[0] || '';
-    const cleanUser = userPart.split(':')[0] || '';
-    return cleanUser.replace(/[^0-9]/g, '');
-  }
-
-  // Helper: Unwrap nested message structures (ephemeral, view-once, buttons, captions)
-  function extractMessageData(rawMsg) {
-    if (!rawMsg || !rawMsg.message) return { text: '', hasDocument: false, documentFileName: null, unwrappedMsg: null };
-
-    let m = rawMsg.message;
-    let depth = 0;
-    while (m && depth < 5) {
-      if (m.ephemeralMessage?.message) {
-        m = m.ephemeralMessage.message;
-      } else if (m.viewOnceMessage?.message) {
-        m = m.viewOnceMessage.message;
-      } else if (m.viewOnceMessageV2?.message) {
-        m = m.viewOnceMessageV2.message;
-      } else if (m.documentWithCaptionMessage?.message) {
-        m = m.documentWithCaptionMessage.message;
-      } else {
-        break;
-      }
-      depth++;
-    }
-
-    const text = (
-      m.conversation ||
-      m.extendedTextMessage?.text ||
-      m.imageMessage?.caption ||
-      m.documentMessage?.caption ||
-      m.videoMessage?.caption ||
-      m.buttonsResponseMessage?.selectedButtonId ||
-      m.listResponseMessage?.singleSelectReply?.selectedRowId ||
-      m.templateButtonReplyMessage?.selectedId ||
-      m.documentMessage?.fileName ||
-      ''
-    ).trim();
-
-    const doc = m.documentMessage || null;
-    return {
-      text,
-      hasDocument: !!doc,
-      documentFileName: doc?.fileName || null,
-      unwrappedMsg: m
-    };
-  }
-
-  // Helper: Resilient webhook forwarding with fallback to internal and public URLs
-  async function forwardToBackendWebhook(payload) {
-    const candidateUrls = [
-      `http://127.0.0.1:${BACKEND_PORT}/api/whatsapp/inbound-webhook`,
-      `http://localhost:${BACKEND_PORT}/api/whatsapp/inbound-webhook`,
-      `http://127.0.0.1:10000/api/whatsapp/inbound-webhook`,
-      `http://127.0.0.1:8000/api/whatsapp/inbound-webhook`,
-      `https://dubai-capital-radar.onrender.com/api/whatsapp/inbound-webhook`
-    ];
-
-    for (const targetUrl of candidateUrls) {
+  scheduleBackup(delayMs = 10000) {
+    if (!AUTH_BACKUP_ENABLED) return;
+    if (this.backupTimeout) clearTimeout(this.backupTimeout);
+    this.backupTimeout = setTimeout(async () => {
       try {
-        console.log(`[WhatsApp Gateway -> Webhook] Trying ${targetUrl} for ${payload.sender}...`);
-        const res = await fetch(targetUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(15000)
-        });
-        const respText = await res.text();
-        console.log(`✅ [WhatsApp Gateway -> Webhook] Delivered to ${targetUrl} (HTTP ${res.status}): ${respText.substring(0, 100)}`);
-        if (res.ok) return true;
-      } catch (err) {
-        console.warn(`⚠️ [WhatsApp Gateway -> Webhook] Failed at ${targetUrl}: ${err.message}`);
+        await this.uploadAuthToSupabase();
+      } catch (e) {
+        console.error(`[Session Backup - ${this.agencyId}] Backup error:`, e.message);
+      }
+    }, delayMs);
+  }
+
+  async uploadAuthToSupabase() {
+    if (!AUTH_BACKUP_ENABLED) return;
+    try {
+      const credsPath = path.join(this.authDir, 'creds.json');
+      if (!fs.existsSync(credsPath)) return;
+      try {
+        const creds = JSON.parse(fs.readFileSync(credsPath, 'utf-8'));
+        if (!creds.me || !creds.me.id) return;
+      } catch (parseErr) {
+        return;
+      }
+
+      const files = fs.readdirSync(this.authDir);
+      if (!files.length) return;
+
+      const bundle = {};
+      for (const file of files) {
+        if (file.startsWith('session-') || file === 'message_store.json') continue;
+        const filePath = path.join(this.authDir, file);
+        bundle[file] = fs.readFileSync(filePath, 'utf-8');
+      }
+
+      const recordId = `whatsapp_auth_${this.agencyId}`;
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'apikey': SUPABASE_KEY,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          id: recordId,
+          full_name: `WhatsApp Auth - ${this.agencyId}`,
+          phone: this.connectedNumber || 'unknown',
+          lead_status: 'SYSTEM',
+          campaign_name: `system_auth_${this.agencyId}`,
+          comments: JSON.stringify(bundle)
+        }),
+        signal: AbortSignal.timeout(15000)
+      });
+
+      if (res.ok) {
+        console.log(`[Session Backup] ✅ Auth bundle for ${this.agencyId} backed up to Supabase (${Object.keys(bundle).length} keys)`);
+      }
+    } catch (err) {
+      console.error(`[Session Backup - ${this.agencyId}] Backup error:`, err.message);
+    }
+  }
+
+  async restoreAuthFromSupabase() {
+    if (!AUTH_BACKUP_ENABLED) return false;
+
+    // Try primary key for this agency, or fallback for Surprise Tourism legacy single session
+    const candidateKeys = [`whatsapp_auth_${this.agencyId}`];
+    if (this.agencyId === 'agency_bd_surprisetourism_com' || this.agencyId === 'agency_master') {
+      candidateKeys.push('whatsapp_auth_session');
+    }
+
+    for (const key of candidateKeys) {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          console.log(`[Session Restore - ${this.agencyId}] Querying Supabase for ${key} (attempt ${attempt}/3)...`);
+          const res = await fetch(`${SUPABASE_URL}/rest/v1/leads?id=eq.${key}&select=*`, {
+            headers: {
+              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'apikey': SUPABASE_KEY
+            },
+            signal: AbortSignal.timeout(20000)
+          });
+
+          if (!res.ok) {
+            if (attempt < 3) {
+              await new Promise(r => setTimeout(r, 2000));
+              continue;
+            }
+            break;
+          }
+
+          const rows = await res.json();
+          if (!rows || !rows.length || !rows[0].comments) {
+            break; // No rows for this candidate, try next key
+          }
+
+          const bundle = JSON.parse(rows[0].comments);
+          const fileKeys = Object.keys(bundle);
+          if (!bundle['creds.json']) {
+            break;
+          }
+
+          let restoredCount = 0;
+          for (const file of fileKeys) {
+            if (file.startsWith('session-') || file === 'message_store.json') continue;
+            let content = bundle[file];
+            if (file === 'creds.json') {
+              try {
+                const parsedCreds = JSON.parse(content);
+                if (parsedCreds.me && !parsedCreds.registered) {
+                  parsedCreds.registered = true;
+                  content = JSON.stringify(parsedCreds, null, 2);
+                }
+              } catch (_) {}
+            }
+            fs.writeFileSync(path.join(this.authDir, file), content, 'utf-8');
+            restoredCount++;
+          }
+
+          // Purge stale contact session files
+          if (fs.existsSync(this.authDir)) {
+            for (const f of fs.readdirSync(this.authDir)) {
+              if (f.startsWith('session-')) {
+                try { fs.unlinkSync(path.join(this.authDir, f)); } catch (_) {}
+              }
+            }
+          }
+
+          console.log(`[Session Restore - ${this.agencyId}] ✅ Restored ${restoredCount} identity files from Supabase (${key})`);
+          return true;
+        } catch (err) {
+          console.error(`[Session Restore - ${this.agencyId}] Attempt ${attempt} failed:`, err.message);
+          if (attempt < 3) await new Promise(r => setTimeout(r, 2000));
+        }
       }
     }
-    console.error(`❌ [WhatsApp Gateway -> Webhook] ALL candidate endpoints failed for sender ${payload.sender}`);
     return false;
   }
 
-  // Listen to incoming messages for Super-Admin copilot & Prospect AI replies
-  sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    // Log all message types for debugging - 'notify' = new real-time msg, 'append' = history sync
-    console.log(`[WA Event] messages.upsert type=${type} count=${messages.length}`);
-    // Accept both 'notify' (new messages) and 'append' (synced/pending messages from existing chats)
-    if (type !== 'notify' && type !== 'append') return;
-
-    for (const msg of messages) {
-      if (!msg.message) continue;
-
-      // Cache message in store to handle potential Baileys retry requests (Signal ratchet sync)
-      if (msg.key && msg.key.id) {
-        saveToMessageStore(msg.key.id, msg.message);
-      }
-
-      const remoteJid = msg.key.remoteJid || '';
-      const isGroup = remoteJid.endsWith('@g.us') || remoteJid.includes('@g.us');
-      const isBroadcast = remoteJid === 'status@broadcast' || remoteJid.includes('broadcast');
-
-      // Debug: log every individual message details before filtering
-      console.log(`[WA Msg Debug] remoteJid=${remoteJid} fromMe=${msg.key.fromMe} isGroup=${isGroup} isBroadcast=${isBroadcast} pushName=${msg.pushName || ''}`);
-
-      // STRICT FILTER: completely ignore all WhatsApp groups and status broadcasts
-      if (isGroup || isBroadcast) {
-        continue;
-      }
-
-      // Skip if this message was sent programmatically by this gateway
-      if (msg.key?.id && programmaticSentIds.has(msg.key.id)) {
-        console.log(`[WA Msg Debug] Skipping bot programmatically sent message ID: ${msg.key.id}`);
-        continue;
-      }
-
-      // Allow owner chatting with bot from the same phone (Message yourself)
-      const isChatWithSelf = connectedNumber && (remoteJid.includes(connectedNumber) || remoteJid.startsWith(connectedNumber));
-      // Outbound messages from this session to other numbers must NEVER be forwarded to backend webhook
-      if (msg.key.fromMe && !isChatWithSelf) {
-        console.log(`[WA Msg Debug] Skipping outbound fromMe=true message to: ${remoteJid}`);
-        continue;
-      }
-
-
-      const senderNumber = extractPhoneNumber(remoteJid, msg.key.participant, msg.key.remoteJidAlt);
-      const { text, hasDocument, documentFileName, unwrappedMsg } = extractMessageData(msg);
-
-      let documentBase64 = null;
-      if (hasDocument) {
-        try {
-          const buffer = await downloadMediaMessage(
-            { key: msg.key, message: unwrappedMsg },
-            'buffer',
-            {},
-            { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
-          );
-          if (buffer) {
-            documentBase64 = buffer.toString('base64');
-            console.log(`[WhatsApp Inbound] Downloaded document (${buffer.length} bytes): ${documentFileName}`);
-          }
-        } catch (mediaErr) {
-          console.error(`[WhatsApp Inbound] Error downloading document:`, mediaErr.message);
-        }
-      }
-
-      if (!text && !hasDocument) continue;
-
-      console.log(`[WhatsApp Inbound] 📩 Direct message received from ${senderNumber} (Push: ${msg.pushName || 'Anon'}): "${text.substring(0, 50)}"`);
-
-      // Persist auth keys to Supabase
-      scheduleAuthBackup();
-
-      // Forward to Python backend asynchronously
-      forwardToBackendWebhook({
-        sender: senderNumber,
-        jid: remoteJid,
-        is_group: false,
-        text: text,
-        push_name: msg.pushName || '',
-        has_document: hasDocument,
-        document_file_name: documentFileName,
-        document_base64: documentBase64,
-        timestamp: msg.messageTimestamp,
-        bot_phone: connectedNumber || ''
-      }).catch(err => {
-        console.error(`[WhatsApp Inbound] Error in forward webhook handler:`, err.message);
+  async clearAuthFromSupabase() {
+    if (!AUTH_BACKUP_ENABLED) return;
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/leads?id=eq.whatsapp_auth_${this.agencyId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'apikey': SUPABASE_KEY
+        },
+        signal: AbortSignal.timeout(5000)
       });
+      console.log(`[Session Backup] Deleted whatsapp_auth_${this.agencyId} from Supabase`);
+    } catch (err) {
+      console.error(`[Session Backup] Error deleting auth from Supabase for ${this.agencyId}:`, err.message);
     }
-  });
+  }
 }
 
-startWhatsApp();
+function getOrCreateSession(rawAgencyId) {
+  const agencyId = sanitizeAgencyId(rawAgencyId);
+  if (!sessions.has(agencyId)) {
+    const s = new AgencySession(agencyId);
+    sessions.set(agencyId, s);
+  }
+  return sessions.get(agencyId);
+}
 
-// ─── API Endpoints ────────────────────────────────────────────────────────────
+// ─── Helpers: Message extraction & webhook forwarding ─────────────────────────
+function extractPhoneNumber(remoteJid, participant, remoteJidAlt) {
+  const rawJid = participant || remoteJidAlt || remoteJid || '';
+  const numPart = rawJid.split('@')[0] || '';
+  return numPart.split(':')[0].replace(/[^0-9]/g, '');
+}
 
-// Health check + keep-alive target
-app.get('/healthz', (req, res) => {
-  lastActivityAt = Date.now();
-  res.json({
-    status: 'ok',
-    whatsapp_connected: isConnected,
-    phone: connectedNumber,
-    messages_sent_today: messagesSentToday,
-    session_backup: AUTH_BACKUP_ENABLED ? 'supabase' : 'local_only',
-    uptime_seconds: Math.floor(process.uptime())
-  });
-});
+function extractMessageData(m) {
+  let depth = 0;
+  while (depth < 6) {
+    if (m.ephemeralMessage?.message) {
+      m = m.ephemeralMessage.message;
+    } else if (m.viewOnceMessage?.message) {
+      m = m.viewOnceMessage.message;
+    } else if (m.viewOnceMessageV2?.message) {
+      m = m.viewOnceMessageV2.message;
+    } else if (m.documentWithCaptionMessage?.message) {
+      m = m.documentWithCaptionMessage.message;
+    } else {
+      break;
+    }
+    depth++;
+  }
+
+  const text = (
+    m.conversation ||
+    m.extendedTextMessage?.text ||
+    m.imageMessage?.caption ||
+    m.documentMessage?.caption ||
+    m.videoMessage?.caption ||
+    m.buttonsResponseMessage?.selectedButtonId ||
+    m.listResponseMessage?.singleSelectReply?.selectedRowId ||
+    m.templateButtonReplyMessage?.selectedId ||
+    m.documentMessage?.fileName ||
+    ''
+  ).trim();
+
+  const doc = m.documentMessage || null;
+  return {
+    text,
+    hasDocument: !!doc,
+    documentFileName: doc?.fileName || null,
+    unwrappedMsg: m
+  };
+}
+
+async function forwardToBackendWebhook(payload) {
+  const candidateUrls = [
+    `http://127.0.0.1:${BACKEND_PORT}/api/whatsapp/inbound-webhook`,
+    `http://localhost:${BACKEND_PORT}/api/whatsapp/inbound-webhook`,
+    `http://127.0.0.1:10000/api/whatsapp/inbound-webhook`,
+    `https://dubai-capital-radar.onrender.com/api/whatsapp/inbound-webhook`
+  ];
+
+  for (const targetUrl of candidateUrls) {
+    try {
+      const res = await fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(15000)
+      });
+      if (res.ok) {
+        console.log(`✅ [Webhook -> Backend] Delivered to ${targetUrl} (Agency: ${payload.agency_id || 'n/a'}, Sender: ${payload.sender})`);
+        return true;
+      }
+    } catch (err) {}
+  }
+  return false;
+}
+
+// ─── Socket Lifecycle per Session ─────────────────────────────────────────────
+async function startSession(agencyId) {
+  const session = getOrCreateSession(agencyId);
+  if (session.isStarting) return;
+  session.isStarting = true;
+
+  try {
+    const credsExist = fs.existsSync(path.join(session.authDir, 'creds.json'));
+    if (!credsExist) {
+      console.log(`[Startup - ${session.agencyId}] No local creds.json found. Checking Supabase...`);
+      await session.restoreAuthFromSupabase();
+    }
+
+    const { state, saveCreds } = await useMultiFileAuthState(session.authDir);
+    const { version } = await fetchLatestBaileysVersion();
+
+    session.sock = makeWASocket({
+      version,
+      logger: pino({ level: 'silent' }),
+      auth: state,
+      browser: Browsers.ubuntu(`Radar-${session.agencyId}`),
+      syncFullHistory: false,
+      generateHighQualityLinkPreview: false,
+      markOnlineOnConnect: true,
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 60000,
+      keepAliveIntervalMs: 25000,
+      retryRequestDelayMs: 2000,
+      maxMsgRetryCount: 5,
+      getMessage: async (key) => {
+        if (!key?.id) return undefined;
+        if (messageStore.has(key.id)) return messageStore.get(key.id);
+        await restoreMessageStoreFromSupabase();
+        return messageStore.get(key.id);
+      }
+    });
+
+    session.sock.ev.on('creds.update', async () => {
+      try {
+        await saveCreds();
+        session.scheduleBackup(2000);
+      } catch (e) {
+        console.error(`[creds.update - ${session.agencyId}] Error:`, e.message);
+      }
+    });
+
+    session.sock.ev.on('connection.update', async (update) => {
+      const { connection, lastDisconnect, qr } = update;
+
+      if (qr) {
+        session.currentQR = await QRCode.toDataURL(qr, {
+          width: 360,
+          margin: 4,
+          errorCorrectionLevel: 'M',
+          color: { dark: '#000000', light: '#ffffff' }
+        });
+        console.log(`[WhatsApp - ${session.agencyId}] New QR code generated. Ready for scanning.`);
+      }
+
+      if (connection === 'close') {
+        session.isConnected = false;
+        session.connectedNumber = null;
+        const code = lastDisconnect?.error?.output?.statusCode;
+        const shouldReconnect = code !== DisconnectReason.loggedOut;
+        console.log(`[WhatsApp - ${session.agencyId}] Connection closed (code: ${code}). Reconnecting: ${shouldReconnect}`);
+        if (shouldReconnect) {
+          const delay = code === 428 ? 10000 : 3000;
+          setTimeout(() => startSession(session.agencyId), delay);
+        } else {
+          console.log(`[WhatsApp - ${session.agencyId}] Logged out - clearing session`);
+          await session.clearAuthFromSupabase();
+          if (fs.existsSync(session.authDir)) {
+            fs.rmSync(session.authDir, { recursive: true, force: true });
+            fs.mkdirSync(session.authDir, { recursive: true });
+          }
+        }
+      } else if (connection === 'open') {
+        session.isConnected = true;
+        session.currentQR = null;
+        session.lastActivityAt = Date.now();
+        const rawId = session.sock.user?.id || '';
+        session.connectedNumber = rawId.split(':')[0] || rawId.split('@')[0];
+        console.log(`🎉 [WhatsApp - ${session.agencyId}] Connected successfully as +${session.connectedNumber}`);
+        session.scheduleBackup(1000);
+      }
+    });
+
+    session.sock.ev.on('messages.upsert', async ({ messages, type }) => {
+      if (type !== 'notify' && type !== 'append') return;
+
+      for (const msg of messages) {
+        if (!msg.message) continue;
+
+        if (msg.key && msg.key.id) {
+          saveToMessageStore(msg.key.id, msg.message);
+        }
+
+        const remoteJid = msg.key.remoteJid || '';
+        const isGroup = remoteJid.endsWith('@g.us') || remoteJid.includes('@g.us');
+        const isBroadcast = remoteJid === 'status@broadcast' || remoteJid.includes('broadcast');
+
+        if (isGroup || isBroadcast) continue;
+
+        if (msg.key?.id && programmaticSentIds.has(msg.key.id)) continue;
+
+        const isChatWithSelf = session.connectedNumber && (remoteJid.includes(session.connectedNumber) || remoteJid.startsWith(session.connectedNumber));
+        if (msg.key.fromMe && !isChatWithSelf) continue;
+
+        const senderNumber = extractPhoneNumber(remoteJid, msg.key.participant, msg.key.remoteJidAlt);
+        const { text, hasDocument, documentFileName, unwrappedMsg } = extractMessageData(msg);
+
+        let documentBase64 = null;
+        if (hasDocument) {
+          try {
+            const buffer = await downloadMediaMessage(
+              { key: msg.key, message: unwrappedMsg },
+              'buffer',
+              {},
+              { logger: pino({ level: 'silent' }), reuploadRequest: session.sock.updateMediaMessage }
+            );
+            if (buffer) {
+              documentBase64 = buffer.toString('base64');
+            }
+          } catch (e) {}
+        }
+
+        if (!text && !hasDocument) continue;
+
+        console.log(`[Inbound - ${session.agencyId}] Message from ${senderNumber}: "${text.substring(0, 50)}"`);
+        session.scheduleBackup();
+
+        forwardToBackendWebhook({
+          agency_id: session.agencyId,
+          sender: senderNumber,
+          jid: remoteJid,
+          is_group: false,
+          text: text,
+          push_name: msg.pushName || '',
+          has_document: hasDocument,
+          document_file_name: documentFileName,
+          document_base64: documentBase64,
+          timestamp: msg.messageTimestamp,
+          bot_phone: session.connectedNumber || ''
+        });
+      }
+    });
+
+  } catch (err) {
+    console.error(`[StartSession - ${session.agencyId}] Error:`, err.message);
+    setTimeout(() => startSession(session.agencyId), 5000);
+  } finally {
+    session.isStarting = false;
+  }
+}
+
+// ─── Bootstrap All Saved Sessions On Startup ──────────────────────────────────
+async function bootstrapAllSessions() {
+  await restoreMessageStoreFromSupabase();
+
+  // 1. Check local subdirectories
+  const localAgencyIds = new Set();
+  if (fs.existsSync(AUTH_BASE_DIR)) {
+    for (const f of fs.readdirSync(AUTH_BASE_DIR)) {
+      const fullP = path.join(AUTH_BASE_DIR, f);
+      if (fs.statSync(fullP).isDirectory() && f !== 'node_modules') {
+        localAgencyIds.add(f);
+      }
+    }
+  }
+
+  // 2. Discover agencies in Supabase
+  if (AUTH_BACKUP_ENABLED) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/leads?id=like.whatsapp_auth_%25&select=id,phone`, {
+        headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'apikey': SUPABASE_KEY },
+        signal: AbortSignal.timeout(10000)
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        for (const r of rows) {
+          const rawId = r.id || '';
+          if (rawId === 'whatsapp_auth_session') {
+            // Legacy single-session record: map to agency_bd_surprisetourism_com
+            localAgencyIds.add('agency_bd_surprisetourism_com');
+          } else if (rawId.startsWith('whatsapp_auth_')) {
+            const agId = rawId.replace('whatsapp_auth_', '');
+            if (agId) localAgencyIds.add(agId);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Bootstrap] Supabase query warning:', e.message);
+    }
+  }
+
+  // 3. Always ensure primary agencies are registered
+  localAgencyIds.add('agency_bd_surprisetourism_com');
+  localAgencyIds.add('agency_master');
+
+  console.log(`[Multi-Session Bootstrap] Initializing ${localAgencyIds.size} agencies:`, Array.from(localAgencyIds));
+
+  // Initialize and spin up sockets
+  for (const agId of localAgencyIds) {
+    const s = getOrCreateSession(agId);
+    startSession(s.agencyId);
+  }
+}
+
+// ─── REST API Routes ──────────────────────────────────────────────────────────
+
+function resolveTargetSession(req) {
+  const reqAgency = req.query?.agency_id || req.body?.agency_id;
+  if (reqAgency && reqAgency !== 'all') {
+    return getOrCreateSession(reqAgency);
+  }
+  // If no agency provided, check if agency_master is connected
+  const master = sessions.get('agency_master');
+  if (master && master.isConnected) return master;
+
+  // Otherwise, return first connected session (e.g. Surprise Tourism)
+  for (const [_, s] of sessions.entries()) {
+    if (s.isConnected && s.sock) return s;
+  }
+  return master || getOrCreateSession('agency_master');
+}
 
 app.get('/status', (req, res) => {
-  lastActivityAt = Date.now();
-  res.json({
-    connected: isConnected,
-    phone: connectedNumber,
-    has_qr: !!currentQR
+  const reqAgency = req.query?.agency_id;
+  if (reqAgency === 'all') {
+    const all = {};
+    for (const [id, s] of sessions.entries()) {
+      all[id] = {
+        connected: s.isConnected,
+        phone: s.connectedNumber,
+        has_qr: !!s.currentQR,
+        agency_id: id
+      };
+    }
+    return res.json({ sessions: all, count: sessions.size });
+  }
+
+  const s = resolveTargetSession(req);
+  s.lastActivityAt = Date.now();
+  return res.json({
+    agency_id: s.agencyId,
+    connected: s.isConnected,
+    phone: s.connectedNumber,
+    has_qr: !!s.currentQR,
+    gateway_online: true
   });
 });
 
 app.get('/qr', (req, res) => {
-  res.json({
-    connected: isConnected,
-    qr: currentQR,
-    phone: connectedNumber
+  const s = resolveTargetSession(req);
+  return res.json({
+    agency_id: s.agencyId,
+    connected: s.isConnected,
+    qr: s.currentQR,
+    phone: s.connectedNumber
   });
 });
 
 app.post('/send', async (req, res) => {
   try {
-    const { to, message, image_path, image_url, jid: directJid } = req.body;
+    const { to, message, image_path, image_url, jid: directJid, agency_id } = req.body;
 
     if ((!to && !directJid) || (!message && !image_path && !image_url)) {
       return res.status(400).json({ error: 'Missing recipient phone number or content' });
     }
 
-    if (!isConnected || !sock) {
-      return res.status(503).json({ 
-        success: false, 
-        error: 'WhatsApp not connected. Please scan QR code.',
-        has_qr: !!currentQR
+    const s = resolveTargetSession(req);
+    if (!s || !s.isConnected || !s.sock) {
+      return res.status(503).json({
+        success: false,
+        error: `WhatsApp no conectado para la agencia ${s ? s.agencyId : 'solicitada'}. Por favor escanea el código QR.`,
+        has_qr: !!s?.currentQR,
+        agency_id: s?.agencyId || null
       });
     }
 
     const cleanNumber = (to || '').replace(/[^0-9]/g, '');
 
-    // Resolve target JID: if directJid provided (e.g. from incoming chat or @lid), prioritize it!
     let jid = directJid;
     if (!jid) {
       if (!cleanNumber) {
@@ -704,165 +700,111 @@ app.post('/send', async (req, res) => {
       }
       jid = `${cleanNumber}@s.whatsapp.net`;
 
-      // Try onWhatsApp to refine JID, but never block sending if onWhatsApp fails or is rate-limited
       try {
-        const checkResults = await sock.onWhatsApp(cleanNumber);
+        const checkResults = await s.sock.onWhatsApp(cleanNumber);
         const onWa = Array.isArray(checkResults) ? checkResults[0] : checkResults;
         if (onWa && onWa.exists && onWa.jid) {
           jid = onWa.jid;
         } else if (onWa && onWa.exists === false) {
-          console.log(`[WhatsApp] Number ${cleanNumber} does NOT exist on WhatsApp. Skipping send.`);
+          console.log(`[WhatsApp - ${s.agencyId}] Number ${cleanNumber} does NOT exist on WhatsApp. Skipping send.`);
           return res.status(404).json({ success: false, error: 'El número no tiene cuenta de WhatsApp registrada', exists: false, phone: cleanNumber });
         }
       } catch (onWaErr) {
-        console.warn(`[WhatsApp] onWhatsApp check warning for ${cleanNumber}:`, onWaErr.message);
+        console.warn(`[WhatsApp - ${s.agencyId}] onWhatsApp check warning for ${cleanNumber}:`, onWaErr.message);
       }
     }
 
-    console.log(`[WhatsApp] Dispatching to JID: ${jid} (to: ${to || 'direct'})...`);
+    console.log(`[WhatsApp - ${s.agencyId}] Dispatching to JID: ${jid} (to: ${to || 'direct'})...`);
 
     try {
       const hasValidImage = image_path && fs.existsSync(image_path) && fs.statSync(image_path).size > 1000;
       let sentMsg = null;
       if (hasValidImage) {
         const imageBuffer = fs.readFileSync(image_path);
-        sentMsg = await sock.sendMessage(jid, { image: imageBuffer, caption: message || '' });
+        sentMsg = await s.sock.sendMessage(jid, { image: imageBuffer, caption: message || '' });
       } else if (image_url) {
-        sentMsg = await sock.sendMessage(jid, { image: { url: image_url }, caption: message || '' });
+        sentMsg = await s.sock.sendMessage(jid, { image: { url: image_url }, caption: message || '' });
       } else {
-        sentMsg = await sock.sendMessage(jid, { text: message });
+        sentMsg = await s.sock.sendMessage(jid, { text: message });
       }
 
-      // Store in memory for Baileys retry handlers so recipients never get stuck on "Waiting for this message"
       if (sentMsg?.key?.id && sentMsg?.message) {
         saveToMessageStore(sentMsg.key.id, sentMsg.message);
         recordProgrammaticSend(sentMsg.key.id);
       }
-      // Persist auth ratchet state
-      scheduleAuthBackup();
 
-      resetDailyCounterIfNeeded();
-      messagesSentToday++;
-      lastActivityAt = Date.now();
-      console.log(`[WhatsApp] Message delivered to ${jid} (ID: ${sentMsg?.key?.id || 'n/a'})`);
-      return res.json({ success: true, delivered_to: cleanNumber || jid, jid, message_id: sentMsg?.key?.id, exists: true });
+      s.scheduleBackup();
+      s.resetDailyCounterIfNeeded();
+      s.messagesSentToday++;
+      s.lastActivityAt = Date.now();
+
+      return res.json({
+        success: true,
+        agency_id: s.agencyId,
+        delivered_to: cleanNumber || jid,
+        jid,
+        message_id: sentMsg?.key?.id,
+        exists: true
+      });
 
     } catch (sendErr) {
-      console.error(`[WhatsApp] Send error for ${jid}:`, sendErr.message);
-      if (cleanNumber && jid !== `${cleanNumber}@s.whatsapp.net`) {
-        const fallbackJid = `${cleanNumber}@s.whatsapp.net`;
-        console.log(`[WhatsApp] Retrying dispatch to standard JID: ${fallbackJid}...`);
-        try {
-          let retryMsg = null;
-          if (hasValidImage) {
-            const imageBuffer = fs.readFileSync(image_path);
-            retryMsg = await sock.sendMessage(fallbackJid, { image: imageBuffer, caption: message || '' });
-          } else if (image_url) {
-            retryMsg = await sock.sendMessage(fallbackJid, { image: { url: image_url }, caption: message || '' });
-          } else {
-            retryMsg = await sock.sendMessage(fallbackJid, { text: message });
-          }
-          if (retryMsg?.key?.id && retryMsg?.message) {
-            saveToMessageStore(retryMsg.key.id, retryMsg.message);
-            recordProgrammaticSend(retryMsg.key.id);
-          }
-          scheduleAuthBackup();
-          resetDailyCounterIfNeeded();
-          messagesSentToday++;
-          lastActivityAt = Date.now();
-          console.log(`[WhatsApp] Fallback delivered to ${fallbackJid} (ID: ${retryMsg?.key?.id || 'n/a'})`);
-          return res.json({ success: true, delivered_to: cleanNumber, jid: fallbackJid, message_id: retryMsg?.key?.id, exists: true });
-        } catch (retryErr) {
-          console.error(`[WhatsApp] Fallback retry failed for ${fallbackJid}:`, retryErr.message);
-        }
-      }
-      return res.status(500).json({ success: false, error: sendErr.message });
+      console.error(`[WhatsApp - ${s.agencyId}] Send error for ${jid}:`, sendErr.message);
+      return res.status(500).json({ success: false, error: sendErr.message, agency_id: s.agencyId });
     }
 
   } catch (err) {
-    console.error('[WhatsApp] Internal error:', err.message);
+    console.error('[WhatsApp] Internal error in /send:', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Verify multiple numbers at once
 app.post('/verify-numbers', async (req, res) => {
   try {
     const { numbers } = req.body;
-    if (!isConnected || !sock) {
-      return res.status(503).json({ error: 'WhatsApp not connected' });
+    const s = resolveTargetSession(req);
+    if (!s || !s.isConnected || !s.sock) {
+      return res.status(503).json({ error: 'WhatsApp not connected for verification' });
     }
     const results = [];
     for (const num of numbers) {
       const clean = num.replace(/[^0-9]/g, '');
       try {
-        const checkResults = await sock.onWhatsApp(clean);
+        const checkResults = await s.sock.onWhatsApp(clean);
         const onWa = Array.isArray(checkResults) ? checkResults[0] : checkResults;
         results.push({ phone: num, clean, exists: !!onWa?.exists, jid: onWa?.jid || null });
       } catch (e) {
         results.push({ phone: num, clean, exists: false, error: e.message });
       }
     }
-    return res.json({ results });
+    return res.json({ results, agency_id: s.agencyId });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
 });
 
-// Endpoint: Reset encryption session for a specific contact (forces fresh Signal pre-key handshake)
-app.post('/reset-contact-session', async (req, res) => {
-  try {
-    const { phone } = req.body;
-    if (!phone) return res.status(400).json({ error: 'Missing phone' });
-    const clean = phone.replace(/[^0-9]/g, '');
-    let deletedCount = 0;
-    
-    if (fs.existsSync(AUTH_DIR)) {
-      const files = fs.readdirSync(AUTH_DIR);
-      for (const f of files) {
-        if (f.startsWith(`session-${clean}`) || f.includes(clean)) {
-          try {
-            fs.unlinkSync(path.join(AUTH_DIR, f));
-            deletedCount++;
-          } catch (e) {}
-        }
-      }
-    }
-    
-    // Update Supabase backup
-    if (AUTH_BACKUP_ENABLED) {
-      await uploadAuthToSupabase();
-    }
-    
-    console.log(`[Session Reset] Cleared ${deletedCount} session files for +${clean}`);
-    return res.json({ success: true, phone: clean, deleted_files: deletedCount });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// Endpoint: Generate 8-digit Pairing Code for phone number (No camera / QR scan needed)
 app.post('/pairing-code', async (req, res) => {
   try {
+    const s = resolveTargetSession(req);
     const { phone } = req.body;
     if (!phone) {
       return res.status(400).json({ success: false, error: 'Falta el número de teléfono' });
     }
     const cleanNumber = phone.replace(/[^0-9]/g, '');
     if (!cleanNumber || cleanNumber.length < 8) {
-      return res.status(400).json({ success: false, error: 'Número inválido. Incluye prefijo de país (ej. 971501378020 o 34600000000).' });
+      return res.status(400).json({ success: false, error: 'Número inválido. Incluye prefijo de país.' });
     }
-    if (isConnected) {
-      return res.json({ success: false, error: `Ya está conectado como +${connectedNumber}` });
+    if (s.isConnected) {
+      return res.json({ success: false, error: `Ya está conectado como +${s.connectedNumber} para ${s.agencyId}` });
     }
-    if (!sock || typeof sock.requestPairingCode !== 'function') {
+    if (!s.sock || typeof s.sock.requestPairingCode !== 'function') {
       return res.status(503).json({ success: false, error: 'El servicio WhatsApp se está iniciando. Espera unos segundos e intenta nuevamente.' });
     }
-    const rawCode = await sock.requestPairingCode(cleanNumber);
+    const rawCode = await s.sock.requestPairingCode(cleanNumber);
     const formattedCode = rawCode?.match(/.{1,4}/g)?.join('-') || rawCode;
-    console.log(`[WhatsApp] Pairing code generated for +${cleanNumber}: ${formattedCode}`);
+    console.log(`[WhatsApp - ${s.agencyId}] Pairing code generated for +${cleanNumber}: ${formattedCode}`);
     return res.json({
       success: true,
+      agency_id: s.agencyId,
       code: formattedCode,
       raw_code: rawCode,
       phone: cleanNumber
@@ -875,39 +817,20 @@ app.post('/pairing-code', async (req, res) => {
 
 app.post('/restore-session', async (req, res) => {
   try {
-    if (sock) {
-      try { sock.end(undefined); } catch (_) {}
+    const s = resolveTargetSession(req);
+    if (s.sock) {
+      try { s.sock.end(undefined); } catch (_) {}
     }
-    const success = await restoreAuthFromSupabase();
+    const success = await s.restoreAuthFromSupabase();
     if (success) {
-      isConnected = false;
-      connectedNumber = null;
-      currentQR = null;
-      setTimeout(startWhatsApp, 1500);
-      return res.json({ success: true, message: 'Sesión restaurada desde Supabase. Reconectando WhatsApp...' });
+      s.isConnected = false;
+      s.connectedNumber = null;
+      s.currentQR = null;
+      setTimeout(() => startSession(s.agencyId), 1500);
+      return res.json({ success: true, message: `Sesión de ${s.agencyId} restaurada desde Supabase. Reconectando WhatsApp...` });
     } else {
-      return res.status(500).json({ success: false, error: 'No se pudo restaurar la sesión desde Supabase' });
+      return res.status(500).json({ success: false, error: `No se pudo restaurar la sesión para ${s.agencyId}` });
     }
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-app.post('/force-clear-restart', async (req, res) => {
-  try {
-    if (sock) {
-      try { await sock.logout(); } catch (e) { try { sock.end(undefined); } catch (_) {} }
-    }
-    if (fs.existsSync(AUTH_DIR)) {
-      fs.rmSync(AUTH_DIR, { recursive: true, force: true });
-      fs.mkdirSync(AUTH_DIR, { recursive: true });
-    }
-    await clearAuthFromSupabase();
-    isConnected = false;
-    currentQR = null;
-    connectedNumber = null;
-    setTimeout(startWhatsApp, 2000);
-    return res.json({ success: true, message: 'Cleared and restarting...' });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -915,25 +838,47 @@ app.post('/force-clear-restart', async (req, res) => {
 
 app.post('/logout', async (req, res) => {
   try {
-    if (sock) {
-      try { await sock.logout(); } catch (e) { try { sock.end(undefined); } catch (_) {} }
+    const s = resolveTargetSession(req);
+    if (s.sock) {
+      try { await s.sock.logout(); } catch (e) { try { s.sock.end(undefined); } catch (_) {} }
     }
-    await clearAuthFromSupabase();
-    if (fs.existsSync(AUTH_DIR)) {
-      fs.rmSync(AUTH_DIR, { recursive: true, force: true });
-      fs.mkdirSync(AUTH_DIR, { recursive: true });
+    await s.clearAuthFromSupabase();
+    if (fs.existsSync(s.authDir)) {
+      fs.rmSync(s.authDir, { recursive: true, force: true });
+      fs.mkdirSync(s.authDir, { recursive: true });
     }
-    isConnected = false;
-    currentQR = null;
-    connectedNumber = null;
-    setTimeout(startWhatsApp, 1500);
-    return res.json({ success: true, message: 'Logged out and restarted' });
+    s.isConnected = false;
+    s.currentQR = null;
+    s.connectedNumber = null;
+    setTimeout(() => startSession(s.agencyId), 1500);
+    return res.json({ success: true, message: `Sesión de ${s.agencyId} cerrada y reiniciada.` });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Transparent Fallback: If any request (e.g. GET / or UI assets) hits this gateway directly, forward to Python FastAPI
+app.post('/force-clear-restart', async (req, res) => {
+  try {
+    const s = resolveTargetSession(req);
+    if (s.sock) {
+      try { await s.sock.logout(); } catch (e) { try { s.sock.end(undefined); } catch (_) {} }
+    }
+    if (fs.existsSync(s.authDir)) {
+      fs.rmSync(s.authDir, { recursive: true, force: true });
+      fs.mkdirSync(s.authDir, { recursive: true });
+    }
+    await s.clearAuthFromSupabase();
+    s.isConnected = false;
+    s.currentQR = null;
+    s.connectedNumber = null;
+    setTimeout(() => startSession(s.agencyId), 2000);
+    return res.json({ success: true, message: `Sesión de ${s.agencyId} reseteada y reiniciando...` });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Transparent Fallback to FastAPI
 app.use(async (req, res) => {
   try {
     const backendUrl = `http://127.0.0.1:${BACKEND_PORT}${req.originalUrl || req.url}`;
@@ -961,13 +906,12 @@ app.use(async (req, res) => {
     const buf = await bRes.arrayBuffer();
     return res.send(Buffer.from(buf));
   } catch (err) {
-    console.error(`[Gateway Proxy Fallback] Error forwarding to backend:`, err.message);
     return res.status(502).json({ error: 'Backend unreachable', details: err.message });
   }
 });
 
 app.listen(GATEWAY_PORT, '0.0.0.0', () => {
-  console.log(`[WhatsApp Gateway] Running on port ${GATEWAY_PORT}`);
-  console.log(`[Session Backup] Supabase: ${AUTH_BACKUP_ENABLED ? 'ENABLED' : 'DISABLED (set SUPABASE_URL + SUPABASE_SERVICE_KEY)'}`);
-  console.log(`[Keep-Alive] Self-ping: ${SELF_URL ? 'ENABLED' : 'DISABLED (set SELF_URL)'}`);
+  console.log(`[WhatsApp Gateway Multi-Tenant] Running on port ${GATEWAY_PORT}`);
+  console.log(`[Session Backup] Supabase: ${AUTH_BACKUP_ENABLED ? 'ENABLED' : 'DISABLED'}`);
+  bootstrapAllSessions();
 });

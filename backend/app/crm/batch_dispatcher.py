@@ -118,7 +118,9 @@ class CampaignBatchManager:
                         if os.path.exists(madrid_flyer) and os.path.getsize(madrid_flyer) > 1000:
                             effective_image = madrid_flyer
 
+                agency_id = lead.get("agency_id") or ("agency_bd_surprisetourism_com" if is_tourism else "agency_master")
                 payload = {
+                    "agency_id": agency_id,
                     "to": phone,
                     "message": message,
                     "image_path": effective_image
