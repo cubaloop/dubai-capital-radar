@@ -189,6 +189,9 @@ def init_crm_db():
     # Hydrate sent/failed lead statuses from Supabase so redeploys never repeat leads
     hydrate_leads_from_supabase(conn)
 
+    # Hydrate custom campaigns & leads uploaded via Excel from Supabase
+    hydrate_campaigns_from_supabase(conn)
+
     conn.close()
 
     # Hydrate agency configs (admin_phone, bot_phone, etc.) from Supabase
@@ -233,6 +236,111 @@ def hydrate_leads_from_supabase(conn):
                 print(f"[Supabase Hydration] Restored sent/failed status for {updated} leads from cloud database")
     except Exception as e:
         print("[Supabase Hydration] Warning:", e)
+
+def backup_campaign_to_supabase(campaign_id: str):
+    """Backs up a full campaign and its leads to Supabase leads table under camp_data_<id>."""
+    if not SUPABASE_URL or not SUPABASE_KEY or not campaign_id:
+        return
+    try:
+        camp = get_campaign_by_id(campaign_id)
+        if not camp:
+            return
+        leads = get_leads_by_campaign(campaign_id)
+        bundle = {
+            "campaign": dict(camp),
+            "leads": [dict(l) for l in leads]
+        }
+        bundle_json = json.dumps(bundle, ensure_ascii=False)
+        record = {
+            "id": f"camp_data_{campaign_id}",
+            "name": camp.get("name", "Campaign"),
+            "email": "system@dubaicapitalradar.com",
+            "phone": "+971501378020",
+            "country": "CampaignBundle",
+            "budget_eur": len(leads),
+            "status": "active",
+            "comments": bundle_json
+        }
+        req = urllib.request.Request(
+            f"{SUPABASE_URL}/rest/v1/leads",
+            data=json.dumps([record]).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "apikey": SUPABASE_KEY,
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates"
+            },
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            pass
+    except Exception as e:
+        print(f"[Supabase Campaign Backup] Warning for {campaign_id}: {e}")
+
+def hydrate_campaigns_from_supabase(conn):
+    """Restores all custom uploaded campaigns and leads from Supabase on system startup."""
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return
+    try:
+        req = urllib.request.Request(
+            f"{SUPABASE_URL}/rest/v1/leads?id=like.camp_data_%&select=id,comments",
+            headers={
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "apikey": SUPABASE_KEY
+            }
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            rows = json.loads(resp.read().decode("utf-8"))
+            if not rows:
+                return
+            cursor = conn.cursor()
+            restored_count = 0
+            for r in rows:
+                comments_raw = r.get("comments")
+                if not comments_raw:
+                    continue
+                try:
+                    data = json.loads(comments_raw)
+                    camp = data.get("campaign", {})
+                    leads = data.get("leads", [])
+                    cid = camp.get("id")
+                    if not cid:
+                        continue
+                    
+                    cursor.execute("""
+                    INSERT OR REPLACE INTO campaigns (id, name, category, description, attached_flyer, ai_prompt_instructions, agency_id, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        cid, camp.get("name"), camp.get("category"), camp.get("description"),
+                        camp.get("attached_flyer"), camp.get("ai_prompt_instructions"),
+                        camp.get("agency_id"), camp.get("created_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    ))
+                    
+                    for l in leads:
+                        cursor.execute("""
+                        INSERT OR REPLACE INTO leads (
+                            id, campaign_id, name, phone, clean_phone, email,
+                            budget_aed, budget_eur, objective, timeline, notes,
+                            crm_status, whatsapp_status, last_contact_date, last_sent_type,
+                            personalized_message, next_reminder_date, agency_id, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            l.get("id"), cid, l.get("name"), l.get("phone"), l.get("clean_phone"),
+                            l.get("email"), l.get("budget_aed"), l.get("budget_eur"),
+                            l.get("objective"), l.get("timeline"), l.get("notes"),
+                            l.get("crm_status", "CREATED"), l.get("whatsapp_status", "pending"),
+                            l.get("last_contact_date"), l.get("last_sent_type"),
+                            l.get("personalized_message"), l.get("next_reminder_date"),
+                            l.get("agency_id"), l.get("created_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        ))
+                    restored_count += 1
+                except Exception as row_err:
+                    print(f"[Supabase Campaign Restore] Row error: {row_err}")
+            conn.commit()
+            if restored_count > 0:
+                print(f"[Supabase Hydration] Restored {restored_count} custom campaigns from cloud.")
+    except Exception as e:
+        print(f"[Supabase Hydration] Warning during campaign restore: {e}")
 
 def seed_latam_campaign(conn):
     cursor = conn.cursor()
@@ -674,6 +782,7 @@ def create_campaign_with_leads(campaign_data: Dict[str, Any], leads_data: List[D
 
     conn.commit()
     conn.close()
+    backup_campaign_to_supabase(cid)
     return {"id": cid, "name": cname, "total_leads": len(leads_data)}
 
 def get_leads_by_campaign(campaign_id: str) -> List[Dict[str, Any]]:
@@ -972,6 +1081,7 @@ def update_single_lead_message(lead_id: str, new_message: str) -> bool:
     conn.close()
     if updated_lead:
         sync_lead_background(dict(updated_lead))
+        backup_campaign_to_supabase(updated_lead["campaign_id"])
     return True
 
 async def regenerate_campaign_lead_messages(campaign_id: str, new_prompt: Optional[str] = None, only_pending: bool = True) -> Dict[str, Any]:

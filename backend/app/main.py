@@ -691,6 +691,7 @@ from .database.crm_db import (
     get_leads_by_campaign,
     get_lead_by_id,
     mark_lead_whatsapp_sent,
+    mark_lead_whatsapp_failed,
     update_lead_crm_fields,
     add_lead_note_db,
     get_lead_notes_db,
